@@ -7,9 +7,9 @@ from base64 import b64encode
 async def test_authentication(test_app, local_device):
     test_client = test_app.test_client()
 
-    # # Test authenticated route without session token
-    # response = await test_client.get("/workspaces")
-    # assert response.status_code == 401
+    # Test authenticated route without session token
+    response = await test_client.get("/workspaces")
+    assert response.status_code == 401
 
     # Now proceed to the auth
     response = await test_client.post("/auth", json={"email": local_device.email, "key": b64encode(local_device.key).decode("ascii")})
