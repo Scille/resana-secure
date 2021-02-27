@@ -12,7 +12,6 @@ class APIException(HTTPException):
     def get_response(self) -> Response:
         response = jsonify(self.data)
         response.status_code = self.status_code
-        response.headers.update(**self.get_headers())
         return response
 
 
