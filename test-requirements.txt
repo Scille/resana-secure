@@ -1,2 +1,4 @@
 pytest
 pytest-trio
+pre-commit
+black==20.8b1

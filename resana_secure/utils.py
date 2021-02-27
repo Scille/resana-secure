@@ -19,6 +19,7 @@ class ReadWriteLock:
     """
     Reader/writer lock with priority of writer
     """
+
     def __init__(self) -> None:
         self._lock = trio.Lock()
         self._no_writers = trio.Event()

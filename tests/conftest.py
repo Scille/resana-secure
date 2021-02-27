@@ -32,7 +32,13 @@ async def test_app(core_config_dir):
 async def authenticated_client(test_app, local_device):
     test_client = test_app.test_client()
 
-    response = await test_client.post("/auth", json={"email": local_device.email, "key": b64encode(local_device.key).decode("ascii")})
+    response = await test_client.post(
+        "/auth",
+        json={
+            "email": local_device.email,
+            "key": b64encode(local_device.key).decode("ascii"),
+        },
+    )
     assert response.status_code == 200
     # Note cookie is automatically added to test_client's cookie jar
     return test_client
@@ -58,8 +64,10 @@ async def running_backend():
     )
     async with backend_app_factory(config) as backend:
         async with trio.open_service_nursery() as nursery:
-            host = '127.0.0.1'
-            listeners = await nursery.start(partial(trio.serve_tcp, backend.handle_client, port=0, host=host))
+            host = "127.0.0.1"
+            listeners = await nursery.start(
+                partial(trio.serve_tcp, backend.handle_client, port=0, host=host)
+            )
             _, port = listeners[0].socket.getsockname()
             backend_addr = BackendAddr(hostname=host, port=port, use_ssl=False)
             yield backend_addr
@@ -72,15 +80,21 @@ def core_config_dir(tmp_path):
 
 
 LocalDeviceTestbed = namedtuple("LocalDeviceTestbed", "device,email,key")
+
+
 @pytest.fixture
 async def local_device(running_backend, core_config_dir):
     backend_addr = running_backend
     organization_id = OrganizationID("CoolOrg")
     device_label = "alice's desktop"
     key = b"P@ssw0rd."
-    password = b64encode(key).decode("ascii")  # TODO should implement&use `save_device_with_key`
+    password = b64encode(key).decode(
+        "ascii"
+    )  # TODO should implement&use `save_device_with_key`
     human_handle = HumanHandle(email="alice@example.com", label="Alice")
-    bootstrap_addr = BackendOrganizationBootstrapAddr.build(backend_addr=backend_addr, organization_id=organization_id)
+    bootstrap_addr = BackendOrganizationBootstrapAddr.build(
+        backend_addr=backend_addr, organization_id=organization_id
+    )
 
     async with apiv1_backend_anonymous_cmds_factory(addr=bootstrap_addr) as cmds:
         new_device = await bootstrap_organization(
