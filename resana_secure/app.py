@@ -3,14 +3,14 @@ import secrets
 from functools import wraps
 from uuid import uuid4
 from base64 import b64decode, b64encode
-from typing import Dict
+from typing import Dict, Type
 from quart_trio import QuartTrio
 from quart import current_app, session, request, Blueprint
 from werkzeug.routing import BaseConverter
 from contextlib import asynccontextmanager, contextmanager
 
 from parsec.api.data import EntryID
-from parsec.api.protocol import RealmRole
+from parsec.api.protocol import RealmRole, EntryName
 from parsec.core import logged_core_factory
 from parsec.core.config import load_config
 from parsec.core.local_device import (
@@ -19,9 +19,9 @@ from parsec.core.local_device import (
     LocalDeviceError,
 )
 from parsec.core.backend_connection import BackendConnectionError, BackendNotAvailable, BackendConnectionRefused
-from parsec.core.fs.exceptions import FSError, FSWorkspaceNotFoundError, FSBackendOfflineError, FSSharingNotAllowedError
+from parsec.core.fs.exceptions import FSError, FSWorkspaceNotFoundError, FSBackendOfflineError, FSSharingNotAllowedError, FSNotADirectoryError, FSFileNotFoundError, FSPermissionError, FSReadOnlyError, FSNoAccessError
 
-from .utils import APIException, ReadWriteLock
+from .utils import APIException, ReadWriteLock, json_abort
 
 
 class CoreNotLoggedError(Exception):
@@ -189,6 +189,9 @@ def check_data():
     yield bad_fields
     if bad_fields:
         raise APIException(400, {"error": "bad_data", "fields": list(bad_fields)})
+
+
+### Workspaces ###
 
 
 @api_bp.route('/workspaces', methods=["GET"])
@@ -359,6 +362,226 @@ async def share_workspace(core, workspace_id):
         raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
 
     return {}, 200
+
+
+### Folders ###
+
+
+@api_bp.route('/workspaces/<string:workspace_id>/folders', methods=["GET"])
+@authenticated
+async def get_workspace_folders_tree(core, workspace_id):
+    try:
+        workspace_id = EntryID(workspace_id)
+    except ValueError:
+        raise APIException(404, {"error": "unknown_workspace"})
+
+    try:
+        workspace = core.user_fs.get_workspace(workspace_id)
+    except FSWorkspaceNotFoundError:
+        raise APIException(404, {"error": "unknown_workspace"})
+
+    async def _recursive_build_tree(path, name):
+        entry_info = await workspace.entry_info(path=path)
+        if entry_info["type"] != "folder":
+            return None
+        cooked_children = {}
+        for child_name in entry_info["children"]:
+            child_cooked_tree = await _recursive_build_tree(path=f"{path}/{child_name}", name=child_name)
+            cooked_children[child_name] = child_cooked_tree
+        return {
+            "id": entry_info["id"].hex,
+            "name": name,
+            "created": entry_info["created"].to_iso8601_string(),
+            "updated": entry_info["updated"].to_iso8601_string(),
+            "children": cooked_children,
+        }
+
+    try:
+        cooked_tree = await _recursive_build_tree(path="/", name="/")
+    except FSWorkspaceNotFoundError:
+        raise APIException(404, {"error": "unknown_workspace"})
+    except FSBackendOfflineError:
+        raise APIException(503, {"error": "offline"})
+    except FSError as exc:
+        raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
+
+    return cooked_tree, 200
+
+
+# TODO: Parsec api should provide a way to do this
+async def entry_id_to_path(workspace, needle_entry_id):
+    async def _recursive_search(path):
+        entry_info = await workspace.entry_info(path=path)
+        if entry_info["id"] == needle_entry_id:
+            return path, entry_info
+        if entry_info["type"] == "folder":
+            for child_name in entry_info["children"]:
+                result = await _recursive_search(path=f"{path}/{child_name}")
+                if result:
+                    return result
+        return None
+    return await _recursive_search(path="/")
+
+
+@api_bp.route('/workspaces/<string:workspace_id>/folders', methods=["POST"])
+@authenticated
+async def create_workspace_folder(core, workspace_id):
+    try:
+        workspace_id = EntryID(workspace_id)
+    except ValueError:
+        raise APIException(404, {"error": "unknown_workspace"})
+
+    try:
+        workspace = core.user_fs.get_workspace(workspace_id)
+    except FSWorkspaceNotFoundError:
+        raise APIException(404, {"error": "unknown_workspace"})
+
+    data = await request.get_json()
+    with check_data() as bad_fields:
+        name = data.get("name")
+        try:
+            name = EntryName(name)
+        except (TypeError, ValueError):
+            bad_fields.add("name")
+        parent_entry_id = data.get("parent")
+        try:
+            parent_entry_id = EntryID(parent_entry_id)
+        except (TypeError, ValueError):
+            bad_fields.add("parent")
+
+    result = await entry_id_to_path(workspace, parent_entry_id)
+    if not result:
+        raise APIException(404, {"error": "unknown_parent"})
+
+    try:
+        path, _ = result
+        await workspace.mkdir(path=path)
+    except FSWorkspaceNotFoundError:
+        raise APIException(404, {"error": "unknown_workspace"})
+    except FSBackendOfflineError:
+        raise APIException(503, {"error": "offline"})
+    except FSError as exc:
+        raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
+
+    return {}, 201
+
+
+@api_bp.route('/workspaces/<string:workspace_id>/folders/rename', methods=["POST"])
+@authenticated
+async def rename_workspace_folder(core, workspace_id):
+    try:
+        workspace_id = EntryID(workspace_id)
+    except ValueError:
+        raise APIException(404, {"error": "unknown_workspace"})
+
+    try:
+        workspace = core.user_fs.get_workspace(workspace_id)
+    except FSWorkspaceNotFoundError:
+        raise APIException(404, {"error": "unknown_workspace"})
+
+    data = await request.get_json()
+    with check_data() as bad_fields:
+        entry_id = data.get("id")
+        try:
+            entry_id = EntryID(entry_id)
+        except (TypeError, ValueError):
+            bad_fields.add("id")
+        new_name = data.get("new_name")
+        try:
+            new_name = EntryName(new_name)
+        except (TypeError, ValueError):
+            bad_fields.add("new_name")
+        new_parent_entry_id = data.get("new_parent")
+        if new_parent_entry_id is not None:
+            try:
+                new_parent_entry_id = EntryID(new_parent_entry_id)
+            except (TypeError, ValueError):
+                bad_fields.add("new_parent")
+
+    result = await entry_id_to_path(workspace, entry_id)
+    if not result:
+        raise APIException(404, {"error": "unknown_source_folder"})
+    source_path, _ = result
+
+    if new_parent_entry_id:
+        result = await entry_id_to_path(workspace, new_parent_entry_id)
+        if not result:
+            raise APIException(404, {"error": "unknown_destination_parent_folder"})
+        destination_parent_path, _ = result
+        destination_path = destination_parent_path / new_name
+    else:
+        destination_path = source_path.parent / new_name
+
+    try:
+        await workspace.move(source=source_path, destination=destination_path)
+    except FSNotADirectoryError as exc:
+        if exc.filename == destination_path:
+            raise APIException(404, {"error": "destination_parent_not_a_folder"})
+        else:
+            raise APIException(404, {"error": "source_not_a_folder"})
+    except FSFileNotFoundError as exc:
+        if exc.filename == destination_path:
+            raise APIException(404, {"error": "unknown_destination_parent_folder"})
+        else:
+            raise APIException(404, {"error": "unknown_source_folder"})
+    except FSPermissionError:
+            raise APIException(404, {"error": "cannot_move_root_folder"})
+    except (FSWorkspaceNotFoundError, FSNoAccessError):
+        raise APIException(404, {"error": "unknown_workspace"})
+    except FSReadOnlyError:
+        raise APIException(403, {"error": "read_only_workspace"})
+    except FSBackendOfflineError:
+        raise APIException(503, {"error": "offline"})
+    except FSError as exc:
+        raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
+
+    return {}, 200
+
+
+@api_bp.route('/workspaces/<string:workspace_id>/folders/<string:folder_id>', methods=["DELETE"])
+@authenticated
+async def delete_workspace_folder(core, workspace_id, folder_id):
+    try:
+        workspace_id = EntryID(workspace_id)
+    except ValueError:
+        raise APIException(404, {"error": "unknown_workspace"})
+
+    try:
+        workspace = core.user_fs.get_workspace(workspace_id)
+    except FSWorkspaceNotFoundError:
+        raise APIException(404, {"error": "unknown_workspace"})
+
+    try:
+        folder_id = EntryID(folder_id)
+    except ValueError:
+        raise APIException(404, {"error": "unknown_workspace"})
+
+    result = await entry_id_to_path(workspace, folder_id)
+    if not result:
+        raise APIException(404, {"error": "unknown_folder"})
+    path, _ = result
+
+    try:
+        await workspace.rmdir(path=path)
+    except FSNotADirectoryError as exc:
+        raise APIException(404, {"error": "not_a_folder"})
+    except FSFileNotFoundError as exc:
+        raise APIException(404, {"error": "unknown_folder"})
+    except FSPermissionError:
+        raise APIException(400, {"error": "cannot_delete_root_folder"})
+    except (FSWorkspaceNotFoundError, FSNoAccessError):
+        raise APIException(404, {"error": "unknown_workspace"})
+    except FSReadOnlyError:
+        raise APIException(403, {"error": "read_only_workspace"})
+    except FSBackendOfflineError:
+        raise APIException(503, {"error": "offline"})
+    except FSError as exc:
+        raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
+
+    return {}, 204
+
+
+### Files ###
 
 
 @asynccontextmanager
