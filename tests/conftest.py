@@ -17,9 +17,16 @@ from parsec.core.local_device import save_device_with_password
 from resana_secure.app import app_factory
 
 
+@pytest.fixture(scope="session")
+def client_origin():
+    return "https://resana.numerique.gouv.fr"
+
+
 @pytest.fixture
-async def test_app(core_config_dir):
-    async with app_factory(config_dir=core_config_dir) as app:
+async def test_app(core_config_dir, client_origin):
+    async with app_factory(
+        config_dir=core_config_dir, client_allowed_origins=[client_origin]
+    ) as app:
         async with app.test_app() as test_app:
             yield test_app
 

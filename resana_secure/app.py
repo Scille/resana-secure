@@ -8,11 +8,12 @@ import secrets
 from functools import wraps, partial
 from uuid import uuid4
 from base64 import b64decode, b64encode
-from typing import Dict, Type
-from quart_trio import QuartTrio
+from typing import Dict, List
 from quart import current_app, session, request, Blueprint
+from quart_cors import cors
+from quart_trio import QuartTrio
 from werkzeug.routing import BaseConverter
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import asynccontextmanager
 
 from parsec.api.data import EntryID, EntryName
 from parsec.api.protocol import RealmRole
@@ -200,6 +201,11 @@ async def check_data():
 
 
 api_bp = Blueprint("api", __name__)
+
+
+@api_bp.route("/<path:subpath>", methods=["OPTIONS"])
+async def do_head(subpath):
+    return {}, 200
 
 
 @api_bp.route("/auth", methods=["POST"])
@@ -767,8 +773,9 @@ async def open_workspace_item(core, workspace_id, entry_id):
 
 
 @asynccontextmanager
-async def app_factory(config_dir: Path):
+async def app_factory(config_dir: Path, client_allowed_origins: List[str]):
     app = QuartTrio(__name__)
+    cors(app)
     app.register_blueprint(api_bp)
 
     app.config.from_mapping(
@@ -779,14 +786,18 @@ async def app_factory(config_dir: Path):
         SECRET_KEY=secrets.token_hex(),
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="strict",
+        QUART_CORS_ALLOW_CREDENTIALS=True,
+        QUART_CORS_ALLOW_ORIGIN=client_allowed_origins,
         CORE_CONFIG_DIR=config_dir,
     )
     async with CoresManager.run() as app.cores_manager:
         yield app
 
 
-async def main(host, port, debug, config_dir):
-    async with app_factory(config_dir=config_dir) as app:
+async def main(host, port, debug, client_allowed_origins, config_dir):
+    async with app_factory(
+        config_dir=config_dir, client_allowed_origins=client_allowed_origins
+    ) as app:
         await app.run_task(host=host, port=port, debug=debug)
 
 
@@ -795,6 +806,7 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--client-origin", type=lambda x: x.split(";"), default=["*"])
     parser.add_argument("--config-dir", type=Path, required=True)
     args = parser.parse_args()
     trio.run(
@@ -803,6 +815,7 @@ if __name__ == "__main__":
             port=args.port,
             host=args.host,
             debug=args.debug,
+            client_allowed_origins=args.client_origin,
             config_dir=args.config_dir,
         )
     )

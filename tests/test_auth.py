@@ -72,20 +72,53 @@ async def test_authentication_body_not_json(test_app, local_device):
     assert response.status_code == 400
 
 
+ROUTES_SAMPLE = [
+    ("POST", "/auth"),
+    ("GET", "/workspaces"),
+    ("POST", "/workspaces"),
+    ("POST", "/workspaces/sync"),
+    ("PATCH", "/workspaces/c3acdcb2ede6437f89fb94da11d733f2"),
+    ("GET", "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/share"),
+    ("PATCH", "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/share"),
+    ("GET", "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/folders"),
+    ("POST", "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/folders"),
+    ("POST", "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/folders/rename"),
+    (
+        "DELETE",
+        "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/folders/c0f0b18ee7634d01bd7ae9533d1222ef",
+    ),
+    ("GET", "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/files"),
+    ("POST", "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/files"),
+    ("POST", "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/files/rename"),
+    (
+        "DELETE",
+        "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/files/c0f0b18ee7634d01bd7ae9533d1222ef",
+    ),
+    (
+        "POST",
+        "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/open/c0f0b18ee7634d01bd7ae9533d1222ef",
+    ),
+]
+
+
 @pytest.mark.trio
-@pytest.mark.parametrize(
-    "route,method",
-    [
-        ("/workspaces", "GET"),
-        ("/workspaces", "POST"),
-        ("/workspaces/sync", "POST"),
-        ("/workspaces/c3acdcb2ede6437f89fb94da11d733f2", "PATCH"),
-        ("/workspaces/c3acdcb2ede6437f89fb94da11d733f2/share", "GET"),
-        ("/workspaces/c3acdcb2ede6437f89fb94da11d733f2/share", "PATCH"),
-    ],
-)
+@pytest.mark.parametrize("method, route", ROUTES_SAMPLE)
 async def test_authenticated_routes(test_app, route, method):
     test_client = test_app.test_client()
-
     response = await getattr(test_client, method.lower())(route)
-    assert response.status_code == 401
+    if route == "/auth":
+        assert response.status_code == 400
+    else:
+        assert response.status_code == 401
+
+
+@pytest.mark.trio
+@pytest.mark.parametrize("route,method", ROUTES_SAMPLE)
+async def test_cors_routes(test_app, client_origin, method, route):
+    test_client = test_app.test_client()
+    response = await test_client.options(
+        route,
+        headers={"Origin": client_origin, "Access-Control-Request-Method": "POST"},
+    )
+    assert response.status_code == 200
+    assert response.headers.get("Access-Control-Allow-Origin") == client_origin

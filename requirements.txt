@@ -1,2 +1,4 @@
+Quart
 Quart-Trio
+Quart-CORS
 -e subtree/parsec-cloud[backend,core]
