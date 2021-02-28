@@ -66,6 +66,13 @@ async def test_authentication_bad_key(test_app, local_device):
 
 
 @pytest.mark.trio
+async def test_authentication_body_not_json(test_app, local_device):
+    test_client = test_app.test_client()
+    response = await test_client.post("/auth")
+    assert response.status_code == 400
+
+
+@pytest.mark.trio
 @pytest.mark.parametrize(
     "route,method",
     [

@@ -187,13 +187,23 @@ def authenticated(fn):
     return wrapper
 
 
+@asynccontextmanager
+async def check_data():
+    if not request.is_json:
+        raise APIException(400, {"error": "json_body_expected"})
+    data = await request.get_json()
+    bad_fields = set()
+    yield data, bad_fields
+    if bad_fields:
+        raise APIException(400, {"error": "bad_data", "fields": list(bad_fields)})
+
+
 api_bp = Blueprint("api", __name__)
 
 
 @api_bp.route("/auth", methods=["POST"])
 async def do_auth():
-    data = await request.get_json()
-    with check_data() as bad_fields:
+    async with check_data() as (data, bad_fields):
         email = data.get("email")
         if not isinstance(email, str):
             bad_fields.add("email")
@@ -211,14 +221,6 @@ async def do_auth():
         raise APIException(404, {"error": "already_authenticated"})
     session["logged_in"] = auth_token
     return {}, 200
-
-
-@contextmanager
-def check_data():
-    bad_fields = set()
-    yield bad_fields
-    if bad_fields:
-        raise APIException(400, {"error": "bad_data", "fields": list(bad_fields)})
 
 
 ### Workspaces ###
@@ -243,8 +245,7 @@ async def list_workspaces(core):
 @api_bp.route("/workspaces", methods=["POST"])
 @authenticated
 async def create_workspaces(core):
-    data = await request.get_json()
-    with check_data() as bad_fields:
+    async with check_data() as (data, bad_fields):
         name = data.get("name")
         if not isinstance(name, str):
             bad_fields.add("name")
@@ -285,8 +286,7 @@ async def rename_workspaces(core, workspace_id):
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
-    data = await request.get_json()
-    with check_data() as bad_fields:
+    async with check_data() as (data, bad_fields):
         old_name = data.get("old_name")
         if not isinstance(old_name, str):
             bad_fields.add("old_name")
@@ -349,8 +349,7 @@ async def share_workspace(core, workspace_id):
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
-    data = await request.get_json()
-    with check_data() as bad_fields:
+    async with check_data() as (data, bad_fields):
         email = data.get("email")
         if not isinstance(email, str):
             bad_fields.add("email")
@@ -481,8 +480,7 @@ async def _create_workspace_entry(core, workspace_id, type):
     except FSWorkspaceNotFoundError:
         raise APIException(404, {"error": "unknown_workspace"})
 
-    data = await request.get_json()
-    with check_data() as bad_fields:
+    async with check_data() as (data, bad_fields):
         name = data.get("name")
         try:
             name = EntryName(name)
@@ -534,8 +532,7 @@ async def _rename_workspace_entry(core, workspace_id, expected_entry_type):
     except FSWorkspaceNotFoundError:
         raise APIException(404, {"error": "unknown_workspace"})
 
-    data = await request.get_json()
-    with check_data() as bad_fields:
+    async with check_data() as (data, bad_fields):
         entry_id = data.get("id")
         try:
             entry_id = EntryID(entry_id)
@@ -665,8 +662,7 @@ async def get_workspace_folder_content(core, workspace_id):
     except FSWorkspaceNotFoundError:
         raise APIException(404, {"error": "unknown_workspace"})
 
-    data = await request.get_json()
-    with check_data() as bad_fields:
+    async with check_data() as (data, bad_fields):
         folder_id = data.get("folder")
         try:
             folder_id = EntryID(folder_id)
@@ -794,9 +790,9 @@ async def main(host, port, debug):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument('--port', type=int, default=8080)
-    parser.add_argument('--host', default='127.0.0.1')
-    parser.add_argument('--debug', action='store_true')
+    parser = argparse.ArgumentParser(description="Process some integers.")
+    parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()
     trio.run(partial(main, port=args.port, host=args.host, debug=args.debug))
