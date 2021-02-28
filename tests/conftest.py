@@ -19,11 +19,7 @@ from resana_secure.app import app_factory
 
 @pytest.fixture
 async def test_app(core_config_dir):
-    async with app_factory() as app:
-        # TODO: use blueprints to avoid this hack by having an app factory
-        app.config.from_mapping(
-            CORE_CONFIG_DIR=core_config_dir,
-        )
+    async with app_factory(config_dir=core_config_dir) as app:
         async with app.test_app() as test_app:
             yield test_app
 

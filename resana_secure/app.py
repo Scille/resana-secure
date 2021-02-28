@@ -1,4 +1,5 @@
 import argparse
+from pathlib import Path
 import sys
 import os
 import subprocess
@@ -766,7 +767,7 @@ async def open_workspace_item(core, workspace_id, entry_id):
 
 
 @asynccontextmanager
-async def app_factory():
+async def app_factory(config_dir: Path):
     app = QuartTrio(__name__)
     app.register_blueprint(api_bp)
 
@@ -778,14 +779,14 @@ async def app_factory():
         SECRET_KEY=secrets.token_hex(),
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="strict",
-        CORE_CONFIG_DIR=None,  # TODO: Needed
+        CORE_CONFIG_DIR=config_dir,
     )
     async with CoresManager.run() as app.cores_manager:
         yield app
 
 
-async def main(host, port, debug):
-    async with app_factory() as app:
+async def main(host, port, debug, config_dir):
+    async with app_factory(config_dir=config_dir) as app:
         await app.run_task(host=host, port=port, debug=debug)
 
 
@@ -794,5 +795,14 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--config-dir", type=Path, required=True)
     args = parser.parse_args()
-    trio.run(partial(main, port=args.port, host=args.host, debug=args.debug))
+    trio.run(
+        partial(
+            main,
+            port=args.port,
+            host=args.host,
+            debug=args.debug,
+            config_dir=args.config_dir,
+        )
+    )
