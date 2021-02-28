@@ -1,9 +1,10 @@
+import argparse
 import sys
 import os
 import subprocess
 import trio
 import secrets
-from functools import wraps
+from functools import wraps, partial
 from uuid import uuid4
 from base64 import b64decode, b64encode
 from typing import Dict, Type
@@ -787,10 +788,15 @@ async def app_factory():
         yield app
 
 
-async def main(port="8080", debug=True):
+async def main(host, port, debug):
     async with app_factory() as app:
-        await app.run_task(host="127.0.0.1", port=port, debug=debug)
+        await app.run_task(host=host, port=port, debug=debug)
 
 
 if __name__ == "__main__":
-    trio.run(main)
+    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser.add_argument('--port', type=int, default=8080)
+    parser.add_argument('--host', default='127.0.0.1')
+    parser.add_argument('--debug', action='store_true')
+    args = parser.parse_args()
+    trio.run(partial(main, port=args.port, host=args.host, debug=args.debug))
