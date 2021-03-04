@@ -275,7 +275,6 @@ Démarre la phase d'enrôlement et attend que le pair à enrôler ait rejoins le
 Request:
 ```
 {
-    "token": <uuid>
 }
 ```
 
@@ -288,8 +287,16 @@ HTTP 200
 }
 ```
 ou
+```
+HTTP 400
+{
+    "error": "invitation_already_used"
+}
+```
+ou
 - HTTP 404 si le token est inconnu
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 `type` est `DEVICE` ou `USER`
 `greeter_sas` est le code de 4 caractère à transmettre par un canal tiers au pair.
@@ -317,6 +324,7 @@ ou
 - HTTP 404 si le token est inconnu
 - HTTP 409 si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 `candidate_claimer_sas` est une liste de quatre codes dont un seul correspond
 au code SAS du pair. L'utilisateur est donc obligé de se concerter avec le pair
@@ -353,6 +361,7 @@ ou
 - HTTP 400 si claimer_sas n'est pas le bon
 - HTTP 409 si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 
 `POST /invitations/<token>/greeter/4-finalize`
@@ -387,6 +396,7 @@ ou
 - HTTP 404 si le token est inconnu
 - HTTP 409 si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 
 Enrôlement (claimer)
@@ -416,6 +426,7 @@ HTTP 200
 ou
 - HTTP 404 si le token est inconnu
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 `type` est `DEVICE` ou `USER`
 `candidate_greeter_sas` est une liste de quatre codes dont un seul correspond
@@ -448,6 +459,7 @@ ou
 - HTTP 400 si greeter_sas n'est pas le bon
 - HTTP 409 si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 `greeter_sas` est le code de 4 caractère à transmettre par un canal tiers au pair.
 
@@ -473,6 +485,7 @@ ou
 - HTTP 404 si le token est inconnu
 - HTTP 409 si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 
 `POST /invitations/<token>/claimer/4-finalize`
@@ -506,6 +519,7 @@ ou
 - HTTP 404 si le token est inconnu
 - HTTP 409 si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 `key` est utilisé pour chiffrer le fichier de clé de Device résultant de l'opération d'enrôlement.
 
