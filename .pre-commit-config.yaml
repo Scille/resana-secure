@@ -11,6 +11,17 @@ repos:
     rev: 3.8.3
     hooks:
     - id: flake8
+      args:
+        - "--max-line-length=100"
+        # Handled by black:
+        # E501: Line too long
+        # E127: continuation line over-indented for visual indent
+        # E128: continuation line under-indented for visual indent
+        # E203 whitespace before ':'
+        # W503 line break before binary operator
+        # Misc:
+        # E266 too many leading '#' for block comment
+        - "--ignore=E501,E127,E128,E203,W503,E266"
 -   repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v2.2.3  # Use the ref you want to point at
     hooks:
