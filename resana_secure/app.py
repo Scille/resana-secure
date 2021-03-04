@@ -14,6 +14,7 @@ from .routes.files import files_bp
 from .routes.invite import invite_bp
 from .routes.workspaces import workspaces_bp
 from .routes.invitations import invitations_bp
+from .ltcm import LTCM
 
 
 @asynccontextmanager
@@ -38,7 +39,9 @@ async def app_factory(config_dir: Path, client_allowed_origins: List[str]):
         QUART_CORS_ALLOW_ORIGIN=client_allowed_origins,
         CORE_CONFIG_DIR=config_dir,
     )
-    async with CoresManager.run() as app.cores_manager:  # type: ignore
+    async with LTCM.run() as ltcm:
+        app.ltcm = ltcm  # type: ignore
+        app.cores_manager = CoresManager()  # type: ignore
         yield app
 
 

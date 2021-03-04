@@ -30,10 +30,11 @@ def authenticated(fn):
     @wraps(fn)
     async def wrapper(*args, **kwargs):
         # global auth_token
-        is_auth = session.get("logged_in", "")
+        auth_token = session.get("logged_in", "")
         try:
-            async with current_app.cores_manager.get_core(is_auth) as core:
+            async with current_app.cores_manager.get_core(auth_token) as core:
                 return await fn(*args, core=core, **kwargs)
+
         except CoreNotLoggedError:
             raise APIException(401, {"error": "authentication_requested"})
 

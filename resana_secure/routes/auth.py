@@ -27,9 +27,11 @@ async def do_auth():
 
     try:
         auth_token = await current_app.cores_manager.loggin(email=email, key=key)
+
     except CoreUnknownEmailError:
         raise APIException(404, {"error": "bad_auth"})
     except CoreAlreadyLoggedError:
         raise APIException(404, {"error": "already_authenticated"})
+
     session["logged_in"] = auth_token
     return {}, 200

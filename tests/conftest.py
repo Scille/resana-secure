@@ -1,14 +1,12 @@
 import pytest
 import trio
-import re
 from functools import partial
 from collections import namedtuple
 from base64 import b64encode
 
-from parsec.crypto import SigningKey
-from parsec.api.protocol import OrganizationID, DeviceID, HumanHandle
+from parsec.api.protocol import OrganizationID, HumanHandle
 from parsec.core.types import BackendOrganizationBootstrapAddr, BackendAddr
-from parsec.backend import backend_app_factory, organization
+from parsec.backend import backend_app_factory
 from parsec.backend.config import BackendConfig, MockedBlockStoreConfig
 from parsec.core.invite import bootstrap_organization
 from parsec.core.backend_connection import apiv1_backend_anonymous_cmds_factory
@@ -37,10 +35,7 @@ async def authenticated_client(test_app, local_device):
 
     response = await test_client.post(
         "/auth",
-        json={
-            "email": local_device.email,
-            "key": b64encode(local_device.key).decode("ascii"),
-        },
+        json={"email": local_device.email, "key": b64encode(local_device.key).decode("ascii")},
     )
     assert response.status_code == 200
     # Note cookie is automatically added to test_client's cookie jar
@@ -91,9 +86,7 @@ async def local_device(running_backend, core_config_dir):
     organization_id = OrganizationID("CoolOrg")
     device_label = "alice's desktop"
     key = b"P@ssw0rd."
-    password = b64encode(key).decode(
-        "ascii"
-    )  # TODO should implement&use `save_device_with_key`
+    password = b64encode(key).decode("ascii")  # TODO should implement&use `save_device_with_key`
     human_handle = HumanHandle(email="alice@example.com", label="Alice")
     bootstrap_addr = BackendOrganizationBootstrapAddr.build(
         backend_addr=backend_addr, organization_id=organization_id
@@ -103,7 +96,5 @@ async def local_device(running_backend, core_config_dir):
         new_device = await bootstrap_organization(
             cmds=cmds, human_handle=human_handle, device_label=device_label
         )
-        save_device_with_password(
-            config_dir=core_config_dir, device=new_device, password=password
-        )
+        save_device_with_password(config_dir=core_config_dir, device=new_device, password=password)
     return LocalDeviceTestbed(device=new_device, email=human_handle.email, key=key)

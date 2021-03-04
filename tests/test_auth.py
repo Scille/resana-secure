@@ -87,6 +87,8 @@ async def test_authenticated_routes(test_app, routes_samples):
     for method, route in routes_samples:
         if method == "OPTIONS":
             continue
+        if "/claimer/" in route:
+            continue
         test_client = test_app.test_client()
         response = await getattr(test_client, method.lower())(route)
         if route == "/auth":
