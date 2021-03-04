@@ -93,7 +93,7 @@ Utilisateurs & invitations
 ==========================
 
 /**************
-`GET /humans?q=<query>&page=<int>&per_page=<int>&omit_revoqued=<bool>`
+`GET /humans?q=<query>&page=<int>&per_page=<int>&omit_revoked=<bool>`
 ------------
 
 `query` est recherchée contre les champs human_handle.email et human_handle.label, les match partiel sont acceptés.
@@ -109,7 +109,7 @@ Response:
 ```
 HTTP 200
 {
-    "users": [ 
+    "users": [
         {
             "user_id": <uuid>,
             "human_handle": {
@@ -121,11 +121,13 @@ HTTP 200
             "revoked_on": <datetime>
         },
         …
-    ]
+    ],
+    "total": <int>
 }
 ```
 ou
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 `profile` peut être: `ADMIN` ou `STANDARD`
 **************/
@@ -149,6 +151,7 @@ ou
 - HTTP 404 si email inconnu
 - HTTP 403 si l'utilisateur actuel n'a pas le profil administrateur sur l'organisation Parsec
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 
 `GET /invitations`
@@ -184,6 +187,7 @@ HTTP 200
 ```
 ou
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 `status` peut être: `IDLE` ou `READY`
 Notes:
@@ -222,8 +226,16 @@ HTTP 200
 }
 ```
 ou
+```
+HTTP 4004
+{
+    "error":  "claimer_already_member"
+}
+```
+ou
 - HTTP 403 si l'utilisateur actuel n'a pas le profil administrateur sur l'organisation Parsec et tente d'inviter un autre utilisateur.
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 La création d'invitation est idempotent (si une invitation existe déjà, elle ne sera pas recréée et le token existant sera retourné).
 
@@ -247,9 +259,9 @@ HTTP 204
 {
 }
 ```
-ou
-- HTTP 404 si le token n'existe pas
+ou- HTTP 404 si le token n'existe pas
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 
 Enrôlement (greeter)
@@ -602,7 +614,7 @@ HTTP 200
 ou
 - HTTP 404: le workspace n'existe pas
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-
+- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 
 `PATCH /workspace/<id>/share`
