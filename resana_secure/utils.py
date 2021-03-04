@@ -1,7 +1,18 @@
-import trio
-from quart import jsonify, Response
-from quart.exceptions import HTTPException
+from functools import wraps
 from contextlib import asynccontextmanager
+from quart import jsonify, Response, current_app, session, request
+from quart.exceptions import HTTPException
+from werkzeug.routing import BaseConverter
+
+from .cores_manager import CoreNotLoggedError
+
+
+class EntryIDConverter(BaseConverter):
+    def to_python(self, value):
+        return super().to_python(value)
+
+    def to_url(self, value) -> str:
+        return super().to_url(value)
 
 
 class APIException(HTTPException):
@@ -15,54 +26,26 @@ class APIException(HTTPException):
         return response
 
 
-class ReadWriteLock:
-    """
-    Reader/writer lock with priority of writer
-    """
-
-    def __init__(self) -> None:
-        self._lock = trio.Lock()
-        self._no_writers = trio.Event()
-        self._no_writers.set()
-        self._no_readers = trio.Event()
-        self._no_readers.set()
-        self._readers = 0
-
-    @asynccontextmanager
-    async def read_acquire(self):
-        while True:
-            async with self._lock:
-                if self._no_writers.is_set():
-                    self._readers += 1
-                    if self._readers == 1:
-                        self._no_readers = trio.Event()
-                    break
-            await self._no_writers.wait()
+def authenticated(fn):
+    @wraps(fn)
+    async def wrapper(*args, **kwargs):
+        # global auth_token
+        is_auth = session.get("logged_in", "")
         try:
-            yield
-        finally:
-            with trio.CancelScope(shield=True):
-                async with self._lock:
-                    self._readers -= 1
-                    if self._readers == 0:
-                        self._no_readers.set()
+            async with current_app.cores_manager.get_core(is_auth) as core:
+                return await fn(*args, core=core, **kwargs)
+        except CoreNotLoggedError:
+            raise APIException(401, {"error": "authentication_requested"})
 
-    @asynccontextmanager
-    async def write_acquire(self):
-        # First declare ourself as the current writer
-        while True:
-            async with self._lock:
-                if self._no_writers.is_set():
-                    # From now on, no other reader/writers can join
-                    self._no_writers = trio.Event()
-                    break
-            # Somebody is already writting, must wait for it to finish
-            await self._no_writers.wait()
-        # Now we must wait for the readers that arrived before us to finish reading
-        await self._no_readers.wait()
-        try:
-            yield
-        finally:
-            with trio.CancelScope(shield=True):
-                async with self._lock:
-                    self._no_writers.set()
+    return wrapper
+
+
+@asynccontextmanager
+async def check_data():
+    if not request.is_json:
+        raise APIException(400, {"error": "json_body_expected"})
+    data = await request.get_json()
+    bad_fields = set()
+    yield data, bad_fields
+    if bad_fields:
+        raise APIException(400, {"error": "bad_data", "fields": list(bad_fields)})

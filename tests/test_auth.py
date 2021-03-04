@@ -14,10 +14,7 @@ async def test_authentication(test_app, local_device):
     # Now proceed to the auth
     response = await test_client.post(
         "/auth",
-        json={
-            "email": local_device.email,
-            "key": b64encode(local_device.key).decode("ascii"),
-        },
+        json={"email": local_device.email, "key": b64encode(local_device.key).decode("ascii")},
     )
     assert response.status_code == 200
     assert len(response.headers.get_all("set-cookie")) == 1
@@ -38,9 +35,7 @@ async def test_authentication(test_app, local_device):
 
     # Invalid token should be rejected
     dummy_session_cookie = "eyJsb2dnZWRfaW4iOiI1ODU5NWY1OTI1OTA0NGMyYTE1ODg4NGFlYzY5NGJkOCJ9.YDeKyQ.46LVu1VFkoZISHp-5xaXDK-sjDk"
-    test_client.set_cookie(
-        server_name="127.0.0.1", key="session", value=dummy_session_cookie
-    )
+    test_client.set_cookie(server_name="127.0.0.1", key="session", value=dummy_session_cookie)
     response = await test_client.get("/workspaces")
     assert response.status_code == 401
 
@@ -49,9 +44,7 @@ async def test_authentication(test_app, local_device):
 async def test_authentication_unknown_email(test_app):
     test_client = test_app.test_client()
 
-    response = await test_client.post(
-        "/auth", json={"email": "john@doe.com", "key": ""}
-    )
+    response = await test_client.post("/auth", json={"email": "john@doe.com", "key": ""})
     assert response.status_code == 404
 
 
@@ -59,9 +52,7 @@ async def test_authentication_unknown_email(test_app):
 async def test_authentication_bad_key(test_app, local_device):
     test_client = test_app.test_client()
 
-    response = await test_client.post(
-        "/auth", json={"email": local_device.email, "key": ""}
-    )
+    response = await test_client.post("/auth", json={"email": local_device.email, "key": ""})
     assert response.status_code == 404
 
 
@@ -72,53 +63,57 @@ async def test_authentication_body_not_json(test_app, local_device):
     assert response.status_code == 400
 
 
-ROUTES_SAMPLE = [
-    ("POST", "/auth"),
-    ("GET", "/workspaces"),
-    ("POST", "/workspaces"),
-    ("POST", "/workspaces/sync"),
-    ("PATCH", "/workspaces/c3acdcb2ede6437f89fb94da11d733f2"),
-    ("GET", "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/share"),
-    ("PATCH", "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/share"),
-    ("GET", "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/folders"),
-    ("POST", "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/folders"),
-    ("POST", "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/folders/rename"),
-    (
-        "DELETE",
-        "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/folders/c0f0b18ee7634d01bd7ae9533d1222ef",
-    ),
-    ("GET", "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/files"),
-    ("POST", "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/files"),
-    ("POST", "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/files/rename"),
-    (
-        "DELETE",
-        "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/files/c0f0b18ee7634d01bd7ae9533d1222ef",
-    ),
-    (
-        "POST",
-        "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/open/c0f0b18ee7634d01bd7ae9533d1222ef",
-    ),
-]
+@pytest.fixture
+def routes_samples(test_app):
+    default_args_values = {
+        "workspace_id": "c3acdcb2ede6437f89fb94da11d733f2",
+        "file_id": "c0f0b18ee7634d01bd7ae9533d1222ef",
+        "folder_id": "c0f0b18ee7634d01bd7ae9533d1222ef",
+        "entry_id": "c0f0b18ee7634d01bd7ae9533d1222ef",
+        "subpath": "foo/bar",  # TODO
+        "token": "7a0a3d1038bb4a22ba6d310abcc198d4",
+    }
+    routes = []
+    for rule in test_app.app.url_map.iter_rules():
+        args = {key: default_args_values[key] for key in rule.arguments}
+        _, route = rule.build(args)
+        for rule_method in rule.methods:
+            routes.append((rule_method, route))
+    return routes
 
 
 @pytest.mark.trio
-@pytest.mark.parametrize("method, route", ROUTES_SAMPLE)
-async def test_authenticated_routes(test_app, route, method):
-    test_client = test_app.test_client()
-    response = await getattr(test_client, method.lower())(route)
-    if route == "/auth":
-        assert response.status_code == 400
-    else:
-        assert response.status_code == 401
+async def test_authenticated_routes(test_app, routes_samples):
+    for method, route in routes_samples:
+        if method == "OPTIONS":
+            continue
+        test_client = test_app.test_client()
+        response = await getattr(test_client, method.lower())(route)
+        if route == "/auth":
+            assert response.status_code == 400
+        else:
+            assert response.status_code == 401
 
 
 @pytest.mark.trio
-@pytest.mark.parametrize("route,method", ROUTES_SAMPLE)
-async def test_cors_routes(test_app, client_origin, method, route):
+async def test_cors_routes(test_app, client_origin, routes_samples):
     test_client = test_app.test_client()
-    response = await test_client.options(
-        route,
-        headers={"Origin": client_origin, "Access-Control-Request-Method": "POST"},
-    )
-    assert response.status_code == 200
-    assert response.headers.get("Access-Control-Allow-Origin") == client_origin
+    for method, route in routes_samples:
+        if method == "OPTIONS":
+            continue
+        response = await test_client.options(
+            route, headers={"Origin": client_origin, "Access-Control-Request-Method": method}
+        )
+        assert response.status_code == 200
+        assert response.headers.get("Access-Control-Allow-Origin") == client_origin
+        assert (
+            response.headers.get("Access-Control-Allow-Methods")
+            == "GET, HEAD, POST, OPTIONS, PUT, PATCH, DELETE"
+        )
+
+        # Test with bad origin
+        response = await test_client.options(
+            route, headers={"Origin": "https://dummy.org", "Access-Control-Request-Method": method}
+        )
+        assert response.status_code == 200
+        assert "Access-Control-Allow-Origin" not in response.headers
