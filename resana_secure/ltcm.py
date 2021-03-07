@@ -3,9 +3,13 @@ from typing import Callable, Dict, TypeVar, Optional
 from contextlib import asynccontextmanager
 
 
+class ReadCancelledByWriter(Exception):
+    pass
+
+
 class ReadWriteLock:
     """
-    Reader/writer lock with priority of writer
+    Reader/writer lock with priority on writers.
     """
 
     def __init__(self) -> None:
@@ -14,26 +18,32 @@ class ReadWriteLock:
         self._no_writers.set()
         self._no_readers = trio.Event()
         self._no_readers.set()
-        self._readers = 0
+        self._readers_cancel_scopes = {}
 
     @asynccontextmanager
     async def read_acquire(self):
         while True:
             async with self._lock:
                 if self._no_writers.is_set():
-                    self._readers += 1
-                    if self._readers == 1:
+                    # Stores the cancel scopes allows us to count the number
+                    # of readers and to cancel them all when a writer arrives
+                    cancel_scope = trio.CancelScope()
+                    self._readers_cancel_scopes[id(cancel_scope)] = cancel_scope
+                    if len(self._readers_cancel_scopes) == 1:
                         self._no_readers = trio.Event()
                     break
             await self._no_writers.wait()
         try:
-            yield
+            with cancel_scope:
+                yield
         finally:
             with trio.CancelScope(shield=True):
                 async with self._lock:
-                    self._readers -= 1
-                    if self._readers == 0:
+                    del self._readers_cancel_scopes[id(cancel_scope)]
+                    if not self._readers_cancel_scopes:
                         self._no_readers.set()
+                    if cancel_scope.cancelled_caught:
+                        raise ReadCancelledByWriter
 
     @asynccontextmanager
     async def write_acquire(self):
@@ -78,35 +88,46 @@ class ManagedComponent:
                 cancel_scope.cancel()
                 await component_stopped.wait()
 
+            managed_component = None
+
+            def _on_started(component):
+                nonlocal managed_component
+                managed_component = cls(component=component, stop_component=_stop_component)
+                task_status.started(managed_component)
+
             try:
-                async with component_factory() as component:
-                    managed_component = cls(component=component, stop_component=_stop_component)
-                    task_status.started(managed_component)
-                    await trio.sleep_forever()
+                await component_factory(on_started=_on_started)
 
             finally:
+                if managed_component is not None:
+                    managed_component._component = None
                 component_stopped.set()
 
-        async def stop(self):
-            async with self._rwlock.write_acquire():
-                # _stop_component_callback is idempotent so no need to check
-                # if the component is actually still running
-                await self._stop_component_callback()
-                self._component = None
+    async def stop(self):
+        async with self._rwlock.write_acquire():
+            # _stop_component_callback is idempotent so no need to check
+            # if the component is actually still running
+            await self._stop_component_callback()
 
     @asynccontextmanager
     async def acquire(self) -> ComponentTypeVar:
-        # TODO: kill the reader instead of just waiting for them to finish ?
-        async with self._rwlock.read_acquire():
-            if self._component is None:
-                raise ComponentNotRegistered
-            yield self._component
+        try:
+            async with self._rwlock.read_acquire():
+                if self._component is None:
+                    raise ComponentNotRegistered
+                yield self._component
+
+        except ReadCancelledByWriter as exc:
+            raise ComponentNotRegistered from exc
 
 
 class LTCM:
     """
     Long Time Component Management.
-    Also manages greeter/claimer invite context, but I didn't waint to spoil the cool name ;-)
+    Allow to run arbitrary long-lived code with a greater lifetime
+    than the code that initiated it.
+    This is useful when exposing a stateless API where LTCM will hold the state
+    on the behalf of the API consumer.
     """
 
     def __init__(self, nursery):

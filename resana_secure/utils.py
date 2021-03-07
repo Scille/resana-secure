@@ -1,8 +1,12 @@
+from uuid import UUID
 from functools import wraps
 from contextlib import asynccontextmanager
 from quart import jsonify, Response, current_app, session, request
 from quart.exceptions import HTTPException
 from werkzeug.routing import BaseConverter
+
+from parsec.api.protocol import OrganizationID, InvitationType
+from parsec.core.types import BackendInvitationAddr
 
 from .cores_manager import CoreNotLoggedError
 
@@ -50,3 +54,29 @@ async def check_data():
     yield data, bad_fields
     if bad_fields:
         raise APIException(400, {"error": "bad_data", "fields": list(bad_fields)})
+
+
+def build_apitoken(
+    organization_id: OrganizationID, invitation_type: InvitationType, token: UUID
+) -> str:
+    invitation_type = "u" if invitation_type == InvitationType.USER else "d"
+    return f"{organization_id}:{invitation_type}:{token.hex}"
+
+
+def apitoken_to_addr(apitoken: str) -> BackendInvitationAddr:
+    organization_id, invitation_type, token = apitoken.split(":")
+    organization_id = OrganizationID(organization_id)
+    if invitation_type == "u":
+        invitation_type = InvitationType.USER
+    elif invitation_type == "d":
+        invitation_type = InvitationType.DEVICE
+    else:
+        raise ValueError
+    token = UUID(hex=token)
+
+    return BackendInvitationAddr.build(
+        backend_addr=current_app.config["PARSEC_BACKEND_ADDR"],
+        organization_id=organization_id,
+        invitation_type=invitation_type,
+        token=token,
+    )

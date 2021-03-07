@@ -20,10 +20,42 @@ def client_origin():
     return "https://resana.numerique.gouv.fr"
 
 
+class BackendAddrRegisterer:
+    def __init__(self):
+        self.backend_addr_defined = trio.Event()
+        self.backend_addr = None
+
+    def register(self, backend_addr):
+        self.backend_addr = backend_addr
+        self.backend_addr_defined.set()
+
+    async def get(self):
+        await self.backend_addr_defined.wait()
+        return self.backend_addr
+
+
 @pytest.fixture
-async def test_app(core_config_dir, client_origin):
+def _backend_addr_register(request):
+    registerer = BackendAddrRegisterer()
+    # Use a dummy URL (port 0 should trigger error when used !) if current
+    # test doesn't use `running_backend` fixture
+    if "running_backend" not in request.fixturenames:
+        registerer.register(BackendAddr(hostname="127.0.0.1", port=0, use_ssl=False))
+
+    return registerer
+
+
+@pytest.fixture
+async def backend_addr(_backend_addr_register):
+    return await _backend_addr_register.get()
+
+
+@pytest.fixture
+async def test_app(core_config_dir, client_origin, backend_addr):
     async with app_factory(
-        config_dir=core_config_dir, client_allowed_origins=[client_origin]
+        config_dir=core_config_dir,
+        client_allowed_origins=[client_origin],
+        backend_addr=backend_addr,
     ) as app:
         async with app.test_app() as test_app:
             yield test_app
@@ -43,7 +75,7 @@ async def authenticated_client(test_app, local_device):
 
 
 @pytest.fixture
-async def running_backend():
+async def running_backend(_backend_addr_register):
     config = BackendConfig(
         administration_token="s3cr3t",
         db_min_connections=1,
@@ -68,6 +100,7 @@ async def running_backend():
             )
             _, port = listeners[0].socket.getsockname()
             backend_addr = BackendAddr(hostname=host, port=port, use_ssl=False)
+            _backend_addr_register.register(backend_addr)
             yield backend_addr
             nursery.cancel_scope.cancel()
 
@@ -81,8 +114,7 @@ LocalDeviceTestbed = namedtuple("LocalDeviceTestbed", "device,email,key")
 
 
 @pytest.fixture
-async def local_device(running_backend, core_config_dir):
-    backend_addr = running_backend
+async def local_device(running_backend, backend_addr, core_config_dir):
     organization_id = OrganizationID("CoolOrg")
     device_label = "alice's desktop"
     key = b"P@ssw0rd."

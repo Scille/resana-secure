@@ -71,7 +71,7 @@ def routes_samples(test_app):
         "folder_id": "c0f0b18ee7634d01bd7ae9533d1222ef",
         "entry_id": "c0f0b18ee7634d01bd7ae9533d1222ef",
         "subpath": "foo/bar",  # TODO
-        "token": "7a0a3d1038bb4a22ba6d310abcc198d4",
+        "apitoken": "7a0a3d1038bb4a22ba6d310abcc198d4",
     }
     routes = []
     for rule in test_app.app.url_map.iter_rules():

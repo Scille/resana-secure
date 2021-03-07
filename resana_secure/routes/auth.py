@@ -26,7 +26,7 @@ async def do_auth():
             bad_fields.add("key")
 
     try:
-        auth_token = await current_app.cores_manager.loggin(email=email, key=key)
+        auth_token = await current_app.cores_manager.login(email=email, key=key)
 
     except CoreUnknownEmailError:
         raise APIException(404, {"error": "bad_auth"})

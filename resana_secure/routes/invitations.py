@@ -1,4 +1,3 @@
-from uuid import UUID
 from quart import Blueprint
 
 from parsec.api.protocol import InvitationType
@@ -11,7 +10,7 @@ from parsec.core.backend_connection import (
     BackendInvitationOnExistingMember,
 )
 
-from ..utils import authenticated, check_data, APIException
+from ..utils import authenticated, check_data, APIException, build_apitoken, apitoken_to_addr
 
 
 invitations_bp = Blueprint("invitations_api", __name__)
@@ -33,10 +32,15 @@ async def get_invitations(core):
     cooked = {"users": [], "device": None}
 
     for invitation in invitations:
+        apitoken = build_apitoken(
+            organization_id=core.device.organization_id,
+            invitation_type=invitation["type"],
+            token=invitation["token"],
+        )
         if invitation["type"] == InvitationType.USER:
             cooked["users"].append(
                 {
-                    "token": invitation["token"].hex,
+                    "token": apitoken,
                     "created_on": invitation["created_on"].to_iso8601_string(),
                     "claimer_email": invitation["claimer_email"],
                     "status": invitation["status"].value,
@@ -44,7 +48,7 @@ async def get_invitations(core):
             )
         else:  # Device
             cooked["device"] = {
-                "token": invitation["token"].hex,
+                "token": apitoken,
                 "created_on": invitation["created_on"].to_iso8601_string(),
                 "status": invitation["status"].value,
             }
@@ -77,19 +81,22 @@ async def create_invitation(core):
     except BackendConnectionError as exc:
         raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
 
-    return {"token": addr.token.hex}, 200
+    apitoken = build_apitoken(
+        organization_id=addr.organization_id, invitation_type=addr.invitation_type, token=addr.token
+    )
+    return {"token": apitoken}, 200
 
 
-@invitations_bp.route("/invitations/<string:token>", methods=["DELETE"])
+@invitations_bp.route("/invitations/<string:apitoken>", methods=["DELETE"])
 @authenticated
-async def delete_invitation(core, token):
+async def delete_invitation(core, apitoken):
     try:
-        token = UUID(hex=token)
+        addr = apitoken_to_addr(apitoken)
     except ValueError:
         raise APIException(404, {"error": "unknown_token"})
 
     try:
-        await core.delete_invitation(token=token)
+        await core.delete_invitation(token=addr.token)
 
     except BackendNotAvailable:
         raise APIException(503, {"error": "offline"})
