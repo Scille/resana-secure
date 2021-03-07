@@ -294,6 +294,7 @@ HTTP 400
 }
 ```
 ou
+- HTTP 403 si l'utilisateur n'a pas le profil `ADMIN` et tente d'inviter un nouvel utilisateur
 - HTTP 404 si le token est inconnu
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
 - HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
@@ -321,6 +322,7 @@ HTTP 200
 }
 ```
 ou
+- HTTP 403 si l'utilisateur n'a pas le profil `ADMIN` et tente d'inviter un nouvel utilisateur
 - HTTP 404 si le token est inconnu
 - HTTP 409 si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
@@ -344,19 +346,13 @@ Request:
 ```
 
 Response:
-pour un enrôlement de device:
-```
-HTTP 200
-{
-}
-```
-ou pour un enrôlement de user:
 ```
 HTTP 200
 {
 }
 ```
 ou
+- HTTP 403 si l'utilisateur n'a pas le profil `ADMIN` et tente d'inviter un nouvel utilisateur
 - HTTP 404 si le token est inconnu
 - HTTP 400 si claimer_sas n'est pas le bon
 - HTTP 409 si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
@@ -374,17 +370,18 @@ pour un enrôlement de device:
 ```
 HTTP 200
 {
-    "granted_device_label": <string>
 }
 ```
 ou pour un enrôlement de user:
 ```
 HTTP 200
 {
-    "granted_user_label": <string>,
-    "granted_user_email": <string>
+    "claimer_email": <string>,
+    "granted_profile": <string>,
 }
 ```
+`granted_profile` peut être: `ADMIN` ou `STANDARD`
+(seuls les profiles `ADMIN` peuvent à leur tour inviter de nouveaux utilisateurs)
 
 Response:
 ```
@@ -393,6 +390,7 @@ HTTP 200
 }
 ```
 ou
+- HTTP 403 si l'utilisateur n'a pas le profil `ADMIN` et tente d'inviter un nouvel utilisateur
 - HTTP 404 si le token est inconnu
 - HTTP 409 si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
@@ -403,10 +401,10 @@ Enrôlement (claimer)
 ====================
 
 
-`POST /invitations/<token>/claimer/1-wait-peer-ready`
+`POST /invitations/<token>/claimer/0-retreive-info`
 -------------------------------------------------------
 
-Démarre la phase d'enrôlement et attend que le pair qui enrôle ait rejoins le serveur Parsec.
+Démarre la phase d'enrôlement et récupères des informations de base sur l'invitation.
 
 Request:
 ```
@@ -420,6 +418,36 @@ Response:
 HTTP 200
 {
     "type": <string>,
+    "greeter_email": <string>,
+}
+```
+ou
+- HTTP 404 si le token est inconnu
+- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+
+`type` est `DEVICE` ou `USER`
+`candidate_greeter_sas` est une liste de quatre codes dont un seul correspond
+au code SAS du pair. L'utilisateur est donc obligé de se concerter avec le pair
+pour déterminer lequel est le bon.
+
+
+`POST /invitations/<token>/claimer/1-wait-peer-ready`
+-------------------------------------------------------
+
+Attend que le pair qui enrôle ait rejoins le serveur Parsec.
+
+Request:
+```
+{
+    "token": <uuid>
+}
+```
+
+Response:
+```
+HTTP 200
+{
     "candidate_greeter_sas": [<string>, …]
 }
 ```
@@ -494,14 +522,6 @@ ou
 Ajoute le pair dans Parsec
 
 Request:
-pour un enrôlement de device:
-```
-HTTP 200
-{
-    "key": <base64>
-}
-```
-ou pour un enrôlement de user:
 ```
 HTTP 200
 {
