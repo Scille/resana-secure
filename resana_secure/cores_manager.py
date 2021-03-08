@@ -1,7 +1,7 @@
 import trio
 from uuid import uuid4, UUID
 from base64 import b64encode
-from typing import Dict, Callable
+from typing import Dict
 from functools import partial
 from quart import current_app
 from contextlib import asynccontextmanager
@@ -29,7 +29,8 @@ class CoreAlreadyLoggedError(Exception):
     pass
 
 
-async def start_core(on_started: Callable, config: CoreConfig, email: str, key: bytes):
+@asynccontextmanager
+async def start_core(config: CoreConfig, email: str, key: bytes):
     for available_device in list_available_devices(config.config_dir):
         if available_device.human_handle and available_device.human_handle.email == email:
             try:
@@ -47,16 +48,7 @@ async def start_core(on_started: Callable, config: CoreConfig, email: str, key: 
         raise CoreUnknownEmailError("No avaible device for this email")
 
     async with logged_core_factory(config, device) as core:
-        # Greeting processes are going to have their own long-term lifetimes,
-        # however their are themselves limited by the lifetime of the core
-        # they use to communicate with the Parsec server.
-        async with trio.open_nursery() as greeters_nursery:
-            current_app.greeters_manager.register_greeters_nursery(core, greeters_nursery)
-            try:
-                on_started(core)
-                await trio.sleep_forever()
-            finally:
-                current_app.greeters_manager.unregister_greeters_nursery(greeters_nursery)
+        yield core
 
 
 class CoresManager:

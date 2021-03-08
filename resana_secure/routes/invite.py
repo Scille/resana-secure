@@ -31,6 +31,8 @@ from parsec.core.invite import (
 
 from ..utils import authenticated, check_data, APIException, apitoken_to_addr
 
+# from ..invites_manager import LongTermCtxNotStarted  # TODO: handle this exception
+
 
 invite_bp = Blueprint("invite_api", __name__)
 
@@ -47,7 +49,9 @@ async def greeter_1_wait_peer_ready(core, apitoken):
         raise APIException(404, {"error": "unknown_token"})
 
     try:
-        async with current_app.greeters_manager.start_greeting_ctx(core, addr) as lifetime_ctx:
+        async with current_app.greeters_manager.start_ctx(
+            device=core.device, addr=addr
+        ) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
             # `do_wait_peer` has been done in `start_greeting_ctx` so nothing more to do
 
@@ -80,7 +84,7 @@ async def greeter_2_wait_peer_trust(core, apitoken):
         raise APIException(404, {"error": "unknown_token"})
 
     try:
-        async with current_app.greeters_manager.retreive_greeting_ctx(addr) as lifetime_ctx:
+        async with current_app.greeters_manager.retreive_ctx(addr) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
             if not isinstance(
                 in_progress_ctx, (UserGreetInProgress1Ctx, DeviceGreetInProgress1Ctx)
@@ -122,7 +126,7 @@ async def greeter_3_check_trust(core, apitoken):
             bad_fields.add("claimer_sas")
 
     try:
-        async with current_app.greeters_manager.retreive_greeting_ctx(addr) as lifetime_ctx:
+        async with current_app.greeters_manager.retreive_ctx(addr) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
             if not isinstance(
                 in_progress_ctx, (UserGreetInProgress2Ctx, DeviceGreetInProgress2Ctx)
@@ -171,7 +175,7 @@ async def greeter_4_finalize(core, apitoken):
                 bad_fields.add("granted_profile")
 
     try:
-        async with current_app.greeters_manager.retreive_greeting_ctx(addr) as lifetime_ctx:
+        async with current_app.greeters_manager.retreive_ctx(addr) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
 
             if isinstance(in_progress_ctx, UserGreetInProgress3Ctx):
@@ -222,7 +226,7 @@ async def claimer_0_retreive_info(apitoken):
         raise APIException(404, {"error": "unknown_token"})
 
     try:
-        async with current_app.claimers_manager.start_claiming_ctx(addr) as lifetime_ctx:
+        async with current_app.claimers_manager.start_ctx(addr) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
             type = "user" if addr.invitation_type == InvitationType.USER else "device"
             greeter_email = in_progress_ctx.greeter_human_handle.email
@@ -249,7 +253,7 @@ async def claimer_1_wait_peer_ready(apitoken):
         raise APIException(404, {"error": "unknown_token"})
 
     try:
-        async with current_app.claimers_manager.retreive_claiming_ctx(addr) as lifetime_ctx:
+        async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
             if not isinstance(in_progress_ctx, (UserClaimInitialCtx, DeviceClaimInitialCtx)):
                 raise APIException(409, {"error": "invalid_state"})
@@ -287,7 +291,7 @@ async def claimer_2_check_trust(apitoken):
             bad_fields.add("greeter_sas")
 
     # TODO: handle exceptions
-    async with current_app.claimers_manager.retreive_claiming_ctx(addr) as lifetime_ctx:
+    async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
         in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
         if not isinstance(in_progress_ctx, (UserClaimInProgress1Ctx, DeviceClaimInProgress1Ctx)):
             raise APIException(409, {"error": "invalid_state"})
@@ -309,7 +313,7 @@ async def claimer_3_wait_peer_trust(apitoken):
     except ValueError:
         raise APIException(404, {"error": "unknown_token"})
 
-    async with current_app.claimers_manager.retreive_claiming_ctx(addr) as lifetime_ctx:
+    async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
         in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
         if not isinstance(in_progress_ctx, (UserClaimInProgress2Ctx, DeviceClaimInProgress2Ctx)):
             raise APIException(409, {"error": "invalid_state"})
@@ -334,7 +338,7 @@ async def claimer_4_finalize(apitoken):
         # TODO: b64decode + reencode ?
         password = key
 
-    async with current_app.claimers_manager.retreive_claiming_ctx(addr) as lifetime_ctx:
+    async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
         in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
 
         requested_device_label = platform.node() or "-unknown-"

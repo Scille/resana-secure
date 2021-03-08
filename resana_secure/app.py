@@ -9,7 +9,7 @@ from quart_trio import QuartTrio
 from contextlib import asynccontextmanager
 
 from .cores_manager import CoresManager
-from .claimers_manager import GreetersManager, ClaimersManager
+from .invites_manager import ClaimersManager, GreetersManager
 from .routes.auth import auth_bp
 from .routes.files import files_bp
 from .routes.invite import invite_bp

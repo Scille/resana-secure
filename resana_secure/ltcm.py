@@ -57,6 +57,10 @@ class ReadWriteLock:
             # Somebody is already writting, must wait for it to finish
             await self._no_writers.wait()
         # Now we must wait for the readers that arrived before us to finish reading
+        # To avoid deadlock if a reader is blocked forever, we cancel all readers
+        # instead of letting them finish what they are doing
+        for cancel_scope in self._readers_cancel_scopes:
+            cancel_scope.cancel()
         await self._no_readers.wait()
         try:
             yield
@@ -90,18 +94,18 @@ class ManagedComponent:
 
             managed_component = None
 
-            def _on_started(component):
-                nonlocal managed_component
-                managed_component = cls(component=component, stop_component=_stop_component)
-                task_status.started(managed_component)
+            async with component_factory() as component:
+                try:
+                    managed_component = cls(component=component, stop_component=_stop_component)
+                    task_status.started(managed_component)
+                    await trio.sleep_forever()
 
-            try:
-                await component_factory(on_started=_on_started)
-
-            finally:
-                if managed_component is not None:
-                    managed_component._component = None
-                component_stopped.set()
+                finally:
+                    # Do this before entering the component's __aexit__ to ensure
+                    # the component cannot be acquired while it is tearing down
+                    if managed_component is not None:
+                        managed_component._component = None
+                    component_stopped.set()
 
     async def stop(self):
         async with self._rwlock.write_acquire():
