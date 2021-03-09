@@ -903,7 +903,7 @@ Fichiers
 ========
 
 
-`GET /workspace/<id>/files`
+`GET /workspace/<id>/files/<folder_id>`
 ----------------------------------
 
 Consulter l'arborescence des fichiers d'un workspace.
@@ -911,7 +911,6 @@ Consulter l'arborescence des fichiers d'un workspace.
 Request:
 ```
 {
-	"folder": <uuid>,
 }
 ```
 
