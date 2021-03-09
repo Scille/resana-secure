@@ -720,18 +720,8 @@ HTTP 200
             "name": <string>,
             "created": <datetime>,
             "updated": <datetime>,
-            "type": "folder",
             "children": {…}
-        }
-        <string>: {
-            "id": <uuid>,
-            "name": <string>,
-            "created": <datetime>,
-            "updated": <datetime>,
-            "type": "file",
-            "size": <int>,
-            "extension": <string>
-        }
+        },
         …
     }
 }
@@ -764,6 +754,7 @@ Response:
 ```
 HTTP 201
 {
+    "id": <id>
 }
 ```
 ou
@@ -971,7 +962,7 @@ Request:
 ```
 {
     "name": <string>,
-    "folder": <id>
+    "parent": <id>,
     "content": <base64>
 }
 ```
@@ -980,6 +971,7 @@ Response:
 ```
 HTTP 201
 {
+    "id": <id>
 }
 ```
 ou
