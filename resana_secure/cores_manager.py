@@ -1,5 +1,5 @@
 import trio
-from uuid import uuid4, UUID
+from uuid import uuid4
 from base64 import b64encode
 from typing import Dict
 from functools import partial
@@ -53,8 +53,8 @@ async def start_core(config: CoreConfig, email: str, key: bytes):
 
 class CoresManager:
     def __init__(self):
-        self._email_to_auth_token: Dict[str, UUID] = {}
-        self._auth_token_to_component_handle: Dict[UUID, int] = {}
+        self._email_to_auth_token: Dict[str, str] = {}
+        self._auth_token_to_component_handle: Dict[str, int] = {}
         self._login_lock = trio.Lock()
 
     async def login(self, email: str, key: bytes) -> str:

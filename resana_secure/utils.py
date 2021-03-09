@@ -64,7 +64,7 @@ def build_apitoken(
 
 
 def apitoken_to_addr(apitoken: str) -> BackendInvitationAddr:
-    organization_id, invitation_type, token = apitoken.split(":")
+    organization_id, invitation_type, raw_token = apitoken.split(":")
     organization_id = OrganizationID(organization_id)
     if invitation_type == "u":
         invitation_type = InvitationType.USER
@@ -72,7 +72,7 @@ def apitoken_to_addr(apitoken: str) -> BackendInvitationAddr:
         invitation_type = InvitationType.DEVICE
     else:
         raise ValueError
-    token = UUID(hex=token)
+    token = UUID(hex=raw_token)
 
     return BackendInvitationAddr.build(
         backend_addr=current_app.config["PARSEC_BACKEND_ADDR"],

@@ -1,5 +1,5 @@
 import trio
-from typing import Dict, Callable
+from typing import Dict, Callable, Type, AsyncIterator
 from functools import partial
 from quart import current_app
 from contextlib import asynccontextmanager
@@ -31,20 +31,26 @@ class BaseLongTermCtx:
     def mark_as_terminated(self):
         self._in_progress_ctx = None
 
+    @asynccontextmanager
     @classmethod
-    async def start(cls, on_started: Callable, config: CoreConfig, addr: BackendInvitationAddr):
+    async def start(
+        cls, on_started: Callable, config: CoreConfig, addr: BackendInvitationAddr
+    ) -> AsyncIterator["BaseLongTermCtx"]:
         raise NotImplementedError
+        yield
 
 
 class BaseInviteManager:
-    _LONG_TERM_CTX_CLS = None
+    _LONG_TERM_CTX_CLS: Type[BaseLongTermCtx]
 
     def __init__(self):
         self._addr_to_claim_ctx: Dict[BackendInvitationAddr, BaseLongTermCtx] = {}
         self._lock = trio.Lock()
 
     @asynccontextmanager
-    async def start_ctx(self, addr: BackendInvitationAddr, **kwargs) -> BaseLongTermCtx:
+    async def start_ctx(
+        self, addr: BackendInvitationAddr, **kwargs
+    ) -> AsyncIterator[BaseLongTermCtx]:
         # The lock is needed here to avoid concurrent claim contexts with the same invitation
         async with self._lock:
             existing_handle = self._addr_to_claim_ctx.pop(addr, None)
@@ -67,7 +73,7 @@ class BaseInviteManager:
             await current_app.ltcm.unregister_component(component_handle)
 
     @asynccontextmanager
-    async def retreive_ctx(self, addr: BackendInvitationAddr) -> BaseLongTermCtx:
+    async def retreive_ctx(self, addr: BackendInvitationAddr) -> AsyncIterator[BaseLongTermCtx]:
         # The lock is needed here to avoid concurrent claim contexts with the same invitation
         async with self._lock:
             try:
@@ -88,7 +94,9 @@ class BaseInviteManager:
 class ClaimLongTermCtx(BaseLongTermCtx):
     @classmethod
     @asynccontextmanager
-    async def start(cls, config: CoreConfig, addr: BackendInvitationAddr):
+    async def start(
+        cls, config: CoreConfig, addr: BackendInvitationAddr
+    ) -> AsyncIterator["ClaimLongTermCtx"]:
         async with backend_invited_cmds_factory(
             addr=addr, keepalive=config.backend_connection_keepalive
         ) as cmds:
@@ -103,7 +111,9 @@ class ClaimersManager(BaseInviteManager):
 class GreetLongTermCtx(BaseLongTermCtx):
     @classmethod
     @asynccontextmanager
-    async def start(cls, config: CoreConfig, device: LocalDevice, addr: BackendInvitationAddr):
+    async def start(
+        cls, config: CoreConfig, device: LocalDevice, addr: BackendInvitationAddr
+    ) -> AsyncIterator["GreetLongTermCtx"]:
         async with backend_authenticated_cmds_factory(
             addr=device.organization_addr,
             device_id=device.device_id,

@@ -2,6 +2,7 @@ import sys
 import os
 import subprocess
 from quart import Blueprint
+from base64 import b64decode
 
 from parsec.api.data import EntryID, EntryName
 from parsec.core.mountpoint import MountpointNotMounted
@@ -58,25 +59,22 @@ async def get_workspace_folders_tree(core, workspace_id):
 
     async def _recursive_build_tree(path, name):
         entry_info = await workspace.path_info(path=path)
+        if entry_info["type"] != "folder":
+            return
         stat = {
             "id": entry_info["id"].hex,
             "name": name,
             "created": entry_info["created"].to_iso8601_string(),
             "updated": entry_info["updated"].to_iso8601_string(),
-            "type": entry_info["type"],
         }
-        if entry_info["type"] == "file":
-            stat["size"] = entry_info["size"]
-            extension = name.rsplit(".", 1)[-1]
-            stat["extension"] = extension if extension != name else ""
-        else:
-            cooked_children = {}
-            for child_name in entry_info["children"]:
-                child_cooked_tree = await _recursive_build_tree(
-                    path=f"{path}/{child_name}", name=child_name
-                )
+        cooked_children = {}
+        for child_name in entry_info["children"]:
+            child_cooked_tree = await _recursive_build_tree(
+                path=f"{path}/{child_name}", name=child_name
+            )
+            if child_cooked_tree:
                 cooked_children[child_name] = child_cooked_tree
-            stat["children"] = cooked_children
+        stat["children"] = cooked_children
         return stat
 
     try:
@@ -119,6 +117,12 @@ async def _create_workspace_entry(core, workspace_id, type):
             parent_entry_id = EntryID(parent_entry_id)
         except (TypeError, ValueError):
             bad_fields.add("parent")
+        if type == "file":
+            content = data.get("content")
+            try:
+                content = b64decode(content)
+            except (TypeError, ValueError):
+                bad_fields.add("content")
 
     result = await entry_id_to_path(workspace, parent_entry_id)
     if not result:
@@ -128,9 +132,15 @@ async def _create_workspace_entry(core, workspace_id, type):
 
     try:
         if type == "folder":
-            await workspace.mkdir(path=path)
+            entry_id = await workspace.transactions.folder_create(path)
         else:
-            await workspace.touch(path=path)
+            entry_id, fd = await workspace.transactions.file_create(path, open=True)
+            try:
+                await workspace.transactions.fd_write(fd, content=content, offset=0)
+
+            finally:
+                await workspace.transactions.fd_close(fd)
+
     except FSWorkspaceNotFoundError:
         raise APIException(404, {"error": "unknown_workspace"})
     except FSBackendOfflineError:
@@ -138,7 +148,7 @@ async def _create_workspace_entry(core, workspace_id, type):
     except FSError as exc:
         raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
 
-    return {}, 201
+    return {"id": entry_id.hex}, 201
 
 
 @files_bp.route("/workspaces/<string:workspace_id>/folders/rename", methods=["POST"])

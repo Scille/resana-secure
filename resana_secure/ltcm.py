@@ -1,5 +1,5 @@
 import trio
-from typing import Callable, Dict, TypeVar, Optional
+from typing import Callable, Dict, TypeVar, Optional, AsyncIterator
 from contextlib import asynccontextmanager
 
 
@@ -18,10 +18,10 @@ class ReadWriteLock:
         self._no_writers.set()
         self._no_readers = trio.Event()
         self._no_readers.set()
-        self._readers_cancel_scopes = {}
+        self._readers_cancel_scopes: Dict[int, trio.CancelScope] = {}
 
     @asynccontextmanager
-    async def read_acquire(self):
+    async def read_acquire(self) -> AsyncIterator[None]:
         while True:
             async with self._lock:
                 if self._no_writers.is_set():
@@ -46,7 +46,7 @@ class ReadWriteLock:
                         raise ReadCancelledByWriter
 
     @asynccontextmanager
-    async def write_acquire(self):
+    async def write_acquire(self) -> AsyncIterator[None]:
         # First declare ourself as the current writer
         while True:
             async with self._lock:
@@ -59,7 +59,7 @@ class ReadWriteLock:
         # Now we must wait for the readers that arrived before us to finish reading
         # To avoid deadlock if a reader is blocked forever, we cancel all readers
         # instead of letting them finish what they are doing
-        for cancel_scope in self._readers_cancel_scopes:
+        for cancel_scope in self._readers_cancel_scopes.values():
             cancel_scope.cancel()
         await self._no_readers.wait()
         try:
@@ -114,7 +114,7 @@ class ManagedComponent:
             await self._stop_component_callback()
 
     @asynccontextmanager
-    async def acquire(self) -> ComponentTypeVar:
+    async def acquire(self) -> AsyncIterator[ComponentTypeVar]:
         try:
             async with self._rwlock.read_acquire():
                 if self._component is None:
@@ -141,7 +141,7 @@ class LTCM:
 
     @classmethod
     @asynccontextmanager
-    async def run(cls):
+    async def run(cls) -> AsyncIterator["LTCM"]:
         async with trio.open_nursery() as nursery:
             yield cls(nursery)
             nursery.cancel_scope.cancel()
@@ -165,7 +165,7 @@ class LTCM:
         return handle in self._components
 
     @asynccontextmanager
-    async def acquire_component(self, handle: int) -> ComponentTypeVar:
+    async def acquire_component(self, handle: int) -> AsyncIterator[ComponentTypeVar]:
         try:
             managed_component = self._components[handle]
         except KeyError:
