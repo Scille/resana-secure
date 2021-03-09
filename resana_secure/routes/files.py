@@ -231,10 +231,12 @@ async def _rename_workspace_entry(core, workspace_id, expected_entry_type):
 @files_bp.route("/workspaces/<string:workspace_id>/folders/<string:folder_id>", methods=["DELETE"])
 @authenticated
 async def delete_workspace_folder(core, workspace_id, folder_id):
-    return await _delete_workspace_entry(core, workspace_id, folder_id, type="folder")
+    return await _delete_workspace_entry(
+        core, workspace_id, folder_id, expected_entry_type="folder"
+    )
 
 
-async def _delete_workspace_entry(core, workspace_id, entry_id, type):
+async def _delete_workspace_entry(core, workspace_id, entry_id, expected_entry_type):
     try:
         workspace_id = EntryID(workspace_id)
     except ValueError:
@@ -256,7 +258,7 @@ async def _delete_workspace_entry(core, workspace_id, entry_id, type):
     path, _ = result
 
     try:
-        if type == "folder":
+        if expected_entry_type == "folder":
             await workspace.rmdir(path=path)
         else:
             await workspace.unlink(path=path)
@@ -283,31 +285,29 @@ async def _delete_workspace_entry(core, workspace_id, entry_id, type):
 ### Files ###
 
 
-@files_bp.route("/workspaces/<string:workspace_id>/files", methods=["GET"])
+@files_bp.route("/workspaces/<string:workspace_id>/files/<string:folder_id>", methods=["GET"])
 @authenticated
-async def get_workspace_folder_content(core, workspace_id):
+async def get_workspace_folder_content(core, workspace_id, folder_id):
     try:
         workspace_id = EntryID(workspace_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
     try:
+        folder_id = EntryID(folder_id)
+    except ValueError:
+        raise APIException(404, {"error": "unknown_folder"})
+
+    try:
         workspace = core.user_fs.get_workspace(workspace_id)
     except FSWorkspaceNotFoundError:
         raise APIException(404, {"error": "unknown_workspace"})
-
-    async with check_data() as (data, bad_fields):
-        folder_id = data.get("folder")
-        try:
-            folder_id = EntryID(folder_id)
-        except (TypeError, ValueError):
-            bad_fields.add("folder")
 
     async def _build_cooked_files():
         folder_path, folder_stat = await entry_id_to_path(workspace, folder_id)
         if folder_stat["type"] != "folder":
             raise APIException(404, {"error": "unknown_folder"})
-        cooked_files = {}
+        cooked_files = []
         for child_name in folder_stat["children"]:
             child_stat = await workspace.path_info(path=folder_path / child_name)
             if child_stat["type"] == "folder":
@@ -336,7 +336,7 @@ async def get_workspace_folder_content(core, workspace_id):
     except FSError as exc:
         raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
 
-    return 200, {"files": cooked_files}
+    return {"files": cooked_files}, 200
 
 
 @files_bp.route("/workspaces/<string:workspace_id>/files", methods=["POST"])
