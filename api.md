@@ -13,11 +13,6 @@ Pre-Authentification
 
 Récupère la "encrypted master key RESANA Secure" depuis le serveur RESANA.
 
-Request:
-```
-{}
-```
-
 Response:
 ```
 HTTP 200
@@ -99,12 +94,6 @@ Utilisateurs & invitations
 `query` est recherchée contre les champs human_handle.email et human_handle.label, les match partiel sont acceptés.
 (par example, `query=john` va matcher contre `email:john.doe@example.com` et contre `Bob Johnson`)
 
-Request:
-```
-{
-}
-```
-
 Response:
 ```
 HTTP 200
@@ -158,12 +147,6 @@ ou
 ------------------
 
 Récupère la list des invitations en cours.
-
-Request:
-```
-{
-}
-```
 
 Response:
 ```
@@ -553,12 +536,6 @@ Workspace
 
 Récupère la list des workspaces.
 
-Request:
-```
-{
-}
-```
-
 Response:
 ```
 HTTP 200
@@ -630,12 +607,6 @@ Note: le renommage d'un workspace n'impacte que l'utilisateur réalisant ce reno
 
 Récupère le informations de partage d'un workspace.
 
-Request:
-```
-{
-}
-```
-
 Response:
 ```
 HTTP 200
@@ -698,12 +669,6 @@ Dossiers
 ----------------------------------
 
 Consulter l'arborescence d'un workspace.
-
-Request:
-```
-{
-}
-```
 
 Response:
 ```
@@ -841,6 +806,7 @@ ou
 - HTTP 403 si l'utilisateur n'a pas le profil `OWNER`/`MANAGER`/`CONTRIBUTER` sur le workspace
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accèder n'est pas dans le cache local)
 
+
 `DELETE /workspace/<id>/folders/<id>`
 -----------------------------------
 
@@ -897,8 +863,6 @@ ou
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accèder n'est pas dans le cache local)
 
 
-
-
 Fichiers
 ========
 
@@ -908,15 +872,7 @@ Fichiers
 
 Consulter l'arborescence des fichiers d'un workspace.
 
-Request:
-```
-{
-}
-```
-
-
-```
-
+Response:
 ```
 HTTP 200
 {
@@ -949,7 +905,6 @@ HTTP 404
 ```
 ou
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accèder n'est pas dans le cache local)
-
 
 
 `POST /workspace/<id>/files`
@@ -1071,8 +1026,6 @@ ou
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accèder n'est pas dans le cache local)
 
 
-
-
 `POST /workspace/<id>/open/<id>`
 --------------------------------
 
@@ -1113,12 +1066,6 @@ ou
 ----------------------------------
 
 Récupère les information de rechiffrement du workspace.
-
-Request:
-```
-{
-}
-```
 
 Response:
 ```
