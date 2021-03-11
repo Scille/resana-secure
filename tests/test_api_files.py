@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import ANY
 
 
-class TestBed:
+class FilesTestBed:
     def __init__(self, authenticated_client, wid, root_entry_id):
         self.authenticated_client = authenticated_client
         self.wid = wid
@@ -111,7 +111,7 @@ async def testbed(authenticated_client):
     assert response.status_code == 200
     root_entry_id = body["id"]
 
-    return TestBed(authenticated_client, wid, root_entry_id)
+    return FilesTestBed(authenticated_client, wid, root_entry_id)
 
 
 @pytest.mark.trio

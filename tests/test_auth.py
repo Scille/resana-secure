@@ -91,7 +91,9 @@ async def test_authenticated_routes(test_app, routes_samples):
             continue
         test_client = test_app.test_client()
         response = await getattr(test_client, method.lower())(route)
-        if route == "/auth":
+        if route == "/":
+            assert response.status_code == 200
+        elif route == "/auth":
             assert response.status_code == 400
         else:
             assert response.status_code == 401
@@ -108,6 +110,7 @@ async def test_cors_routes(test_app, client_origin, routes_samples):
         )
         assert response.status_code == 200
         assert response.headers.get("Access-Control-Allow-Origin") == client_origin
+        assert response.headers.get("Access-Control-Allow-Credentials") == "true"
         assert (
             response.headers.get("Access-Control-Allow-Methods")
             == "GET, HEAD, POST, OPTIONS, PUT, PATCH, DELETE"
