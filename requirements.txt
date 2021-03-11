@@ -1,4 +1,4 @@
-Quart
-Quart-Trio
-Quart-CORS
+Quart==0.14.1
+Quart-Trio==0.7.0
+Quart-CORS==0.4.0
 -e subtree/parsec-cloud[backend,core]
