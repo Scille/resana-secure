@@ -1,9 +1,11 @@
 import argparse
 from pathlib import Path
 import trio
+import re
 import secrets
 from functools import partial
 from typing import List
+from quart import current_app
 from quart_cors import cors
 from quart_trio import QuartTrio
 from contextlib import asynccontextmanager
@@ -31,6 +33,38 @@ async def app_factory(
     app.register_blueprint(invite_bp)
     app.register_blueprint(workspaces_bp)
     app.register_blueprint(invitations_bp)
+
+    @app.route("/", methods=["GET"])
+    async def landing_page():
+        routes = sorted(
+            [
+                (rule.methods, re.sub(r"<\w+:(\w+)>", r"{\1}", rule.rule))
+                for rule in current_app.url_map.iter_rules()
+            ],
+            key=lambda x: x[1],
+        )
+        body = "<h1>Resana Secure - Parsec client</h1>"
+        body += "<h2>Available routes</h2>"
+        body += "<ul>"
+        for methods, url in routes:
+            methods_display = ", ".join(methods - {"HEAD", "OPTIONS"})
+            if methods_display:
+                body += f"<li>{methods_display} <a href={url}>{url}</a></li>"
+        body += "</ul>"
+
+        return (
+            f"""
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+        <title>Resana Secure - Parsec client</title>
+</head>
+<body>
+{body}
+</body>
+""",
+            200,
+        )
 
     app.config.from_mapping(
         # Secret key changes each time the application is started, this is
