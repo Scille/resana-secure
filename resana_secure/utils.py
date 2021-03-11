@@ -33,8 +33,17 @@ class APIException(HTTPException):
 def authenticated(fn):
     @wraps(fn)
     async def wrapper(*args, **kwargs):
-        # global auth_token
-        auth_token = session.get("logged_in", "")
+        authorization_header = request.headers.get("authorization")
+        if authorization_header is None:
+            auth_token = session.get("logged_in", "")
+        else:
+            try:
+                auth_type, auth_token = authorization_header.split(None, 1)
+                if auth_type.lower() != "bearer":
+                    auth_token = ""
+            except ValueError:
+                auth_token = ""
+
         try:
             async with current_app.cores_manager.get_core(auth_token) as core:
                 return await fn(*args, core=core, **kwargs)

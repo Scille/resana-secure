@@ -1,6 +1,7 @@
 import pytest
 import re
 from base64 import b64encode
+from unittest.mock import ANY
 
 
 @pytest.mark.trio
@@ -9,14 +10,22 @@ async def test_authentication(test_app, local_device):
 
     # Test authenticated route without session token
     response = await test_client.get("/workspaces")
+    body = await response.get_json()
     assert response.status_code == 401
+    assert body == {"error": "authentication_requested"}
 
     # Now proceed to the auth
     response = await test_client.post(
         "/auth",
         json={"email": local_device.email, "key": b64encode(local_device.key).decode("ascii")},
     )
+    body = await response.get_json()
     assert response.status_code == 200
+    # Auth token is provided by the api...
+    assert body == {"token": ANY}
+    auth_token = body["token"]
+    assert isinstance(auth_token, str)
+    # ...and also set as cookie
     assert len(response.headers.get_all("set-cookie")) == 1
     match = re.match(
         r"^session=([a-zA-Z0-9.\-_]+); HttpOnly; Path=/; SameSite=Strict$",
@@ -33,7 +42,16 @@ async def test_authentication(test_app, local_device):
     response = await test_client.get("/workspaces")
     assert response.status_code == 401
 
+    # Auth token allow us to use the authenticated route
+    response = await test_client.get(
+        "/workspaces", headers={"Authorization": f"Bearer {auth_token}"}
+    )
+    assert response.status_code == 200
+
     # Invalid token should be rejected
+    response = await test_client.get("/workspaces", headers={"Authorization": "Bearer dummy"})
+    assert response.status_code == 401
+
     dummy_session_cookie = "eyJsb2dnZWRfaW4iOiI1ODU5NWY1OTI1OTA0NGMyYTE1ODg4NGFlYzY5NGJkOCJ9.YDeKyQ.46LVu1VFkoZISHp-5xaXDK-sjDk"
     test_client.set_cookie(server_name="127.0.0.1", key="session", value=dummy_session_cookie)
     response = await test_client.get("/workspaces")

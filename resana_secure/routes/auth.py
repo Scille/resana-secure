@@ -34,4 +34,4 @@ async def do_auth():
         raise APIException(404, {"error": "already_authenticated"})
 
     session["logged_in"] = auth_token
-    return {}, 200
+    return {"token": auth_token}, 200
