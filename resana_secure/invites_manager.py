@@ -1,3 +1,4 @@
+from resana_secure.ltcm import ComponentNotRegistered
 import trio
 from typing import Dict, Callable, Type, AsyncIterator
 from functools import partial
@@ -55,7 +56,10 @@ class BaseInviteManager:
         async with self._lock:
             existing_handle = self._addr_to_claim_ctx.pop(addr, None)
             if existing_handle:
-                await current_app.ltcm.unregister_component(existing_handle)
+                try:
+                    await current_app.ltcm.unregister_component(existing_handle)
+                except ComponentNotRegistered:
+                    pass
 
             config = load_config(current_app.config["CORE_CONFIG_DIR"])
             component_handle = await current_app.ltcm.register_component(
@@ -66,11 +70,18 @@ class BaseInviteManager:
         # Note we don't protect against concurrent use of the claim context.
         # This is fine given claim contexts are immutables and the Parsec server
         # knows how to deal with concurrent requests.
-        async with current_app.ltcm.acquire_component(component_handle) as component:
-            yield component
+        try:
+            async with current_app.ltcm.acquire_component(component_handle) as component:
+                yield component
+        except ComponentNotRegistered as exc:
+            # The component has probably crashed...
+            raise LongTermCtxNotStarted from exc
 
         if component.get_in_progress_ctx() is None:
-            await current_app.ltcm.unregister_component(component_handle)
+            try:
+                await current_app.ltcm.unregister_component(component_handle)
+            except ComponentNotRegistered:
+                pass
 
     @asynccontextmanager
     async def retreive_ctx(self, addr: BackendInvitationAddr) -> AsyncIterator[BaseLongTermCtx]:
@@ -84,11 +95,18 @@ class BaseInviteManager:
         # Note we don't protect against concurrent use of the claim context.
         # This is fine given claim contexts are immutables and the Parsec server
         # knows how to deal with concurrent requests.
-        async with current_app.ltcm.acquire_component(component_handle) as component:
-            yield component
+        try:
+            async with current_app.ltcm.acquire_component(component_handle) as component:
+                yield component
+        except ComponentNotRegistered as exc:
+            # The component has probably crashed...
+            raise LongTermCtxNotStarted from exc
 
         if component.get_in_progress_ctx() is None:
-            await current_app.ltcm.unregister_component(component_handle)
+            try:
+                await current_app.ltcm.unregister_component(component_handle)
+            except ComponentNotRegistered:
+                pass
 
 
 class ClaimLongTermCtx(BaseLongTermCtx):

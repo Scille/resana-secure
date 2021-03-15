@@ -1,11 +1,12 @@
 import trio
 from uuid import uuid4
 from base64 import b64encode
-from typing import Dict
+from typing import Callable, Dict, Optional
 from functools import partial
 from quart import current_app
 from contextlib import asynccontextmanager
 
+from parsec.core.types import LocalDevice
 from parsec.core.logged_core import logged_core_factory, LoggedCore
 from parsec.core.config import load_config, CoreConfig
 from parsec.core.local_device import (
@@ -17,38 +18,50 @@ from parsec.core.local_device import (
 from .ltcm import ComponentNotRegistered
 
 
-class CoreNotLoggedError(Exception):
+class CoreManagerError(Exception):
     pass
 
 
-class CoreUnknownEmailError(Exception):
+class CoreNotLoggedError(CoreManagerError):
     pass
 
 
-class CoreAlreadyLoggedError(Exception):
+class CoreDeviceNotFoundError(CoreManagerError):
     pass
 
 
-@asynccontextmanager
-async def start_core(config: CoreConfig, email: str, key: bytes):
+class CoreDeviceInvalidKeyError(CoreManagerError):
+    pass
+
+
+def load_device_or_error(config: CoreConfig, email: str, key: bytes) -> Optional[LocalDevice]:
+    found_email = False
     for available_device in list_available_devices(config.config_dir):
         if available_device.human_handle and available_device.human_handle.email == email:
+            found_email = True
             try:
                 password = b64encode(key).decode(
                     "ascii"
                 )  # TODO: use key (made of bytes) directly instead
-                device = load_device_with_password(available_device.key_file_path, password)
-                break
+                return load_device_with_password(available_device.key_file_path, password)
 
             except LocalDeviceError:
                 # Maybe another device file is available for this email...
                 continue
-
     else:
-        raise CoreUnknownEmailError("No avaible device for this email")
+        if found_email:
+            raise CoreDeviceInvalidKeyError
+        else:
+            raise CoreDeviceNotFoundError
 
+
+@asynccontextmanager
+async def start_core(config: CoreConfig, device: LocalDevice, on_stopped: Callable):
     async with logged_core_factory(config, device) as core:
-        yield core
+        try:
+            yield core
+        finally:
+            on_stopped()
 
 
 class CoresManager:
@@ -58,16 +71,35 @@ class CoresManager:
         self._login_lock = trio.Lock()
 
     async def login(self, email: str, key: bytes) -> str:
+        """
+        Raises:
+            CoreDeviceNotFoundError
+            CoreDeviceInvalidKeyError
+        """
+        # First load the device from disk
+        # This operation can be done concurrently and ensures the email/key couple is valid
+        config = load_config(current_app.config["CORE_CONFIG_DIR"])
+        device = load_device_or_error(config=config, email=email, key=key)
+
         # The lock is needed here to avoid concurrent logins with the same email
         async with self._login_lock:
+            # Return existing auth_token if the login has already be done for this device
             existing_auth_token = self._email_to_auth_token.get(email)
-            if current_app.ltcm.is_registered_component(existing_auth_token):
-                raise CoreAlreadyLoggedError
+            if existing_auth_token:
+                # No need to check if the related component is still available
+                # given `_on_stopped` callback (see below) makes sure to
+                # remove the mapping as soon as the core is starting it teardown
+                return existing_auth_token
+
+            # Actual login is required
+
+            def _on_stopped():
+                self._auth_token_to_component_handle.pop(auth_token, None)
+                self._email_to_auth_token.pop(email, None)
 
             auth_token = uuid4().hex
-            config = load_config(current_app.config["CORE_CONFIG_DIR"])
             component_handle = await current_app.ltcm.register_component(
-                partial(start_core, config=config, email=email, key=key)
+                partial(start_core, config=config, device=device, on_stopped=_on_stopped)
             )
             self._auth_token_to_component_handle[auth_token] = component_handle
             self._email_to_auth_token[email] = auth_token
@@ -75,6 +107,10 @@ class CoresManager:
             return auth_token
 
     async def logout(self, auth_token: str) -> None:
+        """
+        Raises:
+            CoreNotLoggedError
+        """
         # Unlike login, logout is idempotent (because LTCM.unregister_component is)
         # so it's ok to have concurrent call with the same auth_token
         try:
@@ -85,16 +121,16 @@ class CoresManager:
 
         try:
             await current_app.ltcm.unregister_component(component_handle)
-            # Clear token-to-handle mapping last to avoid unreaching component
-            # if cancellation occurs during logout at the wrong time
-            self._auth_token_to_component_handle.pop(auth_token, None)
 
         except ComponentNotRegistered as exc:
-            self._auth_token_to_component_handle.pop(auth_token, None)
             raise CoreNotLoggedError from exc
 
     @asynccontextmanager
     async def get_core(self, auth_token: str) -> LoggedCore:
+        """
+        Raises:
+            CoreNotLoggedError
+        """
         try:
             component_handle = self._auth_token_to_component_handle[auth_token]
 

@@ -22,6 +22,9 @@ class ReadWriteLock:
 
     @asynccontextmanager
     async def read_acquire(self) -> AsyncIterator[None]:
+        """
+        Raises: ReadCancelledByWriter
+        """
         while True:
             async with self._lock:
                 if self._no_writers.is_set():
@@ -47,6 +50,9 @@ class ReadWriteLock:
 
     @asynccontextmanager
     async def write_acquire(self) -> AsyncIterator[None]:
+        """
+        Raises: Nothing
+        """
         # First declare ourself as the current writer
         while True:
             async with self._lock:
@@ -85,6 +91,9 @@ class ManagedComponent:
 
     @classmethod
     async def run(cls, component_factory: Callable, task_status=trio.TASK_STATUS_IGNORED):
+        """
+        Raises: Nothing
+        """
         with trio.CancelScope() as cancel_scope:
             component_stopped = trio.Event()
 
@@ -108,6 +117,9 @@ class ManagedComponent:
                     component_stopped.set()
 
     async def stop(self):
+        """
+        Raises: Nothing
+        """
         async with self._rwlock.write_acquire():
             # _stop_component_callback is idempotent so no need to check
             # if the component is actually still running
@@ -115,6 +127,9 @@ class ManagedComponent:
 
     @asynccontextmanager
     async def acquire(self) -> AsyncIterator[ComponentTypeVar]:
+        """
+        Raises: ComponentNotRegistered
+        """
         try:
             async with self._rwlock.read_acquire():
                 if self._component is None:
@@ -142,11 +157,17 @@ class LTCM:
     @classmethod
     @asynccontextmanager
     async def run(cls) -> AsyncIterator["LTCM"]:
+        """
+        Raises: Nothing
+        """
         async with trio.open_nursery() as nursery:
             yield cls(nursery)
             nursery.cancel_scope.cancel()
 
     async def register_component(self, component_factory: Callable) -> int:
+        """
+        Raises: Nothing
+        """
         async with self._lock:
             managed_component = await self._nursery.start(ManagedComponent.run, component_factory)
             handle = id(managed_component)
@@ -154,6 +175,9 @@ class LTCM:
             return handle
 
     async def unregister_component(self, handle: int) -> None:
+        """
+        Raises: ComponentNotRegistered
+        """
         async with self._lock:
             try:
                 managed_component = self._components.pop(handle)
@@ -166,6 +190,9 @@ class LTCM:
 
     @asynccontextmanager
     async def acquire_component(self, handle: int) -> AsyncIterator[ComponentTypeVar]:
+        """
+        Raises: ComponentNotRegistered
+        """
         try:
             managed_component = self._components[handle]
         except KeyError:
