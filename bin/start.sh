@@ -2,8 +2,10 @@
 set -e
 
 CONFIG_DIR=$HOME/resana_secure_config
-CLIENT_ORIGIN=http://127.0.0.1:9000
-BACKEND_ADDR=parsec://127.0.0.1:6777?no_ssl=true
+CLIENT_ORIGIN="http://127.0.0.1:9000"
+BACKEND_DOMAIN="127.0.0.1:6777"
+BACKEND_ADDR="parsec://$BACKEND_DOMAIN?no_ssl=true"
+BOOTSTRAP_ORG_ADDR="parsec://$BACKEND_DOMAIN/ResanaSecureOrg?no_ssl=true&action=bootstrap_organization"
 
 # scalingo doesn't support libfuse, so mock around to disable fuse mountpoint
 sed -is 's/runner = get_mountpoint_runner()/async def runner(*args, **kwargs): None/' subtree/parsec-cloud/parsec/core/mountpoint/manager.py
@@ -17,10 +19,9 @@ parsec backend run --dev --spontaneous-organization-bootstrap &
 python -c "
 from time import sleep
 from urllib.request import urlopen, URLError
-url = '$BACKEND_ADDR'.replace('parsec://', 'http://')
 for i in range(10):
     try:
-        urlopen(url)
+        urlopen('http://$BACKEND_DOMAIN')
         break
     except URLError:
         print('Retrying...')
@@ -30,8 +31,7 @@ else:
 "
 
 # Now bootstrap organization
-parsec core bootstrap_organization \
-    'parsec://127.0.0.1:6777/touillette42?no_ssl=true&action=bootstrap_organization' \
+parsec core bootstrap_organization $BOOTSTRAP_ORG_ADDR \
     --config-dir=$CONFIG_DIR \
     --password='UEBzc3cwcmQu' \
     --human-label='-unknown-' \
