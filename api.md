@@ -75,13 +75,47 @@ Request:
 Response:
 ```
 HTTP 200
-Set-Cookie: SESSIONID=<cookie-value>; HttpOnly; SameSite=Strict
+Set-Cookie: session=<token>; HttpOnly; Path=/; SameSite=Strict
 {
+    "token": <token>
 }
 ```
 ou
 - HTTP 404: le poste n'a pas été enrôlé pour cet utilisateur (i.e. il ne contient pas de fichier de clés de Device à déchiffrer)
 - HTTP 400: la clé de déchiffrement est invalide
+
+Une fois obtenu, le token d'authentification est
+```
+Authorization: Bearer <token>
+```
+
+
+`DELETE /auth`
+--------------
+
+Met fin à l'authentification auprès du client Parsec et invalide the token d'authentification.
+
+Response:
+```
+HTTP 200
+Set-Cookie: session=; Expires=Thu, 01-Jan-1970 00:00:00 GMT; Max-Age=0; Path=/
+{
+}
+```
+
+
+`DELETE /auth`
+--------------
+
+Met fin à l'authentification auprès du client Parsec et invalide the token d'authentification.
+
+Response:
+```
+HTTP 200
+Set-Cookie: session=; Expires=Thu, 01-Jan-1970 00:00:00 GMT; Max-Age=0; Path=/
+{
+}
+```
 
 
 Utilisateurs & invitations
@@ -242,7 +276,15 @@ HTTP 204
 {
 }
 ```
-ou- HTTP 404 si le token n'existe pas
+ou
+```
+HTTP 400
+{
+    "error": "invitation_already_used"
+}
+```
+ou
+- HTTP 404 si le token n'existe pas
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
 - HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
@@ -351,16 +393,14 @@ Ajoute le pair dans Parsec
 Request:
 pour un enrôlement de device:
 ```
-HTTP 200
 {
 }
 ```
 ou pour un enrôlement de user:
 ```
-HTTP 200
 {
     "claimer_email": <string>,
-    "granted_profile": <string>,
+    "granted_profile": <string>
 }
 ```
 `granted_profile` peut être: `ADMIN` ou `STANDARD`
@@ -506,7 +546,6 @@ Ajoute le pair dans Parsec
 
 Request:
 ```
-HTTP 200
 {
     "key": <base64>
 }

@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 from .cores_manager import CoresManager
 from .invites_manager import ClaimersManager, GreetersManager
 from .routes.auth import auth_bp
+from .routes.humans import humans_bp
 from .routes.files import files_bp
 from .routes.invite import invite_bp
 from .routes.workspaces import workspaces_bp
@@ -29,6 +30,7 @@ async def app_factory(
     app = QuartTrio(__name__, static_folder=None)
     cors(app)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(humans_bp)
     app.register_blueprint(files_bp)
     app.register_blueprint(invite_bp)
     app.register_blueprint(workspaces_bp)

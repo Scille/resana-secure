@@ -59,11 +59,68 @@ async def test_authentication(test_app, local_device):
 
 
 @pytest.mark.trio
+async def test_multi_authentication(test_app, local_device):
+    test_client = test_app.test_client()
+
+    # First auth
+    response = await test_client.post(
+        "/auth",
+        json={"email": local_device.email, "key": b64encode(local_device.key).decode("ascii")},
+    )
+    body = await response.get_json()
+    assert response.status_code == 200
+    token = body["token"]
+
+    # Additional auth, should return the same token
+    response = await test_client.post(
+        "/auth",
+        json={"email": local_device.email, "key": b64encode(local_device.key).decode("ascii")},
+    )
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body["token"] == token
+
+    # Additional auth, but with invalid key
+    response = await test_client.post(
+        "/auth",
+        json={
+            "email": local_device.email,
+            "key": b64encode(local_device.key + b"dummy").decode("ascii"),
+        },
+    )
+    body = await response.get_json()
+    assert response.status_code == 400
+
+    # logout
+    response = await test_client.delete("/auth")
+    body = await response.get_json()
+    assert response.status_code == 200
+    # Cookie should be removed
+    assert len(response.headers.get_all("set-cookie")) == 1
+    assert (
+        response.headers.get("set-cookie")
+        == "session=; Expires=Thu, 01-Jan-1970 00:00:00 GMT; Max-Age=0; Path=/"
+    )
+
+
+@pytest.mark.trio
+async def test_logout_without_auth(test_app):
+    test_client = test_app.test_client()
+
+    response = await test_client.delete("/auth")
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {}
+
+
+@pytest.mark.trio
 async def test_authentication_unknown_email(test_app):
     test_client = test_app.test_client()
 
     response = await test_client.post("/auth", json={"email": "john@doe.com", "key": ""})
+    body = await response.get_json()
     assert response.status_code == 404
+    assert body == {"error": "bad_email"}
 
 
 @pytest.mark.trio
@@ -71,14 +128,31 @@ async def test_authentication_bad_key(test_app, local_device):
     test_client = test_app.test_client()
 
     response = await test_client.post("/auth", json={"email": local_device.email, "key": ""})
-    assert response.status_code == 404
+    body = await response.get_json()
+    assert response.status_code == 400
+    assert body == {"error": "bad_key"}
 
 
 @pytest.mark.trio
-async def test_authentication_body_not_json(test_app, local_device):
+@pytest.mark.parametrize("kind", ["missing_header", "bad_header", "bad_body", "missing_body"])
+async def test_authentication_body_not_json(test_app, kind):
     test_client = test_app.test_client()
-    response = await test_client.post("/auth")
+    if kind == "missing_body":
+        data = None
+    elif kind == "bad_body":
+        data = b"<not_json>"
+    else:
+        data = b"{}"
+    if kind == "missing_header":
+        headers = {}
+    elif kind == "bad_header":
+        headers = {"Content-Type": "application/dummy"}
+    else:
+        headers = {"Content-Type": "application/json"}
+    response = await test_client.post("/auth", headers=headers, data=data)
+    body = await response.get_json()
     assert response.status_code == 400
+    assert body == {"error": "json_body_expected"}
 
 
 @pytest.fixture
@@ -90,6 +164,7 @@ def routes_samples(test_app):
         "entry_id": "c0f0b18ee7634d01bd7ae9533d1222ef",
         "subpath": "foo/bar",  # TODO
         "apitoken": "7a0a3d1038bb4a22ba6d310abcc198d4",
+        "email": "bob@example.com",
     }
     routes = []
     for rule in test_app.app.url_map.iter_rules():
@@ -109,10 +184,12 @@ async def test_authenticated_routes(test_app, routes_samples):
             continue
         test_client = test_app.test_client()
         response = await getattr(test_client, method.lower())(route)
-        if route == "/":
+        if route == "/" and method in ("GET", "HEAD"):
             assert response.status_code == 200
-        elif route == "/auth":
+        elif route == "/auth" and method == "POST":
             assert response.status_code == 400
+        elif route == "/auth" and method == "DELETE":
+            assert response.status_code == 200
         else:
             assert response.status_code == 401
 

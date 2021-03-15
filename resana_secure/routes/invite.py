@@ -4,15 +4,7 @@ import platform
 from parsec.api.protocol import InvitationType, HumanHandle
 from parsec.api.data import UserProfile
 from parsec.core.local_device import save_device_with_password
-from parsec.core.backend_connection import (
-    BackendConnectionError,
-    BackendNotAvailable,
-    BackendConnectionRefused,
-)
 from parsec.core.invite import (
-    InviteError,
-    InviteNotFoundError,
-    InviteAlreadyUsedError,
     UserClaimInitialCtx,
     DeviceClaimInitialCtx,
     UserClaimInProgress1Ctx,
@@ -29,7 +21,13 @@ from parsec.core.invite import (
     DeviceGreetInProgress3Ctx,
 )
 
-from ..utils import authenticated, check_data, APIException, apitoken_to_addr
+from ..utils import (
+    authenticated,
+    check_data,
+    APIException,
+    apitoken_to_addr,
+    backend_errors_to_api_exceptions,
+)
 
 # from ..invites_manager import LongTermCtxNotStarted  # TODO: handle this exception
 
@@ -48,23 +46,12 @@ async def greeter_1_wait_peer_ready(core, apitoken):
     except ValueError:
         raise APIException(404, {"error": "unknown_token"})
 
-    try:
+    with backend_errors_to_api_exceptions():
         async with current_app.greeters_manager.start_ctx(
             device=core.device, addr=addr
         ) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
             # `do_wait_peer` has been done in `start_greeting_ctx` so nothing more to do
-
-    except InviteNotFoundError:
-        raise APIException(404, {"error": "unknown_token"})
-    except InviteAlreadyUsedError:
-        raise APIException(400, {"error": "invitation_already_used"})
-    except BackendNotAvailable:
-        raise APIException(503, {"error": "offline"})
-    except BackendConnectionRefused:
-        raise APIException(502, {"error": "connection_refused_by_server"})
-    except (BackendConnectionError, InviteError) as exc:
-        raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
 
     return (
         {
@@ -83,7 +70,7 @@ async def greeter_2_wait_peer_trust(core, apitoken):
     except ValueError:
         raise APIException(404, {"error": "unknown_token"})
 
-    try:
+    with backend_errors_to_api_exceptions():
         async with current_app.greeters_manager.retreive_ctx(addr) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
             if not isinstance(
@@ -97,17 +84,6 @@ async def greeter_2_wait_peer_trust(core, apitoken):
             candidate_claimer_sas = [
                 str(x) for x in in_progress_ctx.generate_claimer_sas_choices(size=4)
             ]
-
-    except InviteNotFoundError:
-        raise APIException(404, {"error": "unknown_token"})
-    except InviteAlreadyUsedError:
-        raise APIException(400, {"error": "invitation_already_used"})
-    except BackendNotAvailable:
-        raise APIException(503, {"error": "offline"})
-    except BackendConnectionRefused:
-        raise APIException(502, {"error": "connection_refused_by_server"})
-    except (BackendConnectionError, InviteError) as exc:
-        raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
 
     return {"candidate_claimer_sas": candidate_claimer_sas}, 200
 
@@ -125,7 +101,7 @@ async def greeter_3_check_trust(core, apitoken):
         if not isinstance(claimer_sas, str):
             bad_fields.add("claimer_sas")
 
-    try:
+    with backend_errors_to_api_exceptions():
         async with current_app.greeters_manager.retreive_ctx(addr) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
             if not isinstance(
@@ -138,17 +114,6 @@ async def greeter_3_check_trust(core, apitoken):
 
             in_progress_ctx = await in_progress_ctx.do_signify_trust()
             lifetime_ctx.update_in_progress_ctx(in_progress_ctx)
-
-    except InviteNotFoundError:
-        raise APIException(404, {"error": "unknown_token"})
-    except InviteAlreadyUsedError:
-        raise APIException(400, {"error": "invitation_already_used"})
-    except BackendNotAvailable:
-        raise APIException(503, {"error": "offline"})
-    except BackendConnectionRefused:
-        raise APIException(502, {"error": "connection_refused_by_server"})
-    except (BackendConnectionError, InviteError) as exc:
-        raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
 
     return {}, 200
 
@@ -174,7 +139,7 @@ async def greeter_4_finalize(core, apitoken):
             else:
                 bad_fields.add("granted_profile")
 
-    try:
+    with backend_errors_to_api_exceptions():
         async with current_app.greeters_manager.retreive_ctx(addr) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
 
@@ -198,17 +163,6 @@ async def greeter_4_finalize(core, apitoken):
 
             lifetime_ctx.mark_as_terminated()
 
-    except InviteNotFoundError:
-        raise APIException(404, {"error": "unknown_token"})
-    except InviteAlreadyUsedError:
-        raise APIException(400, {"error": "invitation_already_used"})
-    except BackendNotAvailable:
-        raise APIException(503, {"error": "offline"})
-    except BackendConnectionRefused:
-        raise APIException(502, {"error": "connection_refused_by_server"})
-    except (BackendConnectionError, InviteError) as exc:
-        raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
-
     return {}, 200
 
 
@@ -225,22 +179,11 @@ async def claimer_0_retreive_info(apitoken):
     except ValueError:
         raise APIException(404, {"error": "unknown_token"})
 
-    try:
+    with backend_errors_to_api_exceptions():
         async with current_app.claimers_manager.start_ctx(addr) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
             type = "user" if addr.invitation_type == InvitationType.USER else "device"
             greeter_email = in_progress_ctx.greeter_human_handle.email
-
-    except InviteNotFoundError:
-        raise APIException(404, {"error": "unknown_token"})
-    except InviteAlreadyUsedError:
-        raise APIException(400, {"error": "invitation_already_used"})
-    except BackendNotAvailable:
-        raise APIException(503, {"error": "offline"})
-    except BackendConnectionRefused:
-        raise APIException(502, {"error": "connection_refused_by_server"})
-    except (BackendConnectionError, InviteError) as exc:
-        raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
 
     return {"type": type, "greeter_email": greeter_email}, 200
 
@@ -252,7 +195,7 @@ async def claimer_1_wait_peer_ready(apitoken):
     except ValueError:
         raise APIException(404, {"error": "unknown_token"})
 
-    try:
+    with backend_errors_to_api_exceptions():
         async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
             if not isinstance(in_progress_ctx, (UserClaimInitialCtx, DeviceClaimInitialCtx)):
@@ -263,17 +206,6 @@ async def claimer_1_wait_peer_ready(apitoken):
             candidate_greeter_sas = [
                 str(x) for x in in_progress_ctx.generate_greeter_sas_choices(size=4)
             ]
-
-    except InviteNotFoundError:
-        raise APIException(404, {"error": "unknown_token"})
-    except InviteAlreadyUsedError:
-        raise APIException(400, {"error": "invitation_already_used"})
-    except BackendNotAvailable:
-        raise APIException(503, {"error": "offline"})
-    except BackendConnectionRefused:
-        raise APIException(502, {"error": "connection_refused_by_server"})
-    except (BackendConnectionError, InviteError) as exc:
-        raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
 
     return {"candidate_greeter_sas": candidate_greeter_sas}, 200
 
@@ -290,18 +222,20 @@ async def claimer_2_check_trust(apitoken):
         if not isinstance(greeter_sas, str):
             bad_fields.add("greeter_sas")
 
-    # TODO: handle exceptions
-    async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
-        in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
-        if not isinstance(in_progress_ctx, (UserClaimInProgress1Ctx, DeviceClaimInProgress1Ctx)):
-            raise APIException(409, {"error": "invalid_state"})
+    with backend_errors_to_api_exceptions():
+        async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
+            in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
+            if not isinstance(
+                in_progress_ctx, (UserClaimInProgress1Ctx, DeviceClaimInProgress1Ctx)
+            ):
+                raise APIException(409, {"error": "invalid_state"})
 
-        if in_progress_ctx.greeter_sas != greeter_sas:
-            raise APIException(400, {"error": "bad_greeter_sas"})
+            if in_progress_ctx.greeter_sas != greeter_sas:
+                raise APIException(400, {"error": "bad_greeter_sas"})
 
-        in_progress_ctx = await in_progress_ctx.do_signify_trust()
-        lifetime_ctx.update_in_progress_ctx(in_progress_ctx)
-        claimer_sas = str(in_progress_ctx.claimer_sas)
+            in_progress_ctx = await in_progress_ctx.do_signify_trust()
+            lifetime_ctx.update_in_progress_ctx(in_progress_ctx)
+            claimer_sas = str(in_progress_ctx.claimer_sas)
 
     return {"claimer_sas": claimer_sas}, 200
 
@@ -313,13 +247,16 @@ async def claimer_3_wait_peer_trust(apitoken):
     except ValueError:
         raise APIException(404, {"error": "unknown_token"})
 
-    async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
-        in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
-        if not isinstance(in_progress_ctx, (UserClaimInProgress2Ctx, DeviceClaimInProgress2Ctx)):
-            raise APIException(409, {"error": "invalid_state"})
+    with backend_errors_to_api_exceptions():
+        async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
+            in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
+            if not isinstance(
+                in_progress_ctx, (UserClaimInProgress2Ctx, DeviceClaimInProgress2Ctx)
+            ):
+                raise APIException(409, {"error": "invalid_state"})
 
-        in_progress_ctx = await in_progress_ctx.do_wait_peer_trust()
-        lifetime_ctx.update_in_progress_ctx(in_progress_ctx)
+            in_progress_ctx = await in_progress_ctx.do_wait_peer_trust()
+            lifetime_ctx.update_in_progress_ctx(in_progress_ctx)
 
     return {}, 200
 
@@ -338,27 +275,29 @@ async def claimer_4_finalize(apitoken):
         # TODO: b64decode + reencode ?
         password = key
 
-    async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
-        in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
+    with backend_errors_to_api_exceptions():
+        async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
+            in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
 
-        requested_device_label = platform.node() or "-unknown-"
-        if isinstance(in_progress_ctx, UserClaimInProgress3Ctx):
-            new_device = await in_progress_ctx.do_claim_user(
-                requested_device_label=requested_device_label, requested_human_handle=None
+            requested_device_label = platform.node() or "-unknown-"
+            if isinstance(in_progress_ctx, UserClaimInProgress3Ctx):
+                new_device = await in_progress_ctx.do_claim_user(
+                    requested_device_label=requested_device_label, requested_human_handle=None
+                )
+
+            elif isinstance(in_progress_ctx, DeviceClaimInProgress3Ctx):
+                new_device = await in_progress_ctx.do_claim_device(
+                    requested_device_label=requested_device_label
+                )
+
+            else:
+                raise APIException(409, {"error": "invalid_state"})
+
+            save_device_with_password(
+                config_dir=current_app.config["CORE_CONFIG_DIR"],
+                device=new_device,
+                password=password,
             )
-
-        elif isinstance(in_progress_ctx, DeviceClaimInProgress3Ctx):
-            new_device = await in_progress_ctx.do_claim_device(
-                requested_device_label=requested_device_label
-            )
-
-        else:
-            raise APIException(409, {"error": "invalid_state"})
-
-        # TODO: Handle exceptions
-        save_device_with_password(
-            config_dir=current_app.config["CORE_CONFIG_DIR"], device=new_device, password=password
-        )
-        lifetime_ctx.mark_as_terminated()
+            lifetime_ctx.mark_as_terminated()
 
     return {}, 200

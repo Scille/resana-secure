@@ -3,7 +3,7 @@ from unittest.mock import ANY
 
 
 @pytest.mark.trio
-async def test_create_list_delete_users_invitations(authenticated_client, local_device):
+async def test_create_list_delete_users_invitations(authenticated_client):
     async def _check_invitations(expected_users):
         response = await authenticated_client.get("/invitations")
         body = await response.get_json()
@@ -85,11 +85,11 @@ async def test_create_list_delete_users_invitations(authenticated_client, local_
     response = await authenticated_client.delete(f"/invitations/{adam_invitation_token}")
     body = await response.get_json()
     assert response.status_code == 400
-    assert body == {"error": "already_used"}
+    assert body == {"error": "invitation_already_used"}
 
 
 @pytest.mark.trio
-async def test_create_list_delete_device_invitation(authenticated_client, local_device):
+async def test_create_list_delete_device_invitation(authenticated_client):
     async def _check_invitations(expected_device):
         response = await authenticated_client.get("/invitations")
         body = await response.get_json()
@@ -131,7 +131,7 @@ async def test_create_list_delete_device_invitation(authenticated_client, local_
     response = await authenticated_client.delete(f"/invitations/{invitation_token}")
     body = await response.get_json()
     assert response.status_code == 400
-    assert body == {"error": "already_used"}
+    assert body == {"error": "invitation_already_used"}
 
 
 @pytest.mark.trio

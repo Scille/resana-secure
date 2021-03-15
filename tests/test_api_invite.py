@@ -165,11 +165,30 @@ async def test_claim_ok(test_app, local_device, authenticated_client, type):
     assert response.status_code == 200
     assert body == {"users": [], "device": None}
 
-    # # And the new user should be visible
-    # if type == "user":
-    #     response = await authenticated_client.get("/humans")
-    #     body = await response.get_json()
-    #     assert response.status_code == 200
+    # And the new user should be visible
+    if type == "user":
+        response = await authenticated_client.get("/humans")
+        body = await response.get_json()
+        assert response.status_code == 200
+        assert body == {
+            "total": 2,
+            "users": [
+                {
+                    "created_on": ANY,
+                    "human_handle": {"email": "bob@example.com", "label": "-unknown-"},
+                    "profile": "ADMIN",
+                    "revoked_on": None,
+                    "user_id": ANY,
+                },
+                {
+                    "created_on": ANY,
+                    "human_handle": {"email": "alice@example.com", "label": "Alice"},
+                    "profile": "ADMIN",
+                    "revoked_on": None,
+                    "user_id": ANY,
+                },
+            ],
+        }
 
     # New user should be able to connect
     response = await claimer_client.post(

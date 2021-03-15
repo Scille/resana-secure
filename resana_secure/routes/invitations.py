@@ -1,16 +1,15 @@
 from quart import Blueprint
 
 from parsec.api.protocol import InvitationType
-from parsec.core.backend_connection import (
-    BackendConnectionError,
-    BackendNotAvailable,
-    BackendConnectionRefused,
-    BackendInvitationNotFound,
-    BackendInvitationAlreadyUsed,
-    BackendInvitationOnExistingMember,
-)
 
-from ..utils import authenticated, check_data, APIException, build_apitoken, apitoken_to_addr
+from ..utils import (
+    authenticated,
+    check_data,
+    APIException,
+    build_apitoken,
+    apitoken_to_addr,
+    backend_errors_to_api_exceptions,
+)
 
 
 invitations_bp = Blueprint("invitations_api", __name__)
@@ -19,15 +18,8 @@ invitations_bp = Blueprint("invitations_api", __name__)
 @invitations_bp.route("/invitations", methods=["GET"])
 @authenticated
 async def get_invitations(core):
-    try:
+    with backend_errors_to_api_exceptions():
         invitations = await core.list_invitations()
-
-    except BackendNotAvailable:
-        raise APIException(503, {"error": "offline"})
-    except BackendConnectionRefused:
-        raise APIException(502, {"error": "connection_refused_by_server"})
-    except BackendConnectionError as exc:
-        raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
 
     cooked = {"users": [], "device": None}
 
@@ -66,20 +58,11 @@ async def create_invitation(core):
         if type == "user":
             claimer_email = data.get("claimer_email")
 
-    try:
+    with backend_errors_to_api_exceptions():
         if type == "user":
             addr = await core.new_user_invitation(email=claimer_email, send_email=False)
         else:
             addr = await core.new_device_invitation(send_email=False)
-
-    except BackendInvitationOnExistingMember:
-        raise APIException(400, {"error": "claimer_already_member"})
-    except BackendNotAvailable:
-        raise APIException(503, {"error": "offline"})
-    except BackendConnectionRefused:
-        raise APIException(502, {"error": "connection_refused_by_server"})
-    except BackendConnectionError as exc:
-        raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
 
     apitoken = build_apitoken(
         organization_id=addr.organization_id, invitation_type=addr.invitation_type, token=addr.token
@@ -95,18 +78,7 @@ async def delete_invitation(core, apitoken):
     except ValueError:
         raise APIException(404, {"error": "unknown_token"})
 
-    try:
+    with backend_errors_to_api_exceptions():
         await core.delete_invitation(token=addr.token)
-
-    except BackendNotAvailable:
-        raise APIException(503, {"error": "offline"})
-    except BackendInvitationNotFound:
-        raise APIException(404, {"error": "unknown_token"})
-    except BackendInvitationAlreadyUsed:
-        raise APIException(400, {"error": "already_used"})
-    except BackendConnectionRefused:
-        raise APIException(502, {"error": "connection_refused_by_server"})
-    except BackendConnectionError as exc:
-        raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
 
     return {}, 204

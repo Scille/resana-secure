@@ -2,19 +2,8 @@ from quart import Blueprint
 
 from parsec.api.data import EntryID
 from parsec.api.protocol import RealmRole
-from parsec.core.backend_connection import (
-    BackendConnectionError,
-    BackendNotAvailable,
-    BackendConnectionRefused,
-)
-from parsec.core.fs.exceptions import (
-    FSError,
-    FSWorkspaceNotFoundError,
-    FSBackendOfflineError,
-    FSSharingNotAllowedError,
-)
 
-from ..utils import APIException, authenticated, check_data
+from ..utils import APIException, authenticated, check_data, backend_errors_to_api_exceptions
 
 
 workspaces_bp = Blueprint("workspaces_api", __name__)
@@ -23,6 +12,7 @@ workspaces_bp = Blueprint("workspaces_api", __name__)
 @workspaces_bp.route("/workspaces", methods=["GET"])
 @authenticated
 async def list_workspaces(core):
+    # get_user_manifest() never raise exception
     user_manifest = core.user_fs.get_user_manifest()
     return (
         {
@@ -43,7 +33,8 @@ async def create_workspaces(core):
         if not isinstance(name, str):
             bad_fields.add("name")
 
-    workspace_id = await core.user_fs.workspace_create(name)
+    with backend_errors_to_api_exceptions():
+        workspace_id = await core.user_fs.workspace_create(name)
 
     # TODO: should we do a `user_fs.sync()` ?
 
@@ -56,16 +47,11 @@ async def sync_workspaces(core):
     # Core already do the sync in background, this route is to ensure
     # synchronization has occured
     user_fs = core.user_fs
-    try:
+    with backend_errors_to_api_exceptions():
         await user_fs.sync()
         for entry in user_fs.get_user_manifest().workspaces:
             workspace = user_fs.get_workspace(entry.id)
             await workspace.sync()
-
-    except FSBackendOfflineError:
-        raise APIException(503, {"error": "offline"})
-    except FSError as exc:
-        raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
 
     return {}, 200
 
@@ -95,10 +81,9 @@ async def rename_workspaces(core, workspace_id):
                 break
     else:
         raise APIException(404, {"error": "unknown_workspace"})
-    try:
+
+    with backend_errors_to_api_exceptions():
         workspace_id = await core.user_fs.workspace_rename(workspace_id, new_name)
-    except FSWorkspaceNotFoundError:
-        raise APIException(404, {"error": "unknown_workspace"})
 
     # TODO: should we do a `user_fs.sync()` ?
 
@@ -113,23 +98,15 @@ async def get_workspace_share_info(core, workspace_id):
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
-    try:
+    with backend_errors_to_api_exceptions():
         workspace = core.user_fs.get_workspace(workspace_id)
-    except FSWorkspaceNotFoundError:
-        raise APIException(404, {"error": "unknown_workspace"})
 
-    cooked_roles = {}
-    try:
+        cooked_roles = {}
         roles = await workspace.get_user_roles()
         for user_id, role in roles.items():
             user_info = await core.get_user_info(user_id)
             assert user_info.human_handle is not None
             cooked_roles[user_info.human_handle.email] = role.value
-
-    except (BackendNotAvailable, FSBackendOfflineError):
-        raise APIException(404, {"error": "unknown_workspace"})
-    except (FSError, BackendConnectionError) as exc:
-        raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
 
     return {"roles": cooked_roles}, 200
 
@@ -155,7 +132,7 @@ async def share_workspace(core, workspace_id):
             else:
                 bad_fields.add("role")
 
-    try:
+    with backend_errors_to_api_exceptions():
         results, _ = await core.find_humans(query=email, per_page=1)
         try:
             # TODO: find_humans doesn't guarantee exact match on email
@@ -164,24 +141,8 @@ async def share_workspace(core, workspace_id):
         except IndexError:
             raise APIException(404, {"error": "unknown_email"})
 
-    except BackendNotAvailable:
-        raise APIException(503, {"error": "offline"})
-    except BackendConnectionRefused:
-        raise APIException(502, {"error": "connection_refused_by_server"})
-    except BackendConnectionError as exc:
-        raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
-
-    try:
         await core.user_fs.workspace_share(
             workspace_id=workspace_id, recipient=recipient, role=role
         )
-    except FSWorkspaceNotFoundError:
-        raise APIException(404, {"error": "unknown_workspace"})
-    except FSSharingNotAllowedError:
-        raise APIException(403, {"error": "sharing_not_allowed"})
-    except FSBackendOfflineError:
-        raise APIException(503, {"error": "offline"})
-    except FSError as exc:
-        raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
 
     return {}, 200
