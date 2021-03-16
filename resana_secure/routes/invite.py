@@ -29,8 +29,6 @@ from ..utils import (
     backend_errors_to_api_exceptions,
 )
 
-# from ..invites_manager import LongTermCtxNotStarted  # TODO: handle this exception
-
 
 invite_bp = Blueprint("invite_api", __name__)
 

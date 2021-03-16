@@ -28,6 +28,7 @@ from parsec.core.fs.exceptions import (
 from parsec.core.invite import InviteError, InviteNotFoundError, InviteAlreadyUsedError
 
 from .cores_manager import CoreNotLoggedError
+from .invites_manager import LongTermCtxNotStarted
 
 
 class EntryIDConverter(BaseConverter):
@@ -155,3 +156,6 @@ def backend_errors_to_api_exceptions():
         raise APIException(400, {"error": "invitation_already_used"})
     except InviteError as exc:
         raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
+
+    except LongTermCtxNotStarted:
+        raise APIException(409, {"error": "invalid_state"})

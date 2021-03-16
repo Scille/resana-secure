@@ -195,3 +195,28 @@ async def test_claim_ok(test_app, local_device, authenticated_client, type):
         "/auth", json={"email": new_device_email, "key": b64encode(new_device_key).decode("ascii")}
     )
     assert response.status_code == 200
+
+
+@pytest.mark.trio
+async def test_invalid_state(test_app, local_device, authenticated_client, device_invitation):
+    claimer_client = test_app.test_client()
+    token = device_invitation.token
+
+    for url, json, client in [
+        (f"/invitations/{token}/claimer/1-wait-peer-ready", {}, claimer_client),
+        (f"/invitations/{token}/claimer/2-check-trust", {"greeter_sas": "ABCD"}, claimer_client),
+        (f"/invitations/{token}/claimer/3-wait-peer-trust", {}, claimer_client),
+        (f"/invitations/{token}/claimer/4-finalize", {"key": "Zm9v"}, claimer_client),
+        (f"/invitations/{token}/greeter/2-wait-peer-trust", {}, authenticated_client),
+        (
+            f"/invitations/{token}/greeter/3-check-trust",
+            {"claimer_sas": "ABCD"},
+            authenticated_client,
+        ),
+        (f"/invitations/{token}/greeter/4-finalize", {}, authenticated_client),
+    ]:
+        with trio.fail_after(1):
+            response = await client.post(url, json=json)
+            body = await response.get_json()
+            assert response.status_code == 409
+            assert body == {"error": "invalid_state"}
