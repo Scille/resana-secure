@@ -42,7 +42,7 @@ async def remove_auth():
     auth_token = get_auth_token()
     if not auth_token:
         return {}, 200
-    session.pop("logged_in")
+    session.pop("logged_in", None)
     try:
         auth_token = await current_app.cores_manager.logout(auth_token=auth_token)
 

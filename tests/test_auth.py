@@ -114,6 +114,36 @@ async def test_logout_without_auth(test_app):
 
 
 @pytest.mark.trio
+async def test_logout_without_session_cookie(test_app, local_device):
+    # This client will contain the session cookie as soon as the auth query is done
+    test_client_with_cookie = test_app.test_client()
+    response = await test_client_with_cookie.post(
+        "/auth",
+        json={"email": local_device.email, "key": b64encode(local_device.key).decode("ascii")},
+    )
+    body = await response.get_json()
+    assert response.status_code == 200
+    auth_token = body["token"]
+
+    test_client_without_cookie = test_app.test_client()
+    response = await test_client_without_cookie.delete(
+        "/auth", headers={"Authorization": f"Bearer {auth_token}"}
+    )
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {}
+
+    response = await test_client_without_cookie.get(
+        "/workspaces", headers={"Authorization": f"Bearer {auth_token}"}
+    )
+    assert response.status_code == 401
+    response = await test_client_with_cookie.get(
+        "/workspaces", headers={"Authorization": f"Bearer {auth_token}"}
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.trio
 async def test_authentication_unknown_email(test_app):
     test_client = test_app.test_client()
 
