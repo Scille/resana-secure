@@ -1,9 +1,6 @@
-import argparse
 from pathlib import Path
-import trio
 import re
 import secrets
-from functools import partial
 from typing import List
 from quart import current_app
 from quart_cors import cors
@@ -89,32 +86,10 @@ async def app_factory(
         yield app
 
 
-async def main(host, port, debug, config_dir, client_allowed_origins, backend_addr):
+async def serve_app(host, port, debug, config_dir, client_allowed_origins, backend_addr):
     async with app_factory(
         config_dir=config_dir,
         client_allowed_origins=client_allowed_origins,
         backend_addr=backend_addr,
     ) as app:
         await app.run_task(host=host, port=port, debug=debug)
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Process some integers.")
-    parser.add_argument("--port", type=int, default=8080)
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--debug", action="store_true")
-    parser.add_argument("--config-dir", type=Path, required=True)
-    parser.add_argument("--client-origin", type=lambda x: x.split(";"), default=["*"])
-    parser.add_argument("--backend-addr", type=BackendAddr.from_url, required=True)
-    args = parser.parse_args()
-    trio.run(
-        partial(
-            main,
-            port=args.port,
-            host=args.host,
-            debug=args.debug,
-            config_dir=args.config_dir,
-            client_allowed_origins=args.client_origin,
-            backend_addr=args.backend_addr,
-        )
-    )
