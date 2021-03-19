@@ -78,7 +78,9 @@ class CoresManager:
         """
         # First load the device from disk
         # This operation can be done concurrently and ensures the email/key couple is valid
-        config = load_config(current_app.config["CORE_CONFIG_DIR"])
+        config = load_config(
+            config_dir=current_app.config["CORE_CONFIG_DIR"], mountpoint_enabled=True
+        )
         device = load_device_or_error(config=config, email=email, key=key)
 
         # The lock is needed here to avoid concurrent logins with the same email
