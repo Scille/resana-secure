@@ -7,9 +7,6 @@ BACKEND_DOMAIN="127.0.0.1:6777"
 BACKEND_ADDR="parsec://$BACKEND_DOMAIN?no_ssl=true"
 BOOTSTRAP_ORG_ADDR="parsec://$BACKEND_DOMAIN/ResanaSecureOrg?no_ssl=true&action=bootstrap_organization"
 
-# scalingo doesn't support libfuse, so mock around to disable fuse mountpoint
-sed -is 's/runner = get_mountpoint_runner()/async def runner(*args, **kwargs): None/' subtree/parsec-cloud/parsec/core/mountpoint/manager.py
-
 mkdir -p $CONFIG_DIR/devices
 
 # Start parsec Server
@@ -39,9 +36,11 @@ parsec core bootstrap_organization $BOOTSTRAP_ORG_ADDR \
     --device-label='pc42'
 
 # Finally start the resana app
-python -m resana_secure.app \
+python -m resana_secure \
     --host=0.0.0.0 \
     --port=$PORT \
     --config-dir=$CONFIG_DIR \
+    --backend-addr=$BACKEND_ADDR \
     --client-origin=$CLIENT_ORIGIN \
-    --backend-addr=$BACKEND_ADDR
+    --disable-mountpoint \
+    --disable-gui
