@@ -41,7 +41,8 @@ def _setup_logging(log_level: str) -> None:
         cache_logger_on_first_use=True,
     )
     logging.basicConfig(
-        format="[%(asctime)s] %(levelname)s %(name)s - %(message)s",
+        format="%(asctime)s %(levelname)s %(name)s - %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
         stream=sys.stdout,
         level=getattr(logging, log_level),
     )
