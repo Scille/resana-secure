@@ -1,11 +1,14 @@
 from pathlib import Path
 import re
 import secrets
+import logging
 from typing import List
+from contextlib import asynccontextmanager
 from quart import current_app
 from quart_cors import cors
 from quart_trio import QuartTrio
-from contextlib import asynccontextmanager
+from hypercorn.config import Config as HyperConfig
+from hypercorn.trio import serve
 
 from .cores_manager import CoresManager
 from .invites_manager import ClaimersManager, GreetersManager
@@ -25,6 +28,21 @@ async def app_factory(
     config_dir: Path, client_allowed_origins: List[str], backend_addr: BackendAddr
 ):
     app = QuartTrio(__name__, static_folder=None)
+    app.config.from_mapping(
+        # Secret key changes each time the application is started, this is
+        # fine as long as we only use it for session cookies.
+        # The reason for doing this is we serve the api on localhost, so
+        # storing the secret on the hard drive in a no go.
+        SECRET_KEY=secrets.token_hex(),
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="strict",
+        # Access-Control-Allow-Origin=* and Access-Control-Allow-Credential=include are mutually exclusive
+        QUART_CORS_ALLOW_CREDENTIALS="*" not in client_allowed_origins,
+        QUART_CORS_ALLOW_ORIGIN=client_allowed_origins,
+        CORE_CONFIG_DIR=config_dir,
+        PARSEC_BACKEND_ADDR=backend_addr,
+    )
+
     cors(app)
     app.register_blueprint(auth_bp)
     app.register_blueprint(humans_bp)
@@ -65,19 +83,6 @@ async def app_factory(
             200,
         )
 
-    app.config.from_mapping(
-        # Secret key changes each time the application is started, this is
-        # fine as long as we only use it for session cookies.
-        # The reason for doing this is we serve the api on localhost, so
-        # storing the secret on the hard drive in a no go.
-        SECRET_KEY=secrets.token_hex(),
-        SESSION_COOKIE_HTTPONLY=True,
-        SESSION_COOKIE_SAMESITE="strict",
-        QUART_CORS_ALLOW_CREDENTIALS=True,
-        QUART_CORS_ALLOW_ORIGIN=client_allowed_origins,
-        CORE_CONFIG_DIR=config_dir,
-        PARSEC_BACKEND_ADDR=backend_addr,
-    )
     async with LTCM.run() as ltcm:
         app.ltcm = ltcm  # type: ignore
         app.cores_manager = CoresManager()  # type: ignore
@@ -86,10 +91,24 @@ async def app_factory(
         yield app
 
 
-async def serve_app(host, port, debug, config_dir, client_allowed_origins, backend_addr):
+async def serve_app(
+    host: str,
+    port: int,
+    config_dir: Path,
+    client_allowed_origins: List[str],
+    backend_addr: BackendAddr,
+):
+    config = HyperConfig.from_mapping(
+        {
+            "bind": [f"{host}:{port}"],
+            "accesslog": logging.getLogger("hypercorn.access"),
+            "errorlog": logging.getLogger("hypercorn.error"),
+        }
+    )
+
     async with app_factory(
         config_dir=config_dir,
         client_allowed_origins=client_allowed_origins,
         backend_addr=backend_addr,
     ) as app:
-        await app.run_task(host=host, port=port, debug=debug)
+        await serve(app, config)
