@@ -33,7 +33,6 @@ from parsec.core.invite import (
     UserGreetInProgress1Ctx,
     DeviceGreetInitialCtx,
     DeviceGreetInProgress1Ctx,
-    InviteAlreadyMemberError,
 )
 from parsec.core.remote_devices_manager import (
     RemoteDevicesManager,
