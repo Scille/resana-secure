@@ -220,3 +220,109 @@ async def test_invalid_state(test_app, local_device, authenticated_client, devic
             body = await response.get_json()
             assert response.status_code == 409
             assert body == {"error": "invalid_state"}
+
+
+@pytest.mark.trio
+async def test_concurrent_requests_on_steps_0_and_1(
+    test_app, authenticated_client, device_invitation
+):
+    claimer_done = 0
+
+    with trio.fail_after(1):
+        async with trio.open_nursery() as nursery:
+
+            async def _claimer():
+                nonlocal claimer_done
+                claimer_client = test_app.test_client()
+                response = await claimer_client.post(
+                    f"/invitations/{device_invitation.token}/claimer/0-retreive-info", json={}
+                )
+                assert response.status_code == 200
+                response = await claimer_client.post(
+                    f"/invitations/{device_invitation.token}/claimer/1-wait-peer-ready", json={}
+                )
+
+                claimer_done += 1
+                if claimer_client == 9:
+                    # Our request has been cancelled by the last claimer
+                    assert response.status_code == 409
+                    # Act as the greeter so that the last remaining claimer
+                    # won't be waiting forever
+                    response = await authenticated_client.post(
+                        f"/invitations/{device_invitation.token}/greeter/1-wait-peer-ready", json={}
+                    )
+                    assert response.status_code == 200
+
+                elif claimer_client == 10:
+                    # We are the last claimer
+                    response.status_code == 200
+
+                else:
+                    # Our request has been cancelled by another claimer
+                    assert response.status_code == 409
+
+            for _ in range(10):
+                nursery.start_soon(_claimer)
+
+    assert claimer_done == 10
+
+
+@pytest.mark.trio
+async def test_cancel_step_request_then_retry(test_app, authenticated_client, device_invitation):
+    claimer_client = test_app.test_client()
+
+    # Step 0
+
+    response = await claimer_client.post(
+        f"/invitations/{device_invitation.token}/claimer/0-retreive-info", json={}
+    )
+    assert response.status_code == 200
+
+    # Step 1
+
+    async def _greeter(expected_status_code):
+        response = await authenticated_client.post(
+            f"/invitations/{device_invitation.token}/greeter/1-wait-peer-ready", json={}
+        )
+        assert response.status_code == expected_status_code
+
+    async def _claimer():
+        response = await claimer_client.post(
+            f"/invitations/{device_invitation.token}/claimer/1-wait-peer-ready", json={}
+        )
+        body = await response.get_json()
+        return response.status_code, body
+
+    # Step 1, but cancelled before the end
+
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(_claimer)
+        # Wait until request starts waiting for greeter to arrive
+        await trio.testing.wait_all_tasks_blocked()
+        nursery.cancel_scope.cancel()
+
+    # Now retry the step 1, shouldn't succeed due to invalid state, but shouldn't cause deadlock either !
+
+    with trio.fail_after(1):
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(_greeter, 409)
+            status_code, body = (
+                await _claimer()
+            )  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<< deadlock from here
+            assert status_code == 409
+            nursery.cancel_scope.cancel()
+
+    # Go back to step 0, then retry step 1. This time everything should run fine.
+
+    with trio.fail_after(1):
+        async with trio.open_nursery() as nursery:
+            # Greeter can start before we go back to step 0
+            nursery.start_soon(_greeter, 200)
+
+            response = await claimer_client.post(
+                f"/invitations/{device_invitation.token}/claimer/0-retreive-info", json={}
+            )
+            assert response.status_code == 200
+
+            status_code, body = await _claimer()
+            assert status_code == 200
