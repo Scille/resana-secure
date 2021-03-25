@@ -244,7 +244,7 @@ HTTP 200
 ```
 ou
 ```
-HTTP 4004
+HTTP 400
 {
     "error":  "claimer_already_member"
 }
