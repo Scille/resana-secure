@@ -110,9 +110,9 @@ async def test_share_unknown_email(authenticated_client, workspace):
 
 
 @pytest.mark.trio
-async def test_share_invalid_role(authenticated_client, local_device, workspace):
+async def test_share_invalid_role(authenticated_client, other_device, workspace):
     response = await authenticated_client.patch(
-        f"/workspaces/{workspace.id}/share", json={"email": local_device.email, "role": "DUMMY"}
+        f"/workspaces/{workspace.id}/share", json={"email": other_device.email, "role": "DUMMY"}
     )
     body = await response.get_json()
     assert response.status_code == 400
@@ -120,25 +120,38 @@ async def test_share_invalid_role(authenticated_client, local_device, workspace)
 
 
 @pytest.mark.trio
-@pytest.mark.xfail(reason="TODO: other_device not available")
-async def test_share_unknown_workspace(authenticated_client, other_device):
+async def test_share_unknown_workspace(authenticated_client, other_user):
     response = await authenticated_client.patch(
         "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/share",
-        json={"email": other_device.email, "role": "OWNER"},
+        json={"email": other_user.email, "role": "OWNER"},
     )
     body = await response.get_json()
     assert response.status_code == 404
     assert body == {"error": "unknown_workspace"}
-    assert response.status_code == 400
-    assert body == {"detail": "Cannot share to oneself", "error": "unexpected_error"}
 
 
 @pytest.mark.trio
-async def test_self_share_not_allowed(authenticated_client, local_device):
+async def test_self_share_not_allowed(authenticated_client, other_device):
     response = await authenticated_client.patch(
         "/workspaces/c3acdcb2ede6437f89fb94da11d733f2/share?foo=bar&touille=spam&foo=bar2",
-        json={"email": local_device.email, "role": "OWNER"},
+        json={"email": other_device.email, "role": "OWNER"},
     )
     body = await response.get_json()
     assert response.status_code == 400
     assert body == {"error": "unexpected_error", "detail": "Cannot share to oneself"}
+
+
+@pytest.mark.trio
+async def test_share_ok(authenticated_client, other_user, workspace):
+    response = await authenticated_client.patch(
+        f"/workspaces/{workspace.id}/share", json={"email": other_user.email, "role": "MANAGER"}
+    )
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {}
+
+    # Share info should have been updated
+    response = await authenticated_client.get(f"/workspaces/{workspace.id}/share")
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {"roles": {"alice@example.com": "OWNER", "bob@example.com": "MANAGER"}}

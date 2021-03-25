@@ -1,12 +1,16 @@
+import pendulum
 import pytest
 import trio
 from functools import partial
 from collections import namedtuple
 from base64 import b64encode
 
-from parsec.api.protocol import OrganizationID, HumanHandle
+from parsec.crypto import PrivateKey, SigningKey
+from parsec.api.data import UserCertificateContent, DeviceCertificateContent, UserProfile
+from parsec.api.protocol import OrganizationID, HumanHandle, DeviceID, DeviceName
 from parsec.core.types import BackendOrganizationBootstrapAddr, BackendAddr
 from parsec.backend import backend_app_factory
+from parsec.backend.user import User as BackendUser, Device as BackendDevice
 from parsec.backend.config import BackendConfig, MockedBlockStoreConfig
 from parsec.core.invite import bootstrap_organization
 from parsec.core.backend_connection import apiv1_backend_anonymous_cmds_factory
@@ -101,7 +105,7 @@ async def running_backend(_backend_addr_register):
             _, port = listeners[0].socket.getsockname()
             backend_addr = BackendAddr(hostname=host, port=port, use_ssl=False)
             _backend_addr_register.register(backend_addr)
-            yield backend_addr
+            yield backend
             nursery.cancel_scope.cancel()
 
 
@@ -130,3 +134,86 @@ async def local_device(running_backend, backend_addr, core_config_dir):
         )
         save_device_with_password(config_dir=core_config_dir, device=new_device, password=password)
     return LocalDeviceTestbed(device=new_device, email=human_handle.email, key=key)
+
+
+RemoteDeviceTestbed = namedtuple("RemoteDeviceTestbed", "device_id,email")
+
+
+@pytest.fixture
+async def other_device(running_backend, local_device):
+    organization_id = OrganizationID("CoolOrg")
+    now = pendulum.now()
+    author = local_device.device.device_id
+    author_key = local_device.device.signing_key
+
+    device_certificate = DeviceCertificateContent(
+        author=author,
+        timestamp=now,
+        device_id=DeviceID(f"{local_device.device.user_id}@{DeviceName.new()}"),
+        device_label="-unknown-",
+        verify_key=SigningKey.generate().verify_key,
+    )
+    redacted_device_certificate = device_certificate.evolve(device_label=None)
+
+    device = BackendDevice(
+        device_id=device_certificate.device_id,
+        device_label=device_certificate.device_label,
+        device_certificate=device_certificate.dump_and_sign(author_key),
+        redacted_device_certificate=redacted_device_certificate.dump_and_sign(author_key),
+        device_certifier=device_certificate.author,
+        created_on=device_certificate.timestamp,
+    )
+
+    await running_backend.user.create_device(organization_id=organization_id, device=device)
+    return RemoteDeviceTestbed(device.device_id, email=local_device.email)
+
+
+@pytest.fixture
+async def other_user(running_backend, local_device):
+    organization_id = OrganizationID("CoolOrg")
+    now = pendulum.now()
+    author = local_device.device.device_id
+    author_key = local_device.device.signing_key
+
+    device_id = DeviceID.new()
+    user_certificate = UserCertificateContent(
+        author=author,
+        timestamp=now,
+        user_id=device_id.user_id,
+        human_handle=HumanHandle(email="bob@example.com", label="-unknown-"),
+        public_key=PrivateKey.generate().public_key,
+        profile=UserProfile.STANDARD,
+    )
+    redacted_user_certificate = user_certificate.evolve(human_handle=None)
+
+    device_certificate = DeviceCertificateContent(
+        author=author,
+        timestamp=now,
+        device_id=device_id,
+        device_label="-unknown-",
+        verify_key=SigningKey.generate().verify_key,
+    )
+    redacted_device_certificate = device_certificate.evolve(device_label=None)
+
+    user = BackendUser(
+        user_id=user_certificate.user_id,
+        human_handle=user_certificate.human_handle,
+        user_certificate=user_certificate.dump_and_sign(author_key),
+        redacted_user_certificate=redacted_user_certificate.dump_and_sign(author_key),
+        user_certifier=user_certificate.author,
+        profile=user_certificate.profile,
+        created_on=user_certificate.timestamp,
+    )
+    device = BackendDevice(
+        device_id=device_certificate.device_id,
+        device_label=device_certificate.device_label,
+        device_certificate=device_certificate.dump_and_sign(author_key),
+        redacted_device_certificate=redacted_device_certificate.dump_and_sign(author_key),
+        device_certifier=device_certificate.author,
+        created_on=device_certificate.timestamp,
+    )
+
+    await running_backend.user.create_user(
+        organization_id=organization_id, user=user, first_device=device
+    )
+    return RemoteDeviceTestbed(device.device_id, email=user.human_handle.email)
