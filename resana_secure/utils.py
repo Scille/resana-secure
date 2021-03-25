@@ -25,7 +25,12 @@ from parsec.core.fs.exceptions import (
     FSNoAccessError,
     FSError,
 )
-from parsec.core.invite import InviteError, InviteNotFoundError, InviteAlreadyUsedError
+from parsec.core.invite import (
+    InviteError,
+    InviteNotFoundError,
+    InviteAlreadyUsedError,
+    InvitePeerResetError,
+)
 
 from .cores_manager import CoreNotLoggedError
 from .invites_manager import LongTermCtxNotStarted
@@ -152,6 +157,8 @@ def backend_errors_to_api_exceptions():
 
     except InviteNotFoundError:
         raise APIException(404, {"error": "unknown_token"})
+    except InvitePeerResetError:
+        raise APIException(409, {"error": "invalid_state"})
     except InviteAlreadyUsedError:
         raise APIException(400, {"error": "invitation_already_used"})
     except InviteError as exc:
