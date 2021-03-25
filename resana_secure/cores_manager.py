@@ -1,7 +1,7 @@
 import trio
 from uuid import uuid4
 from base64 import b64encode
-from typing import Callable, Dict, Optional
+from typing import AsyncIterator, Callable, Dict, Optional
 from functools import partial
 from quart import current_app
 from contextlib import asynccontextmanager
@@ -56,7 +56,9 @@ def load_device_or_error(config: CoreConfig, email: str, key: bytes) -> Optional
 
 
 @asynccontextmanager
-async def start_core(config: CoreConfig, device: LocalDevice, on_stopped: Callable):
+async def start_core(
+    config: CoreConfig, device: LocalDevice, on_stopped: Callable
+) -> AsyncIterator[LoggedCore]:
     async with logged_core_factory(config, device) as core:
         try:
             yield core
