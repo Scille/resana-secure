@@ -223,52 +223,82 @@ async def test_invalid_state(test_app, local_device, authenticated_client, devic
 
 
 @pytest.mark.trio
-async def test_concurrent_requests_on_steps_0_and_1(
-    test_app, authenticated_client, device_invitation
-):
-    claimer_done = 0
+async def test_claimer_step_1_before_0(test_app, authenticated_client, device_invitation):
+    claimer_client = test_app.test_client()
+
+    async def _greeter():
+        response = await authenticated_client.post(
+            f"/invitations/{device_invitation.token}/greeter/1-wait-peer-ready", json={}
+        )
+        assert response.status_code == 200
 
     with trio.fail_after(1):
         async with trio.open_nursery() as nursery:
+            # Greeter wait for a good step 1
+            nursery.start_soon(_greeter)
+            await trio.testing.wait_all_tasks_blocked()
 
-            async def _claimer():
-                nonlocal claimer_done
-                claimer_client = test_app.test_client()
-                response = await claimer_client.post(
-                    f"/invitations/{device_invitation.token}/claimer/0-retreive-info", json={}
-                )
-                assert response.status_code == 200
-                response = await claimer_client.post(
-                    f"/invitations/{device_invitation.token}/claimer/1-wait-peer-ready", json={}
-                )
+            # Claimer cannot do step 1 before 0
+            response = await claimer_client.post(
+                f"/invitations/{device_invitation.token}/claimer/1-wait-peer-ready", json={}
+            )
+            assert response.status_code == 409
 
-                claimer_done += 1
-                if claimer_client == 9:
-                    # Our request has been cancelled by the last claimer
-                    assert response.status_code == 409
-                    # Act as the greeter so that the last remaining claimer
-                    # won't be waiting forever
-                    response = await authenticated_client.post(
-                        f"/invitations/{device_invitation.token}/greeter/1-wait-peer-ready", json={}
-                    )
-                    assert response.status_code == 200
-
-                elif claimer_client == 10:
-                    # We are the last claimer
-                    response.status_code == 200
-
-                else:
-                    # Our request has been cancelled by another claimer
-                    assert response.status_code == 409
-
-            for _ in range(10):
-                nursery.start_soon(_claimer)
-
-    assert claimer_done == 10
+            # Go back to step 0 should allow to do step 1 fine
+            response = await claimer_client.post(
+                f"/invitations/{device_invitation.token}/claimer/0-retreive-info", json={}
+            )
+            assert response.status_code == 200
+            response = await claimer_client.post(
+                f"/invitations/{device_invitation.token}/claimer/1-wait-peer-ready", json={}
+            )
+            assert response.status_code == 200
 
 
 @pytest.mark.trio
-async def test_cancel_step_request_then_retry(test_app, authenticated_client, device_invitation):
+async def test_claimer_concurrent_requests_on_step_1(
+    test_app, authenticated_client, device_invitation
+):
+    concurrency = 10
+    claimer_results = []
+
+    # Step 0
+    claimer_client = test_app.test_client()
+    response = await claimer_client.post(
+        f"/invitations/{device_invitation.token}/claimer/0-retreive-info", json={}
+    )
+    assert response.status_code == 200
+
+    with trio.fail_after(1):
+        async with trio.open_nursery() as nursery:
+            # Start multiple concurrent claimer steps 1 requests
+
+            async def _claimer():
+                claimer_client = test_app.test_client()
+                response = await claimer_client.post(
+                    f"/invitations/{device_invitation.token}/claimer/1-wait-peer-ready", json={}
+                )
+                claimer_results.append(response.status_code)
+
+            for _ in range(concurrency):
+                nursery.start_soon(_claimer)
+            await trio.testing.wait_all_tasks_blocked()
+
+            # Now greeter arrive, only one claimer request should succeed
+            response = await authenticated_client.post(
+                f"/invitations/{device_invitation.token}/greeter/1-wait-peer-ready", json={}
+            )
+            assert response.status_code == 200
+
+    # Cannot retry step 1 without retrying step 0 first, so only the first claimer request should have succeeded
+    assert claimer_results == [200] + [409] * (concurrency - 1)
+
+
+@pytest.mark.trio
+@pytest.mark.parametrize("claimer_do_step0_before_final_step1", [False, True])
+async def test_cancel_step_request_then_retry(
+    test_app, authenticated_client, device_invitation, claimer_do_step0_before_final_step1
+):
     claimer_client = test_app.test_client()
 
     # Step 0
@@ -293,7 +323,7 @@ async def test_cancel_step_request_then_retry(test_app, authenticated_client, de
         body = await response.get_json()
         return response.status_code, body
 
-    # Step 1, but cancelled before the end
+    # Step 1, but cancelled before greeter arrives
 
     async with trio.open_nursery() as nursery:
         nursery.start_soon(_claimer)
@@ -301,28 +331,66 @@ async def test_cancel_step_request_then_retry(test_app, authenticated_client, de
         await trio.testing.wait_all_tasks_blocked()
         nursery.cancel_scope.cancel()
 
-    # Now retry the step 1, shouldn't succeed due to invalid state, but shouldn't cause deadlock either !
+    # Try to jump to step 2 for claimer, should lead to invalid state
+    response = await claimer_client.post(
+        f"/invitations/{device_invitation.token}/claimer/2-check-trust",
+        json={"greeter_sas": "ABCD"},
+    )
+    assert response.status_code == 409
+    # Same thing for greeter
+    response = await authenticated_client.post(
+        f"/invitations/{device_invitation.token}/greeter/2-wait-peer-trust", json={}
+    )
+    assert response.status_code == 409
 
+    # Now retry the step 1, This time everything should run fine.
+    if claimer_do_step0_before_final_step1:
+        response = await claimer_client.post(
+            f"/invitations/{device_invitation.token}/claimer/0-retreive-info", json={}
+        )
+        assert response.status_code == 200
     with trio.fail_after(1):
         async with trio.open_nursery() as nursery:
-            nursery.start_soon(_greeter, 409)
-            status_code, body = (
-                await _claimer()
-            )  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<< deadlock from here
-            assert status_code == 409
-            nursery.cancel_scope.cancel()
-
-    # Go back to step 0, then retry step 1. This time everything should run fine.
-
-    with trio.fail_after(1):
-        async with trio.open_nursery() as nursery:
-            # Greeter can start before we go back to step 0
             nursery.start_soon(_greeter, 200)
-
-            response = await claimer_client.post(
-                f"/invitations/{device_invitation.token}/claimer/0-retreive-info", json={}
-            )
-            assert response.status_code == 200
-
             status_code, body = await _claimer()
             assert status_code == 200
+
+
+@pytest.mark.trio
+@pytest.mark.parametrize("first", ["claimer", "greeter"])
+async def test_greeter_claimer_start_order(
+    test_app, authenticated_client, device_invitation, first
+):
+    claimer_client = test_app.test_client()
+
+    async def _greeter():
+        # Step 1
+        response = await authenticated_client.post(
+            f"/invitations/{device_invitation.token}/greeter/1-wait-peer-ready", json={}
+        )
+        assert response.status_code == 200
+
+    async def _claimer():
+        # Step 0
+        response = await claimer_client.post(
+            f"/invitations/{device_invitation.token}/claimer/0-retreive-info", json={}
+        )
+        assert response.status_code == 200
+        # Step 1
+        response = await claimer_client.post(
+            f"/invitations/{device_invitation.token}/claimer/1-wait-peer-ready", json={}
+        )
+        assert response.status_code == 200
+
+    with trio.fail_after(1):
+        async with trio.open_nursery() as nursery:
+            if first == "greeter":
+                first_cb = _greeter
+                second_cb = _claimer
+            else:
+                first_cb = _claimer
+                second_cb = _greeter
+
+            nursery.start_soon(first_cb)
+            await trio.testing.wait_all_tasks_blocked()
+            await second_cb()
