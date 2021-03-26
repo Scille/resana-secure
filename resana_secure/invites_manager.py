@@ -1,6 +1,6 @@
 from resana_secure.ltcm import ComponentNotRegistered
 import trio
-from typing import Dict, Callable, Type, AsyncIterator
+from typing import Dict, Type, AsyncIterator
 from functools import partial
 from quart import current_app
 from contextlib import asynccontextmanager
@@ -22,6 +22,7 @@ class LongTermCtxNotStarted(Exception):
 class BaseLongTermCtx:
     def __init__(self, initial_ctx):
         self._in_progress_ctx = initial_ctx
+        self._lock = trio.Lock()
 
     def update_in_progress_ctx(self, new_ctx):
         self._in_progress_ctx = new_ctx
@@ -35,10 +36,10 @@ class BaseLongTermCtx:
     @asynccontextmanager
     @classmethod
     async def start(
-        cls, on_started: Callable, config: CoreConfig, addr: BackendInvitationAddr
+        cls, config: CoreConfig, addr: BackendInvitationAddr
     ) -> AsyncIterator["BaseLongTermCtx"]:
         raise NotImplementedError
-        yield
+        yield  # Needed to respect return type
 
 
 class BaseInviteManager:
@@ -46,67 +47,72 @@ class BaseInviteManager:
 
     def __init__(self):
         self._addr_to_claim_ctx: Dict[BackendInvitationAddr, BaseLongTermCtx] = {}
-        self._lock = trio.Lock()
 
     @asynccontextmanager
     async def start_ctx(
         self, addr: BackendInvitationAddr, **kwargs
     ) -> AsyncIterator[BaseLongTermCtx]:
-        # The lock is needed here to avoid concurrent claim contexts with the same invitation
-        async with self._lock:
-            existing_handle = self._addr_to_claim_ctx.pop(addr, None)
-            if existing_handle:
-                try:
-                    await current_app.ltcm.unregister_component(existing_handle)
-                except ComponentNotRegistered:
-                    pass
+        config = load_config(current_app.config["CORE_CONFIG_DIR"])
+        component_handle = await current_app.ltcm.register_component(
+            partial(self._LONG_TERM_CTX_CLS.start, config=config, addr=addr, **kwargs)
+        )
 
-            config = load_config(current_app.config["CORE_CONFIG_DIR"])
-            component_handle = await current_app.ltcm.register_component(
-                partial(self._LONG_TERM_CTX_CLS.start, config=config, addr=addr, **kwargs)
-            )
-            self._addr_to_claim_ctx[addr] = component_handle
+        # Register the component and teardown any previous one
+        old_component_handle = self._addr_to_claim_ctx.get(addr)
+        if old_component_handle:
+            await self._stop_ctx(addr, old_component_handle)
+        self._addr_to_claim_ctx[addr] = component_handle
 
-        # Note we don't protect against concurrent use of the claim context.
-        # This is fine given claim contexts are immutables and the Parsec server
-        # knows how to deal with concurrent requests.
         try:
             async with current_app.ltcm.acquire_component(component_handle) as component:
-                yield component
+                # LTCM allow concurrent access to the component, however our
+                # invitation components rely on a single backend transport
+                # connection so we need a lock here to avoid concurrent
+                # operations on it
+                async with component._lock:
+                    yield component
+
         except ComponentNotRegistered as exc:
             # The component has probably crashed...
             raise LongTermCtxNotStarted from exc
 
         if component.get_in_progress_ctx() is None:
-            try:
-                await current_app.ltcm.unregister_component(component_handle)
-            except ComponentNotRegistered:
-                pass
+            await self._stop_ctx(addr, component_handle)
+
+    async def _stop_ctx(self, addr, component_handle):
+        try:
+            await current_app.ltcm.unregister_component(component_handle)
+        except ComponentNotRegistered:
+            pass
+        removed_component_handle = self._addr_to_claim_ctx.pop(addr, None)
+        if removed_component_handle is not None and removed_component_handle != component_handle:
+            # Ooops ! The component we've been asked to stop has already been
+            # replaced by another one in the addr to claim dict, just pretent
+            # we did nothing and move and ;-)
+            self._addr_to_claim_ctx[addr] = removed_component_handle
 
     @asynccontextmanager
     async def retreive_ctx(self, addr: BackendInvitationAddr) -> AsyncIterator[BaseLongTermCtx]:
-        # The lock is needed here to avoid concurrent claim contexts with the same invitation
-        async with self._lock:
-            try:
-                component_handle = self._addr_to_claim_ctx[addr]
-            except KeyError:
-                raise LongTermCtxNotStarted
+        try:
+            component_handle = self._addr_to_claim_ctx[addr]
+        except KeyError:
+            raise LongTermCtxNotStarted
 
-        # Note we don't protect against concurrent use of the claim context.
-        # This is fine given claim contexts are immutables and the Parsec server
-        # knows how to deal with concurrent requests.
         try:
             async with current_app.ltcm.acquire_component(component_handle) as component:
-                yield component
+                # LTCM allow concurrent access to the component, however our
+                # invitation components rely on a single backend transport
+                # connection so we need a lock here to avoid concurrent
+                # operations on it
+                async with component._lock:
+                    yield component
+
         except ComponentNotRegistered as exc:
             # The component has probably crashed...
             raise LongTermCtxNotStarted from exc
 
         if component.get_in_progress_ctx() is None:
-            try:
-                await current_app.ltcm.unregister_component(component_handle)
-            except ComponentNotRegistered:
-                pass
+            await self._stop_ctx(addr, component_handle)
 
 
 class ClaimLongTermCtx(BaseLongTermCtx):
