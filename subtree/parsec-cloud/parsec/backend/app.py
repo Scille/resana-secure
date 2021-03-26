@@ -25,7 +25,7 @@ from parsec.api.protocol import (
     UserID,
     InvitationToken,
 )
-from parsec.backend.utils import CancelledByNewRequest, ClientType, collect_apis
+from parsec.backend.utils import CancelledByNewRequest, ClientType, collect_apis, run_with_breathing_transport
 from parsec.backend.config import BackendConfig
 from parsec.backend.client_context import AuthenticatedClientContext, InvitedClientContext
 from parsec.backend.handshake import do_handshake
@@ -450,7 +450,9 @@ class BackendApp:
 
             else:
                 try:
-                    rep = await cmd_func(client_ctx, req)
+                    rep = await run_with_breathing_transport(
+                        client_ctx.transport, cmd_func, client_ctx, req
+                    )
 
                 except InvalidMessageError as exc:
                     rep = {

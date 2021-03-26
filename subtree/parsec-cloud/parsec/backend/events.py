@@ -198,9 +198,7 @@ class EventsComponent:
         msg = events_listen_serializer.req_load(msg)
 
         if msg["wait"]:
-            event_data = await run_with_breathing_transport(
-                client_ctx.transport, client_ctx.receive_events_channel.receive
-            )
+            event_data = await client_ctx.receive_events_channel.receive()
 
             if not event_data:
                 return {"status": "cancelled", "reason": "Client cancelled the listening"}
