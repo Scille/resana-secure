@@ -151,7 +151,6 @@ class LTCM:
 
     def __init__(self, nursery):
         self._nursery = nursery
-        self._lock = trio.Lock()
         self._components: Dict[int, ManagedComponent] = {}
 
     @classmethod
@@ -168,22 +167,20 @@ class LTCM:
         """
         Raises: Nothing
         """
-        async with self._lock:
-            managed_component = await self._nursery.start(ManagedComponent.run, component_factory)
-            handle = id(managed_component)
-            self._components[handle] = managed_component
-            return handle
+        managed_component = await self._nursery.start(ManagedComponent.run, component_factory)
+        handle = id(managed_component)
+        self._components[handle] = managed_component
+        return handle
 
     async def unregister_component(self, handle: int) -> None:
         """
         Raises: ComponentNotRegistered
         """
-        async with self._lock:
-            try:
-                managed_component = self._components.pop(handle)
-            except KeyError:
-                raise ComponentNotRegistered
-            await managed_component.stop()
+        try:
+            managed_component = self._components.pop(handle)
+        except KeyError:
+            raise ComponentNotRegistered
+        await managed_component.stop()
 
     def is_registered_component(self, handle: int) -> bool:
         return handle in self._components
