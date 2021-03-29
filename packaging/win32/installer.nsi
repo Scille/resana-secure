@@ -30,7 +30,7 @@
 
 # Python files generated
 !define LICENSE_FILEPATH "${PROGRAM_FREEZE_BUILD_DIR}\LICENSE.txt"
-!define INSTALLER_FILENAME "resane_secure-${PROGRAM_VERSION}-${PROGRAM_PLATFORM}-setup.exe"
+!define INSTALLER_FILENAME "resana_secure-${PROGRAM_VERSION}-${PROGRAM_PLATFORM}-setup.exe"
 
 !define WINFSP_INSTALLER "winfsp-1.7.20172.msi"
 
@@ -64,7 +64,7 @@ SetCompressorDictSize 64
 !define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
 !define MUI_FINISHPAGE_SHOWREADME_TEXT "Create Desktop Shortcut"
 !define MUI_FINISHPAGE_SHOWREADME_FUNCTION CreateDesktopShortcut
-# Run Resane Secure after install, using explorer.exe to un-elevate priviledges
+# Run Resana Secure after install, using explorer.exe to un-elevate priviledges
 # More information: https://stackoverflow.com/a/15041823/2846140
 !define MUI_FINISHPAGE_RUN "$WINDIR\explorer.exe"
 !define MUI_FINISHPAGE_RUN_PARAMETERS "$INSTDIR\resana_secure.exe"
@@ -148,7 +148,7 @@ Function un.onInit
 FunctionEnd
 
 Function CreateDesktopShortcut
-    CreateShortCut "$DESKTOP\Resane Secure.lnk" "$INSTDIR\resana_secure.exe"
+    CreateShortCut "$DESKTOP\Resana Secure.lnk" "$INSTDIR\resana_secure.exe"
 FunctionEnd
 
 # # Test if Visual Studio Redistributables 2008 SP1 installed and returns -1 if none installed
