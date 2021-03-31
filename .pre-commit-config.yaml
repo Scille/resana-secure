@@ -1,0 +1,2 @@
+# Empty config in case pre-commit is enabled
+repos: []

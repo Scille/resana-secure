@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+PIP_VERSION=21.0.1
+PIP_WHEEL_URL='https://files.pythonhosted.org/packages/fe/ef/60d7ba03b5c442309ef42e7d69959f73aacccd0d86008362a681c4698e83/pip-21.0.1-py3-none-any.whl'
+
+# Hackity hack to select pip version
+# Default version is 20.1.1, but we need >=20.3 to have a correct dependency resolver
+# (see https://blog.python.org/2020/11/pip-20-3-release-new-resolver.html)
+sed "s/PIP_VERSION=.*/PIP_VERSION='$PIP_VERSION'/" -i $BIN_DIR/steps/python
+sed "s#PIP_WHEEL_URL=.*#PIP_WHEEL_URL='$PIP_WHEEL_URL'#" -i $BIN_DIR/steps/python

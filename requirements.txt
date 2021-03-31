@@ -1,0 +1,2 @@
+# Direct reference (requires pip>=19.1), see https://www.python.org/dev/peps/pep-0440/#direct-references
+resana_secure @ git+ssh://git@github.com/Scille/resana-secure.git@d5d3d1b798ed8f21643e643c341f064efc277a7c
