@@ -1,4 +1,3 @@
-from pathlib import Path
 import re
 import secrets
 import logging
@@ -9,6 +8,8 @@ from quart_cors import cors
 from quart_trio import QuartTrio
 from hypercorn.config import Config as HyperConfig
 from hypercorn.trio import serve
+
+from parsec.core.config import CoreConfig
 
 from .cores_manager import CoresManager
 from .invites_manager import ClaimersManager, GreetersManager
@@ -25,7 +26,7 @@ from parsec.core.types import BackendAddr
 
 @asynccontextmanager
 async def app_factory(
-    config_dir: Path, client_allowed_origins: List[str], backend_addr: BackendAddr
+    config: CoreConfig, client_allowed_origins: List[str], backend_addr: BackendAddr
 ):
     app = QuartTrio(__name__, static_folder=None)
     app.config.from_mapping(
@@ -39,7 +40,7 @@ async def app_factory(
         # Access-Control-Allow-Origin=* and Access-Control-Allow-Credential=include are mutually exclusive
         QUART_CORS_ALLOW_CREDENTIALS="*" not in client_allowed_origins,
         QUART_CORS_ALLOW_ORIGIN=client_allowed_origins,
-        CORE_CONFIG_DIR=config_dir,
+        CORE_CONFIG=config,
         PARSEC_BACKEND_ADDR=backend_addr,
     )
 
@@ -94,7 +95,7 @@ async def app_factory(
 async def serve_app(
     host: str,
     port: int,
-    config_dir: Path,
+    config: CoreConfig,
     client_allowed_origins: List[str],
     backend_addr: BackendAddr,
 ):
@@ -107,8 +108,6 @@ async def serve_app(
     )
 
     async with app_factory(
-        config_dir=config_dir,
-        client_allowed_origins=client_allowed_origins,
-        backend_addr=backend_addr,
+        config=config, client_allowed_origins=client_allowed_origins, backend_addr=backend_addr
     ) as app:
         await serve(app, config)

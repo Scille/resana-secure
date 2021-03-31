@@ -11,7 +11,7 @@ from parsec.core.backend_connection import (
     backend_authenticated_cmds_factory,
 )
 from parsec.core.types import LocalDevice, BackendInvitationAddr
-from parsec.core.config import load_config, CoreConfig
+from parsec.core.config import CoreConfig
 from parsec.core.invite import claimer_retrieve_info, UserGreetInitialCtx, DeviceGreetInitialCtx
 
 
@@ -52,9 +52,13 @@ class BaseInviteManager:
     async def start_ctx(
         self, addr: BackendInvitationAddr, **kwargs
     ) -> AsyncIterator[BaseLongTermCtx]:
-        config = load_config(current_app.config["CORE_CONFIG_DIR"])
         component_handle = await current_app.ltcm.register_component(
-            partial(self._LONG_TERM_CTX_CLS.start, config=config, addr=addr, **kwargs)
+            partial(
+                self._LONG_TERM_CTX_CLS.start,
+                config=current_app.config["CORE_CONFIG"],
+                addr=addr,
+                **kwargs
+            )
         )
 
         # Register the component and teardown any previous one

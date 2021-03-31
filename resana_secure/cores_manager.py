@@ -4,11 +4,12 @@ from base64 import b64encode
 from typing import AsyncIterator, Callable, Dict, Optional
 from functools import partial
 from quart import current_app
+from pathlib import Path
 from contextlib import asynccontextmanager
 
 from parsec.core.types import LocalDevice
 from parsec.core.logged_core import logged_core_factory, LoggedCore
-from parsec.core.config import load_config, CoreConfig
+from parsec.core.config import CoreConfig
 from parsec.core.local_device import (
     list_available_devices,
     load_device_with_password,
@@ -34,9 +35,9 @@ class CoreDeviceInvalidKeyError(CoreManagerError):
     pass
 
 
-def load_device_or_error(config: CoreConfig, email: str, key: bytes) -> Optional[LocalDevice]:
+def load_device_or_error(config_dir: Path, email: str, key: bytes) -> Optional[LocalDevice]:
     found_email = False
-    for available_device in list_available_devices(config.config_dir):
+    for available_device in list_available_devices(config_dir):
         if available_device.human_handle and available_device.human_handle.email == email:
             found_email = True
             try:
@@ -78,12 +79,10 @@ class CoresManager:
             CoreDeviceNotFoundError
             CoreDeviceInvalidKeyError
         """
+        config = current_app.config["CORE_CONFIG"]
         # First load the device from disk
         # This operation can be done concurrently and ensures the email/key couple is valid
-        config = load_config(
-            config_dir=current_app.config["CORE_CONFIG_DIR"], mountpoint_enabled=True
-        )
-        device = load_device_or_error(config=config, email=email, key=key)
+        device = load_device_or_error(config_dir=config.config_dir, email=email, key=key)
 
         # The lock is needed here to avoid concurrent logins with the same email
         async with self._login_lock:

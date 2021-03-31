@@ -292,7 +292,7 @@ async def claimer_4_finalize(apitoken):
                 raise APIException(409, {"error": "invalid_state"})
 
             save_device_with_password(
-                config_dir=current_app.config["CORE_CONFIG_DIR"],
+                config_dir=current_app.config["CORE_CONFIG"].config_dir,
                 device=new_device,
                 password=password,
             )

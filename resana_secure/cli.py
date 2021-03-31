@@ -8,7 +8,7 @@ import logging
 import structlog
 
 from parsec.core.types import BackendAddr
-from parsec.core.config import get_default_config_dir
+from parsec.core.config import get_default_config_dir, load_config
 
 from .app import serve_app
 
@@ -85,11 +85,15 @@ def run_cli():
 
         manager.get_mountpoint_runner = _get_mountpoint_runner_mocked
 
+    config = load_config(
+        config_dir=args.config_dir or get_default_config_dir(os.environ), mountpoint_enabled=True
+    )
+
     trio_main = partial(
         serve_app,
         host=args.host,
         port=args.port,
-        config_dir=args.config_dir or get_default_config_dir(os.environ),
+        config=config,
         client_allowed_origins=args.client_origin,
         backend_addr=args.backend_addr,
     )
