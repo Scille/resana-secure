@@ -21,13 +21,9 @@ from .routes.workspaces import workspaces_bp
 from .routes.invitations import invitations_bp
 from .ltcm import LTCM
 
-from parsec.core.types import BackendAddr
-
 
 @asynccontextmanager
-async def app_factory(
-    config: CoreConfig, client_allowed_origins: List[str], backend_addr: BackendAddr
-):
+async def app_factory(config: CoreConfig, client_allowed_origins: List[str]):
     app = QuartTrio(__name__, static_folder=None)
     app.config.from_mapping(
         # Secret key changes each time the application is started, this is
@@ -41,7 +37,6 @@ async def app_factory(
         QUART_CORS_ALLOW_CREDENTIALS="*" not in client_allowed_origins,
         QUART_CORS_ALLOW_ORIGIN=client_allowed_origins,
         CORE_CONFIG=config,
-        PARSEC_BACKEND_ADDR=backend_addr,
     )
 
     cors(app)
@@ -92,13 +87,7 @@ async def app_factory(
         yield app
 
 
-async def serve_app(
-    host: str,
-    port: int,
-    config: CoreConfig,
-    client_allowed_origins: List[str],
-    backend_addr: BackendAddr,
-):
+async def serve_app(host: str, port: int, config: CoreConfig, client_allowed_origins: List[str]):
     config = HyperConfig.from_mapping(
         {
             "bind": [f"{host}:{port}"],
@@ -107,7 +96,5 @@ async def serve_app(
         }
     )
 
-    async with app_factory(
-        config=config, client_allowed_origins=client_allowed_origins, backend_addr=backend_addr
-    ) as app:
+    async with app_factory(config=config, client_allowed_origins=client_allowed_origins) as app:
         await serve(app, config)

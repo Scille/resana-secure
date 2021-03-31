@@ -1,4 +1,5 @@
 import argparse
+from typing import Optional
 from pathlib import Path
 from functools import partial
 import os
@@ -8,7 +9,7 @@ import logging
 import structlog
 
 from parsec.core.types import BackendAddr
-from parsec.core.config import get_default_config_dir, load_config
+from parsec.core.config import CoreConfig
 
 from .app import serve_app
 
@@ -50,6 +51,39 @@ def _setup_logging(log_level: str) -> None:
     )
 
 
+def build_config(backend_addr: BackendAddr, config_dir: Optional[Path] = None) -> CoreConfig:
+    home = Path.home()
+    mountpoint_base_dir = Path.home() / "Resana-Secure"
+
+    if os.name == "nt":
+        appdata = Path(os.environ["APPDATA"])
+        data_base_dir = appdata / "resana_secure/data"
+        cache_base_dir = appdata / "resana_secure/cache"
+        config_dir = config_dir or appdata / "resana_secure/config"
+
+    else:
+        path = os.environ.get("XDG_DATA_HOME") or f"{home}/.local/share"
+        data_base_dir = Path(path) / "resana_secure"
+
+        path = os.environ.get("XDG_CACHE_HOME") or f"{home}/.cache"
+        cache_base_dir = Path(path) / "resana_secure"
+
+        path = os.environ.get("XDG_CONFIG_HOME") or f"{home}/.config"
+        config_dir = config_dir or Path(path) / "resana_secure"
+
+    return CoreConfig(
+        config_dir=config_dir,
+        data_base_dir=data_base_dir,
+        cache_base_dir=cache_base_dir,
+        mountpoint_base_dir=mountpoint_base_dir,
+        # Use a mock to disable mountpoint instead of relying on this option
+        mountpoint_enabled=True,
+        ipc_win32_mutex_name="resana_secure",
+        ipc_socket_file=data_base_dir / "resana_secure.lock",
+        preferred_org_creation_backend_addr=backend_addr,
+    )
+
+
 def run_cli():
     parser = argparse.ArgumentParser(description="Process some integers.")
     parser.add_argument("--port", type=int, default=5775)
@@ -85,9 +119,7 @@ def run_cli():
 
         manager.get_mountpoint_runner = _get_mountpoint_runner_mocked
 
-    config = load_config(
-        config_dir=args.config_dir or get_default_config_dir(os.environ), mountpoint_enabled=True
-    )
+    config = build_config(backend_addr=args.backend_addr, config_dir=args.config_dir)
 
     trio_main = partial(
         serve_app,
@@ -95,7 +127,6 @@ def run_cli():
         port=args.port,
         config=config,
         client_allowed_origins=args.client_origin,
-        backend_addr=args.backend_addr,
     )
 
     if args.disable_gui:

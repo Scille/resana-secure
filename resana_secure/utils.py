@@ -116,7 +116,7 @@ def apitoken_to_addr(apitoken: str) -> BackendInvitationAddr:
     token = UUID(hex=raw_token)
 
     return BackendInvitationAddr.build(
-        backend_addr=current_app.config["PARSEC_BACKEND_ADDR"],
+        backend_addr=current_app.config["CORE_CONFIG"].preferred_org_creation_backend_addr,
         organization_id=organization_id,
         invitation_type=invitation_type,
         token=token,
