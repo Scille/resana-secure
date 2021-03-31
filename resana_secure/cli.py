@@ -136,4 +136,4 @@ def run_cli():
         # Inline import to avoid importing pyqt if gui is disabled
         from .gui import run_gui
 
-        run_gui(trio_main=trio_main, resana_website_url=args.resana_website_url)
+        run_gui(trio_main=trio_main, resana_website_url=args.resana_website_url, config=config)

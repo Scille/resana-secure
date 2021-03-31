@@ -1,10 +1,20 @@
 from typing import Awaitable, Callable, Optional
 from importlib import resources
+from contextlib import asynccontextmanager
 import trio
 from structlog import get_logger
 from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu
 from PyQt5.QtGui import QDesktopServices, QIcon
 from PyQt5.QtCore import pyqtSignal, QUrl
+
+from parsec.core.config import CoreConfig
+from parsec.core.ipcinterface import (
+    run_ipc_server,
+    send_to_ipc_server,
+    IPCServerAlreadyRunning,
+    IPCServerNotRunning,
+    IPCCommand,
+)
 
 
 logger = get_logger()
@@ -41,8 +51,11 @@ class Systray(QSystemTrayIcon):
 class TrioQtApplication(QApplication):
     _run_in_qt_loop = pyqtSignal(object)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    foreground_needed = pyqtSignal()
+
+    def __init__(self, config: CoreConfig):
+        super().__init__([])
+        self.config = config
 
         def _exec_fn(fn):
             fn()
@@ -66,10 +79,11 @@ class TrioQtApplication(QApplication):
 
         async def _trio_main():
             with trio.CancelScope() as self._trio_main_cancel_scope:
-                try:
-                    await trio_main()
-                finally:
-                    self._trio_main_cancel_scope = None
+                async with self._run_ipc_server():
+                    try:
+                        await trio_main()
+                    finally:
+                        self._trio_main_cancel_scope = None
 
         def _start_trio():
             trio.lowlevel.start_guest_run(
@@ -89,9 +103,38 @@ class TrioQtApplication(QApplication):
         else:
             self._quit_cb()
 
+    @asynccontextmanager
+    async def _run_ipc_server(self):
+        async def _cmd_handler(cmd):
+            self.foreground_needed.emit()
+            return {"status": "ok"}
 
-def run_gui(trio_main: Callable[[], Awaitable[None]], resana_website_url: str):
-    app = TrioQtApplication([])
+        while True:
+            try:
+                async with run_ipc_server(
+                    _cmd_handler,
+                    self.config.ipc_socket_file,
+                    win32_mutex_name=self.config.ipc_win32_mutex_name,
+                ):
+                    yield
+
+            except IPCServerAlreadyRunning:
+                # Parsec is already started, give it our work then
+                try:
+                    try:
+                        await send_to_ipc_server(self.config.ipc_socket_file, IPCCommand.FOREGROUND)
+                    finally:
+                        # Now just close our application
+                        self.quit()
+                    return
+
+                except IPCServerNotRunning:
+                    # IPC server has closed, retry to create our own
+                    continue
+
+
+def run_gui(trio_main: Callable[[], Awaitable[None]], resana_website_url: str, config: CoreConfig):
+    app = TrioQtApplication(config)
     app.setQuitOnLastWindowClosed(False)
     tray = Systray()
 
@@ -101,5 +144,6 @@ def run_gui(trio_main: Callable[[], Awaitable[None]], resana_website_url: str):
         QDesktopServices.openUrl(QUrl(resana_website_url))
 
     tray.on_open.connect(_open_resana_website)
+    app.foreground_needed.connect(_open_resana_website)
 
     app.exec_(trio_main)
