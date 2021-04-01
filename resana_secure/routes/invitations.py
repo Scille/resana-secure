@@ -25,6 +25,7 @@ async def get_invitations(core):
 
     for invitation in invitations:
         apitoken = build_apitoken(
+            backend_addr=core.device.organization_addr,
             organization_id=core.device.organization_id,
             invitation_type=invitation["type"],
             token=invitation["token"],
@@ -65,7 +66,10 @@ async def create_invitation(core):
             addr = await core.new_device_invitation(send_email=False)
 
     apitoken = build_apitoken(
-        organization_id=addr.organization_id, invitation_type=addr.invitation_type, token=addr.token
+        backend_addr=addr,
+        organization_id=addr.organization_id,
+        invitation_type=addr.invitation_type,
+        token=addr.token,
     )
     return {"token": apitoken}, 200
 

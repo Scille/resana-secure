@@ -8,7 +8,6 @@ import trio
 import logging
 import structlog
 
-from parsec.core.types import BackendAddr
 from parsec.core.config import CoreConfig
 
 from .app import serve_app
@@ -51,7 +50,7 @@ def _setup_logging(log_level: str) -> None:
     )
 
 
-def build_config(backend_addr: BackendAddr, config_dir: Optional[Path] = None) -> CoreConfig:
+def build_config(config_dir: Optional[Path] = None) -> CoreConfig:
     home = Path.home()
     mountpoint_base_dir = Path.home() / "Resana-Secure"
 
@@ -80,7 +79,6 @@ def build_config(backend_addr: BackendAddr, config_dir: Optional[Path] = None) -
         mountpoint_enabled=True,
         ipc_win32_mutex_name="resana_secure",
         ipc_socket_file=data_base_dir / "resana_secure.lock",
-        preferred_org_creation_backend_addr=backend_addr,
     )
 
 
@@ -89,11 +87,6 @@ def run_cli():
     parser.add_argument("--port", type=int, default=5775)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--config-dir", type=Path)
-    parser.add_argument(
-        "--backend-addr",
-        type=BackendAddr.from_url,
-        default="parsec://resana-secure.numerique.gouv.fr",
-    )
     parser.add_argument("--client-origin", type=lambda x: x.split(";"), default=["*"])
     parser.add_argument(
         "--resana-website-url", type=_cook_website_url, default="https://resana.numerique.gouv.fr/"
@@ -119,7 +112,7 @@ def run_cli():
 
         manager.get_mountpoint_runner = _get_mountpoint_runner_mocked
 
-    config = build_config(backend_addr=args.backend_addr, config_dir=args.config_dir)
+    config = build_config(config_dir=args.config_dir)
 
     trio_main = partial(
         serve_app,

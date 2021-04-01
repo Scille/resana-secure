@@ -1,13 +1,14 @@
 from uuid import UUID
 from typing import Optional
 from functools import wraps
+from base64 import urlsafe_b64decode, urlsafe_b64encode
 from contextlib import asynccontextmanager, contextmanager
 from quart import jsonify, Response, current_app, session, request
 from quart.exceptions import HTTPException
 from werkzeug.routing import BaseConverter
 
 from parsec.api.protocol import OrganizationID, InvitationType
-from parsec.core.types import BackendInvitationAddr
+from parsec.core.types import BackendInvitationAddr, BackendAddr
 from parsec.core.backend_connection import (
     BackendConnectionError,
     BackendNotAvailable,
@@ -98,29 +99,23 @@ async def check_data():
 
 
 def build_apitoken(
-    organization_id: OrganizationID, invitation_type: InvitationType, token: UUID
+    backend_addr: BackendAddr,
+    organization_id: OrganizationID,
+    invitation_type: InvitationType,
+    token: UUID,
 ) -> str:
-    invitation_type = "u" if invitation_type == InvitationType.USER else "d"
-    return f"{organization_id}:{invitation_type}:{token.hex}"
-
-
-def apitoken_to_addr(apitoken: str) -> BackendInvitationAddr:
-    organization_id, invitation_type, raw_token = apitoken.split(":")
-    organization_id = OrganizationID(organization_id)
-    if invitation_type == "u":
-        invitation_type = InvitationType.USER
-    elif invitation_type == "d":
-        invitation_type = InvitationType.DEVICE
-    else:
-        raise ValueError
-    token = UUID(hex=raw_token)
-
-    return BackendInvitationAddr.build(
-        backend_addr=current_app.config["CORE_CONFIG"].preferred_org_creation_backend_addr,
+    invitation_addr = BackendInvitationAddr.build(
+        backend_addr=backend_addr,
         organization_id=organization_id,
         invitation_type=invitation_type,
         token=token,
     )
+    return urlsafe_b64encode(invitation_addr.to_url().encode("ascii")).decode("ascii")
+
+
+def apitoken_to_addr(apitoken: str) -> BackendInvitationAddr:
+    invitation_url = urlsafe_b64decode(apitoken.encode("ascii")).decode("ascii")
+    return BackendInvitationAddr.from_url(invitation_url)
 
 
 @contextmanager
