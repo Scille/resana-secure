@@ -61,8 +61,12 @@ def core_config_dir(tmp_path):
 
 
 @pytest.fixture
-def core_config(core_config_dir, backend_addr):
-    return build_config(backend_addr=backend_addr, config_dir=core_config_dir)
+def core_config(tmp_path, core_config_dir):
+    return build_config(
+        config_dir=core_config_dir,
+        data_base_dir=tmp_path / "data",
+        cache_base_dir=tmp_path / "cache",
+    )
 
 
 @pytest.fixture

@@ -50,22 +50,26 @@ def _setup_logging(log_level: str) -> None:
     )
 
 
-def build_config(config_dir: Optional[Path] = None) -> CoreConfig:
+def build_config(
+    config_dir: Optional[Path] = None,
+    data_base_dir: Optional[Path] = None,
+    cache_base_dir: Optional[Path] = None,
+) -> CoreConfig:
     home = Path.home()
     mountpoint_base_dir = Path.home() / "Resana-Secure"
 
     if os.name == "nt":
         appdata = Path(os.environ["APPDATA"])
-        data_base_dir = appdata / "resana_secure/data"
-        cache_base_dir = appdata / "resana_secure/cache"
+        data_base_dir = data_base_dir or appdata / "resana_secure/data"
+        cache_base_dir = cache_base_dir or appdata / "resana_secure/cache"
         config_dir = config_dir or appdata / "resana_secure/config"
 
     else:
         path = os.environ.get("XDG_DATA_HOME") or f"{home}/.local/share"
-        data_base_dir = Path(path) / "resana_secure"
+        data_base_dir = data_base_dir or Path(path) / "resana_secure"
 
         path = os.environ.get("XDG_CACHE_HOME") or f"{home}/.cache"
-        cache_base_dir = Path(path) / "resana_secure"
+        cache_base_dir = cache_base_dir or Path(path) / "resana_secure"
 
         path = os.environ.get("XDG_CONFIG_HOME") or f"{home}/.config"
         config_dir = config_dir or Path(path) / "resana_secure"
@@ -79,6 +83,7 @@ def build_config(config_dir: Optional[Path] = None) -> CoreConfig:
         mountpoint_enabled=True,
         ipc_win32_mutex_name="resana_secure",
         ipc_socket_file=data_base_dir / "resana_secure.lock",
+        preferred_org_creation_backend_addr=None,
     )
 
 
