@@ -88,7 +88,7 @@ async def app_factory(config: CoreConfig, client_allowed_origins: List[str]):
 
 
 async def serve_app(host: str, port: int, config: CoreConfig, client_allowed_origins: List[str]):
-    config = HyperConfig.from_mapping(
+    hyper_config = HyperConfig.from_mapping(
         {
             "bind": [f"{host}:{port}"],
             "accesslog": logging.getLogger("hypercorn.access"),
@@ -97,4 +97,4 @@ async def serve_app(host: str, port: int, config: CoreConfig, client_allowed_ori
     )
 
     async with app_factory(config=config, client_allowed_origins=client_allowed_origins) as app:
-        await serve(app, config)
+        await serve(app, hyper_config)
