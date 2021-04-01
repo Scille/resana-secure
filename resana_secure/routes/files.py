@@ -1,5 +1,6 @@
 import sys
 import os
+import trio
 import subprocess
 from quart import Blueprint
 from base64 import b64decode
@@ -332,9 +333,14 @@ async def open_workspace_item(core, workspace_id, entry_id):
         except MountpointNotMounted:
             raise APIException(400, {"error": "workspace_not_mounted"})
 
-    if sys.platform == "linux":
-        subprocess.call(["xdg-open", fspath])
-    elif sys.platform == "win32":
-        os.startfile(fspath)
+    # Must run the open in a thread, otherwise we will block the current thread
+    # that is suppossed to handle the actual open operation asked by the kernel !
+    def _open_item():
+        if sys.platform == "linux":
+            subprocess.call(["xdg-open", fspath])
+        elif sys.platform == "win32":
+            os.startfile(fspath)
+
+    await trio.to_thread.run_sync(_open_item)
 
     return {}, 200
