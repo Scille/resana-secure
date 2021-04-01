@@ -267,11 +267,9 @@ async def claimer_4_finalize(apitoken):
         raise APIException(404, {"error": "unknown_token"})
 
     async with check_data() as (data, bad_fields):
-        key = data.get("key")
-        if not isinstance(key, str):
+        password = data.get("key")
+        if not isinstance(password, str):
             bad_fields.add("key")
-        # TODO: b64decode + reencode ?
-        password = key
 
     with backend_errors_to_api_exceptions():
         async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:

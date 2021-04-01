@@ -1,7 +1,10 @@
-from base64 import b64decode
 from quart import Blueprint, current_app, session
 
-from ..cores_manager import CoreNotLoggedError, CoreDeviceNotFoundError, CoreDeviceInvalidKeyError
+from ..cores_manager import (
+    CoreNotLoggedError,
+    CoreDeviceNotFoundError,
+    CoreDeviceInvalidPasswordError,
+)
 from ..utils import check_data, APIException, get_auth_token
 
 
@@ -19,18 +22,16 @@ async def do_auth():
         email = data.get("email")
         if not isinstance(email, str):
             bad_fields.add("email")
-        key = data.get("key")
-        try:
-            key = b64decode(key)
-        except (TypeError, ValueError):
+        password = data.get("key")
+        if not isinstance(password, str):
             bad_fields.add("key")
 
     try:
-        auth_token = await current_app.cores_manager.login(email=email, key=key)
+        auth_token = await current_app.cores_manager.login(email=email, password=password)
 
     except CoreDeviceNotFoundError:
         raise APIException(404, {"error": "bad_email"})
-    except CoreDeviceInvalidKeyError:
+    except CoreDeviceInvalidPasswordError:
         raise APIException(400, {"error": "bad_key"})
 
     session["logged_in"] = auth_token

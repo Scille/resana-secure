@@ -1,6 +1,5 @@
 import trio
 from uuid import uuid4
-from base64 import b64encode
 from typing import AsyncIterator, Callable, Dict, Optional
 from functools import partial
 from quart import current_app
@@ -31,27 +30,26 @@ class CoreDeviceNotFoundError(CoreManagerError):
     pass
 
 
-class CoreDeviceInvalidKeyError(CoreManagerError):
+class CoreDeviceInvalidPasswordError(CoreManagerError):
     pass
 
 
-def load_device_or_error(config_dir: Path, email: str, key: bytes) -> Optional[LocalDevice]:
+def load_device_or_error(config_dir: Path, email: str, password: str) -> Optional[LocalDevice]:
     found_email = False
     for available_device in list_available_devices(config_dir):
         if available_device.human_handle and available_device.human_handle.email == email:
             found_email = True
             try:
-                password = b64encode(key).decode(
-                    "ascii"
-                )  # TODO: use key (made of bytes) directly instead
-                return load_device_with_password(available_device.key_file_path, password)
+                return load_device_with_password(
+                    key_file=available_device.key_file_path, password=password
+                )
 
             except LocalDeviceError:
                 # Maybe another device file is available for this email...
                 continue
     else:
         if found_email:
-            raise CoreDeviceInvalidKeyError
+            raise CoreDeviceInvalidPasswordError
         else:
             raise CoreDeviceNotFoundError
 
@@ -73,16 +71,16 @@ class CoresManager:
         self._auth_token_to_component_handle: Dict[str, int] = {}
         self._login_lock = trio.Lock()
 
-    async def login(self, email: str, key: bytes) -> str:
+    async def login(self, email: str, password: str) -> str:
         """
         Raises:
             CoreDeviceNotFoundError
-            CoreDeviceInvalidKeyError
+            CoreDeviceInvalidPasswordError
         """
         config = current_app.config["CORE_CONFIG"]
         # First load the device from disk
-        # This operation can be done concurrently and ensures the email/key couple is valid
-        device = load_device_or_error(config_dir=config.config_dir, email=email, key=key)
+        # This operation can be done concurrently and ensures the email/password couple is valid
+        device = load_device_or_error(config_dir=config.config_dir, email=email, password=password)
 
         # The lock is needed here to avoid concurrent logins with the same email
         async with self._login_lock:

@@ -3,7 +3,6 @@ import pytest
 import trio
 from functools import partial
 from collections import namedtuple
-from base64 import b64encode
 
 from parsec.crypto import PrivateKey, SigningKey
 from parsec.api.data import UserCertificateContent, DeviceCertificateContent, UserProfile
@@ -81,8 +80,7 @@ async def authenticated_client(test_app, local_device):
     test_client = test_app.test_client()
 
     response = await test_client.post(
-        "/auth",
-        json={"email": local_device.email, "key": b64encode(local_device.key).decode("ascii")},
+        "/auth", json={"email": local_device.email, "key": local_device.key}
     )
     assert response.status_code == 200
     # Note cookie is automatically added to test_client's cookie jar
@@ -127,8 +125,7 @@ LocalDeviceTestbed = namedtuple("LocalDeviceTestbed", "device,email,key")
 async def local_device(running_backend, backend_addr, core_config_dir):
     organization_id = OrganizationID("CoolOrg")
     device_label = "alice's desktop"
-    key = b"P@ssw0rd."
-    password = b64encode(key).decode("ascii")  # TODO should implement&use `save_device_with_key`
+    password = "P@ssw0rd."
     human_handle = HumanHandle(email="alice@example.com", label="Alice")
     bootstrap_addr = BackendOrganizationBootstrapAddr.build(
         backend_addr=backend_addr, organization_id=organization_id
@@ -139,7 +136,7 @@ async def local_device(running_backend, backend_addr, core_config_dir):
             cmds=cmds, human_handle=human_handle, device_label=device_label
         )
         save_device_with_password(config_dir=core_config_dir, device=new_device, password=password)
-    return LocalDeviceTestbed(device=new_device, email=human_handle.email, key=key)
+    return LocalDeviceTestbed(device=new_device, email=human_handle.email, key=password)
 
 
 RemoteDeviceTestbed = namedtuple("RemoteDeviceTestbed", "device_id,email")
