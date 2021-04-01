@@ -1,5 +1,3 @@
--e ./subtree/parsec-cloud[backend,core]
--e .
 pytest
 pytest-trio
 pre-commit
