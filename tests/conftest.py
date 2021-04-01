@@ -9,14 +9,15 @@ from parsec.crypto import PrivateKey, SigningKey
 from parsec.api.data import UserCertificateContent, DeviceCertificateContent, UserProfile
 from parsec.api.protocol import OrganizationID, HumanHandle, DeviceID, DeviceName
 from parsec.core.types import BackendOrganizationBootstrapAddr, BackendAddr
-from parsec.backend import backend_app_factory
-from parsec.backend.user import User as BackendUser, Device as BackendDevice
-from parsec.backend.config import BackendConfig, MockedBlockStoreConfig
 from parsec.core.invite import bootstrap_organization
 from parsec.core.backend_connection import apiv1_backend_anonymous_cmds_factory
 from parsec.core.local_device import save_device_with_password
+from parsec.backend import backend_app_factory
+from parsec.backend.user import User as BackendUser, Device as BackendDevice
+from parsec.backend.config import BackendConfig, MockedBlockStoreConfig
 
 from resana_secure.app import app_factory
+from resana_secure.cli import build_config
 
 
 @pytest.fixture(scope="session")
@@ -55,12 +56,18 @@ async def backend_addr(_backend_addr_register):
 
 
 @pytest.fixture
-async def test_app(core_config_dir, client_origin, backend_addr):
-    async with app_factory(
-        config_dir=core_config_dir,
-        client_allowed_origins=[client_origin],
-        backend_addr=backend_addr,
-    ) as app:
+def core_config_dir(tmp_path):
+    return tmp_path / "core_config_dir"
+
+
+@pytest.fixture
+def core_config(core_config_dir, backend_addr):
+    return build_config(backend_addr=backend_addr, config_dir=core_config_dir)
+
+
+@pytest.fixture
+async def test_app(core_config, client_origin):
+    async with app_factory(config=core_config, client_allowed_origins=[client_origin]) as app:
         async with app.test_app() as test_app:
             yield test_app
 
@@ -107,11 +114,6 @@ async def running_backend(_backend_addr_register):
             _backend_addr_register.register(backend_addr)
             yield backend
             nursery.cancel_scope.cancel()
-
-
-@pytest.fixture
-def core_config_dir(tmp_path):
-    return tmp_path / "core_config_dir"
 
 
 LocalDeviceTestbed = namedtuple("LocalDeviceTestbed", "device,email,key")
