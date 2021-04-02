@@ -2,7 +2,7 @@
 set -e
 
 CONFIG_DIR=$HOME/resana_secure_config
-CLIENT_ORIGIN="http://127.0.0.1:9000"
+CLIENT_ORIGIN="http://127.0.0.1:9000;https://test-resana.interstis.fr"
 BACKEND_DOMAIN="127.0.0.1:6777"
 BACKEND_ADDR="parsec://$BACKEND_DOMAIN?no_ssl=true"
 BOOTSTRAP_ORG_ADDR="parsec://$BACKEND_DOMAIN/ResanaSecureOrg?no_ssl=true&action=bootstrap_organization"
