@@ -1,29 +1,23 @@
 # Resana Secure (https://parsec.cloud) Copyright (c) 2021 Scille SAS
 
 import sys
-import re
 import shutil
 import argparse
 import platform
 import subprocess
-import sysconfig
+from hashlib import sha256
 from urllib.request import urlopen
 from pathlib import Path
 
 
 BUILD_DIR = Path("build").resolve()
 
+WINFSP_URL = "https://github.com/billziss-gh/winfsp/releases/download/v1.7/winfsp-1.7.20172.msi"
+WINFSP_HASH = "3c7a8bf41b0276cc1acabaee502e9ecd81f52d68a92be4119d45ae4c441dad10"
 TOOLS_VENV_DIR = BUILD_DIR / "tools_venv"
 WHEELS_DIR = BUILD_DIR / "wheels"
 
-CPYTHON_DIR = Path(sysconfig.get_paths()["data"]).resolve()
-CPYTHON_VERSION = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-CPYTHON_ARCHSLUG = "win32" if platform.architecture()[0] == "32bit" else "amd64"
-CPYTHON_DISTRIB_NAME = f"python-{CPYTHON_VERSION}-embed-{CPYTHON_ARCHSLUG}"
-CPYTHON_DISTRIB_URL = (
-    f"https://www.python.org/ftp/python/{CPYTHON_VERSION}/{CPYTHON_DISTRIB_NAME}.zip"
-)
-CPYTHON_DISTRIB_ARCHIVE = BUILD_DIR / f"{CPYTHON_DISTRIB_NAME}.zip"
+PYTHON_VERSION = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
 
 def get_archslug():
@@ -47,11 +41,13 @@ def main(program_source):
     program_version = global_dict.get("__version__")
     print(f"### Detected Resana Secure version {program_version} ###")
 
-    # Fetch CPython distrib
-    if not CPYTHON_DISTRIB_ARCHIVE.is_file():
-        print(f"### Fetch CPython {CPYTHON_VERSION} build ###")
-        req = urlopen(CPYTHON_DISTRIB_URL)
-        CPYTHON_DISTRIB_ARCHIVE.write_bytes(req.read())
+    winfsp_installer = BUILD_DIR / WINFSP_URL.rsplit("/", 1)[1]
+    if not winfsp_installer.is_file():
+        print("### Fetching WinFSP installer (will be needed by NSIS packager later) ###")
+        req = urlopen(WINFSP_URL)
+        data = req.read()
+        assert sha256(data).hexdigest() == WINFSP_HASH
+        winfsp_installer.write_bytes(data)
 
     # Bootstrap tools virtualenv
     if not TOOLS_VENV_DIR.is_dir():
@@ -66,93 +62,41 @@ def main(program_source):
             f"{ TOOLS_VENV_DIR / 'Scripts/python' } -m pip wheel {program_source} --wheel-dir {WHEELS_DIR}"
         )
 
-    # Now we actually generate the build target
+    # Bootstrap PyInstaller virtualenv
+    pyinstaller_venv_dir = BUILD_DIR / "pyinstaller_venv"
+    if not pyinstaller_venv_dir.is_dir():
+        print("### Installing wheels & PyInstaller in temporary virtualenv ###")
+        run(f"python -m venv {pyinstaller_venv_dir}")
+        wheels = " ".join(map(str, WHEELS_DIR.glob("*.whl")))
+        run(f"{ pyinstaller_venv_dir / 'Scripts/python' } -m pip install pip --upgrade")
+        run(f"{ pyinstaller_venv_dir / 'Scripts/python' } -m pip install pyinstaller")
+        run(f"{ pyinstaller_venv_dir / 'Scripts/python' } -m pip install {wheels} --no-deps")
+
+    pyinstaller_build = BUILD_DIR / "pyinstaller_build"
+    pyinstaller_dist = BUILD_DIR / "pyinstaller_dist"
+    if not pyinstaller_dist.is_dir():
+        print("### Use Pyinstaller to generate distribution ###")
+        spec_file = Path(__file__).joinpath("..", "resana_secure.spec").resolve()
+        run(
+            f"{ pyinstaller_venv_dir / 'Scripts/python' } -m PyInstaller {spec_file} --distpath {pyinstaller_dist} --workpath {pyinstaller_build}"
+        )
 
     target_dir = BUILD_DIR / f"resana_secure-{program_version}-{get_archslug()}"
     if target_dir.exists():
         raise SystemExit(f"{target_dir} already exists, exiting...")
+    shutil.move(pyinstaller_dist / "resana_secure", target_dir)
 
-    # Extract CPython distrib
-    print("### Extracting CPython embedded distribution ###")
-    shutil.unpack_archive(str(CPYTHON_DISTRIB_ARCHIVE), extract_dir=str(target_dir))
-
-    # Bootstrap build virtualenv
-    build_venv_dir = target_dir / "build_venv"
-    print("### Installing wheels in temporary virtualenv ###")
-    run(f"python -m venv {build_venv_dir}")
-    wheels = " ".join(map(str, WHEELS_DIR.glob("*.whl")))
-    run(f"{ build_venv_dir / 'Scripts/python' } -m pip install {wheels}")
-
-    # Move build virtualenv's site-packages to the build and patch imports
-    print("### Move site-packages to embedded distribution ###")
-    shutil.move(build_venv_dir / "Lib/site-packages", target_dir / "site-packages")
-    shutil.rmtree(build_venv_dir)
-    pth_file, = target_dir.glob("*._pth")
-    pth_file.write_text(pth_file.read_text() + "site-packages\n")
-
-    # Include LICENSE file
-    # (target_dir / "LICENSE.txt").write_text((program_source / "LICENSE").read_text())
-
-    # Build resana_secure.exe
-    resource_rc = BUILD_DIR / "resource.rc"
-    resource_res = BUILD_DIR / "resource.res"
-    versioninfo = (*re.match(r"^.*([0-9]+)\.([0-9]+)\.([0-9]+)", program_version).groups(), "0")
-    escaped_program_ico = str(Path("program.ico").resolve()).replace("\\", "\\\\")
-    escaped_program_manifest = str(Path("program-bootstrap.manifest").resolve()).replace(
-        "\\", "\\\\"
-    )
-    resource_rc.write_text(
-        f"""
-#include <windows.h>
-
-1 RT_MANIFEST "{escaped_program_manifest}"
-2 ICON "{escaped_program_ico}"
-
-VS_VERSION_INFO VERSIONINFO
-FILEVERSION     {','.join(versioninfo)}
-PRODUCTVERSION  {','.join(versioninfo)}
-FILEFLAGSMASK 0x3fL
-FILEFLAGS 0x0L
-FILEOS VOS__WINDOWS32
-FILETYPE VFT_APP
-FILESUBTYPE 0x0L
-BEGIN
-    BLOCK "StringFileInfo"
-    BEGIN
-        BLOCK "000004b0"
-        BEGIN
-            VALUE "CompanyName",      "Scille SAS\\0"
-            VALUE "FileDescription",  "Resana Secure Cloud Storage\\0"
-            VALUE "FileVersion",      "{program_version}\\0"
-            VALUE "InternalName",     "Resana Secure GUI Bootstrapper\\0"
-            VALUE "LegalCopyright",   "Resana Secure (https://parsec.cloud) Copyright (c) 2021 Scille SAS\\0"
-            VALUE "OriginalFilename", "resana_secure.exe\\0"
-            VALUE "ProductName",      "Resana Secure\\0"
-            VALUE "ProductVersion",   "{program_version}\\0"
-        END
-    END
-    BLOCK "VarFileInfo"
-    BEGIN
-        VALUE "Translation", 0x0, 1200
-    END
-END
-"""
-    )
-    run(f"rc.exe /i. /fo {resource_res} {resource_rc}")
-    # Must make sure /Fo option ends with a "\", otherwise it is not considered as a folder...
-    run(f"cl.exe program-bootstrap.c /c /I { CPYTHON_DIR / 'include' } /Fo{BUILD_DIR}\\")
-    run(
-        f"link.exe { BUILD_DIR / 'program-bootstrap.obj' } {resource_res} "
-        f"/LIBPATH:{ CPYTHON_DIR / 'libs' } /OUT:{ target_dir / 'resana_secure.exe' } "
-        f"/subsystem:windows /entry:mainCRTStartup"
-    )
+    # # Include LICENSE file
+    # # (target_dir / "LICENSE.txt").write_text((program_source / "LICENSE").read_text())
 
     # Create build info file for NSIS installer
     (BUILD_DIR / "BUILD.tmp").write_text(
         f'target = "{target_dir}"\n'
         f'program_version = "{program_version}"\n'
-        f'python_version = "{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"\n'
+        f'python_version = "{PYTHON_VERSION}"\n'
         f'platform = "{get_archslug()}"\n'
+        f'winfsp_installer_name = "{winfsp_installer.name}"\n'
+        f'winfsp_installer_path = "{winfsp_installer}"\n'
     )
 
     # Create the install and uninstall file list for NSIS installer
@@ -192,7 +136,7 @@ END
 
 
 def check_python_version():
-    if CPYTHON_VERSION == "3.7.7":
+    if PYTHON_VERSION == "3.7.7":
         raise RuntimeError(
             "CPython 3.7.7 is broken for packaging (see https://bugs.python.org/issue39930)"
         )

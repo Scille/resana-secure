@@ -10,7 +10,7 @@
 
 # Program information
 !define PROGRAM_NAME "Resana Secure"
-!define PROGRAM_WEB_SITE "http://parsec.cloud"
+!define PROGRAM_WEB_SITE "https://resana.numerique.gouv.fr"
 !define APPGUID "918CE5EB-F66D-45EB-9A0A-F013B480A5BC"
 
 # Detect version from file
@@ -27,12 +27,18 @@
 !ifndef PROGRAM_PLATFORM
    !error "Program Platform Undefined"
 !endif
+!searchparse /file ${BUILD_DIR}/BUILD.tmp `winfsp_installer_path = "` WINFSP_INSTALLER_PATH `"`
+!ifndef WINFSP_INSTALLER_PATH
+   !error "WinFSP installer path Undefined"
+!endif
+!searchparse /file ${BUILD_DIR}/BUILD.tmp `winfsp_installer_name = "` WINFSP_INSTALLER_NAME `"`
+!ifndef WINFSP_INSTALLER_NAME
+   !error "WinFSP installer name Undefined"
+!endif
 
 # Python files generated
 !define LICENSE_FILEPATH "${PROGRAM_FREEZE_BUILD_DIR}\LICENSE.txt"
 !define INSTALLER_FILENAME "resana_secure-${PROGRAM_VERSION}-${PROGRAM_PLATFORM}-setup.exe"
-
-!define WINFSP_INSTALLER "winfsp-1.7.20172.msi"
 
 # Set default compressor
 SetCompressor /FINAL /SOLID lzma
@@ -42,7 +48,7 @@ SetCompressorDictSize 64
 # Modern User Interface 2
 !include MUI2.nsh
 # Installer
-!define MUI_ICON "program.ico"
+!define MUI_ICON "icon.ico"
 !define MUI_HEADERIMAGE
 !define MUI_HEADERIMAGE_RIGHT
 !define MUI_HEADERIMAGE_BITMAP "installer-top.bmp"
@@ -225,11 +231,11 @@ SectionEnd
 
 !macro InstallWinFSP
     SetOutPath "$TEMP"
-    File ${WINFSP_INSTALLER}
+    File ${WINFSP_INSTALLER_PATH}
     ; Use /qn to for silent installation
     ; Use a very high installation level to make sure it runs till the end
-    ExecWait "msiexec /i ${WINFSP_INSTALLER} /qn INSTALLLEVEL=1000"
-    Delete ${WINFSP_INSTALLER}
+    ExecWait "msiexec /i ${WINFSP_INSTALLER_NAME} /qn INSTALLLEVEL=1000"
+    Delete ${WINFSP_INSTALLER_NAME}
 !macroend
 
 # Install winfsp if necessary

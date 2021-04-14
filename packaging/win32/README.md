@@ -10,14 +10,6 @@ Build steps
 
 ### 1 - Build the application
 
-First make sure you are within a cmd.exe shell with visual studio configured
-for the target architecture you want to build.
-
-Example for Visual Studio 2017 with amd64 target:
-```shell
-$ "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvarsall.bat"  amd64
-```
-
 Run the `freeze_program.py` Python script with the path to the Resana Secure sources to use:
 ```shell
 $ python freeze_program.py ../..
@@ -25,19 +17,13 @@ $ python freeze_program.py ../..
 
 Note the Python version embedded inside the build will be taken from the interpreter
 you run the script with.
-For this reason, you must run the script with a Python interpreter of the same
-architecture than the one configured for visual studio.
 
 On top of the build, the script will generate `install_files.nsh`, `uninstall_files.nsh`
 and `BUILD.tmp` files that will be used by the packaging nsis script.
+It will also download a WinFSP installer which is also needed by the packaging nsis script.
 
 
 ### 2 - Package the application
-
-First download WinFSP installer that will be packaged in the installer:
-```shell
-$ curl -L https://github.com/billziss-gh/winfsp/releases/download/v1.7/winfsp-1.7.20172.msi -o winfsp-1.7.20172.msi
-```
 
 Run the NSIS script `installer.nsi`:
 ```shell

@@ -72,7 +72,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=True,
+    console=False,  # Windowed application
     icon="./icon.ico",
 )
 coll = COLLECT(
