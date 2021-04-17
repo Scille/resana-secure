@@ -78,7 +78,7 @@ def main(program_source):
     pyinstaller_dist = BUILD_DIR / "pyinstaller_dist"
     if not pyinstaller_dist.is_dir():
         print("### Use Pyinstaller to generate distribution ###")
-        spec_file = Path(__file__).joinpath("..", "resana_secure.spec").resolve()
+        spec_file = Path(__file__).joinpath("..", "pyinstaller.spec").resolve()
         run(
             f"{ pyinstaller_venv_dir / 'Scripts/python' } -m PyInstaller {spec_file} --distpath {pyinstaller_dist} --workpath {pyinstaller_build}"
         )
