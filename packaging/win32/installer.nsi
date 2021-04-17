@@ -70,7 +70,7 @@ SetCompressorDictSize 64
 !define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
 !define MUI_FINISHPAGE_SHOWREADME_TEXT "Create Desktop Shortcut"
 !define MUI_FINISHPAGE_SHOWREADME_FUNCTION CreateDesktopShortcut
-# Run Resana Secure after install, using explorer.exe to un-elevate priviledges
+# Run program after install, using explorer.exe to un-elevate priviledges
 # More information: https://stackoverflow.com/a/15041823/2846140
 !define MUI_FINISHPAGE_RUN "$WINDIR\explorer.exe"
 !define MUI_FINISHPAGE_RUN_PARAMETERS "$INSTDIR\resana_secure.exe"
