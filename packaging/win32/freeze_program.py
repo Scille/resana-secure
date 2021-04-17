@@ -12,8 +12,8 @@ from pathlib import Path
 
 BUILD_DIR = Path("build").resolve()
 
-WINFSP_URL = "https://github.com/billziss-gh/winfsp/releases/download/v1.7/winfsp-1.7.20172.msi"
-WINFSP_HASH = "3c7a8bf41b0276cc1acabaee502e9ecd81f52d68a92be4119d45ae4c441dad10"
+WINFSP_URL = "https://github.com/billziss-gh/winfsp/releases/download/v1.8/winfsp-1.8.20304.msi"
+WINFSP_HASH = "8d6f2c519f3f064881b576452fbbd35fe7ad96445aa15d9adcea1e76878b4f00"
 TOOLS_VENV_DIR = BUILD_DIR / "tools_venv"
 WHEELS_DIR = BUILD_DIR / "wheels"
 
@@ -53,13 +53,15 @@ def main(program_source):
     if not TOOLS_VENV_DIR.is_dir():
         print("### Create tool virtualenv ###")
         run(f"python -m venv {TOOLS_VENV_DIR}")
-        run(f"{ TOOLS_VENV_DIR / 'Scripts/python' } -m pip install pip --upgrade")
-        run(f"{ TOOLS_VENV_DIR / 'Scripts/python' } -m pip install wheel")
+        run(f"{ TOOLS_VENV_DIR / 'Scripts/python' } -m pip install pip wheel setuptools --upgrade")
 
     if not WHEELS_DIR.is_dir():
         print("### Generate wheels from Resana Secure, Parsec and dependencies ###")
+        # Generate wheels for Resana Secure and it dependencies (including parsec).
+        # Also generate wheels for PyInstaller in the same command so that
+        # dependency resolution is done together with resana&parsec.
         run(
-            f"{ TOOLS_VENV_DIR / 'Scripts/python' } -m pip wheel {program_source} --wheel-dir {WHEELS_DIR}"
+            f"{ TOOLS_VENV_DIR / 'Scripts/python' } -m pip wheel --wheel-dir {WHEELS_DIR} {program_source.absolute()} pyinstaller"
         )
 
     # Bootstrap PyInstaller virtualenv
@@ -67,10 +69,10 @@ def main(program_source):
     if not pyinstaller_venv_dir.is_dir():
         print("### Installing wheels & PyInstaller in temporary virtualenv ###")
         run(f"python -m venv {pyinstaller_venv_dir}")
-        wheels = " ".join(map(str, WHEELS_DIR.glob("*.whl")))
         run(f"{ pyinstaller_venv_dir / 'Scripts/python' } -m pip install pip --upgrade")
-        run(f"{ pyinstaller_venv_dir / 'Scripts/python' } -m pip install pyinstaller")
-        run(f"{ pyinstaller_venv_dir / 'Scripts/python' } -m pip install {wheels} --no-deps")
+        run(
+            f"{ pyinstaller_venv_dir / 'Scripts/python' } -m pip install --no-index --find-links {WHEELS_DIR} resana_secure pyinstaller"
+        )
 
     pyinstaller_build = BUILD_DIR / "pyinstaller_build"
     pyinstaller_dist = BUILD_DIR / "pyinstaller_dist"
