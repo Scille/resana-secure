@@ -67,15 +67,15 @@ SetCompressorDictSize 64
 !define MUI_UNFINISHPAGE_NOAUTOCLOSE
 # Add shortcut
 !define MUI_FINISHPAGE_SHOWREADME ""
-!define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
 !define MUI_FINISHPAGE_SHOWREADME_TEXT "Create Desktop Shortcut"
 !define MUI_FINISHPAGE_SHOWREADME_FUNCTION CreateDesktopShortcut
+# !define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
 # Run program after install, using explorer.exe to un-elevate priviledges
 # More information: https://stackoverflow.com/a/15041823/2846140
 !define MUI_FINISHPAGE_RUN "$WINDIR\explorer.exe"
 !define MUI_FINISHPAGE_RUN_PARAMETERS "$INSTDIR\resana_secure.exe"
 !define MUI_FINISHPAGE_RUN_TEXT "Run Resana Secure"
-!define MUI_FINISHPAGE_RUN_NOTCHECKED
+# !define MUI_FINISHPAGE_RUN_NOTCHECKED
 
 # --- Start of Modern User Interface ---
 Var StartMenuFolder
