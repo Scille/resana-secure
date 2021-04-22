@@ -81,8 +81,8 @@ def build_config(
         mountpoint_base_dir=mountpoint_base_dir,
         # Use a mock to disable mountpoint instead of relying on this option
         mountpoint_enabled=True,
-        ipc_win32_mutex_name="resana_secure",
-        ipc_socket_file=data_base_dir / "resana_secure.lock",
+        ipc_win32_mutex_name="resana-secure",
+        ipc_socket_file=data_base_dir / "resana-secure.lock",
         preferred_org_creation_backend_addr=None,
     )
 
