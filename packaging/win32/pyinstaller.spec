@@ -52,7 +52,7 @@ a = Analysis(
         *collect_package_datas("parsec"),
         *collect_package_datas("resana_secure"),
     ],
-    hiddenimports=[],
+    hiddenimports=["psutil", "winreg", "winfspy"],
     hookspath=[],
     runtime_hooks=[],
     excludes=[],

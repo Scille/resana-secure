@@ -61,7 +61,7 @@ def main(program_source):
         # Also generate wheels for PyInstaller in the same command so that
         # dependency resolution is done together with resana&parsec.
         run(
-            f"{ TOOLS_VENV_DIR / 'Scripts/python' } -m pip wheel --wheel-dir {WHEELS_DIR} {program_source.absolute()} pyinstaller"
+            f"{ TOOLS_VENV_DIR / 'Scripts/python' } -m pip wheel --use-feature=in-tree-build --wheel-dir {WHEELS_DIR} {program_source.absolute()} pyinstaller"
         )
 
     # Bootstrap PyInstaller virtualenv
