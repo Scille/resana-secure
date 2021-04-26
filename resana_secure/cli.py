@@ -22,7 +22,7 @@ def _cook_website_url(url: str) -> str:
 _cook_website_url.__name__ = "http[s] url"  # Used by argparse for help output
 
 
-def _setup_logging(log_level: str) -> None:
+def _setup_logging(log_level: str, log_file: Optional[Path]) -> None:
     # The infamous logging configuration...
 
     def _structlog_renderer(_, __, event_dict):
@@ -42,12 +42,15 @@ def _setup_logging(log_level: str) -> None:
         wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=True,
     )
-    logging.basicConfig(
-        format="%(asctime)s %(levelname)s %(name)s - %(message)s",
-        datefmt="%Y-%m-%dT%H:%M:%S",
-        stream=sys.stdout,
-        level=getattr(logging, log_level),
-    )
+
+    format = "%(asctime)s %(levelname)s %(name)s - %(message)s"
+    datefmt = "%Y-%m-%dT%H:%M:%S"
+    level = getattr(logging, log_level)
+    if log_file:
+        log_file.parent.mkdir(exist_ok=True, parents=True)
+        logging.basicConfig(format=format, datefmt=datefmt, filename=log_file, level=level)
+    else:
+        logging.basicConfig(format=format, datefmt=datefmt, stream=sys.stdout, level=level)
 
 
 def build_config(
@@ -101,9 +104,10 @@ def run_cli():
     parser.add_argument(
         "--log-level", choices=("DEBUG", "INFO", "WARNING", "ERROR"), default="INFO"
     )
+    parser.add_argument("--log-file", type=Path)
     args = parser.parse_args()
 
-    _setup_logging(args.log_level)
+    _setup_logging(args.log_level, args.log_file)
 
     if args.disable_mountpoint:
         # TODO: Parsec core factory should allow to do that
