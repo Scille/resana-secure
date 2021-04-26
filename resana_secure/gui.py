@@ -119,18 +119,19 @@ class TrioQtApplication(QApplication):
                     yield
 
             except IPCServerAlreadyRunning:
-                # Parsec is already started, give it our work then
+                # Application is already started, give it our work then
                 try:
-                    try:
-                        await send_to_ipc_server(self.config.ipc_socket_file, IPCCommand.FOREGROUND)
-                    finally:
-                        # Now just close our application
-                        self.quit()
-                    return
+                    await send_to_ipc_server(self.config.ipc_socket_file, IPCCommand.FOREGROUND)
 
                 except IPCServerNotRunning:
                     # IPC server has closed, retry to create our own
                     continue
+
+                # We have successfuly noticed the other running application,
+                # time to close ourself
+                self.quit()
+                # Wait for our coroutine to be cancelled
+                await trio.sleep_forever()
 
 
 def run_gui(trio_main: Callable[[], Awaitable[None]], resana_website_url: str, config: CoreConfig):
