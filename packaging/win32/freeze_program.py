@@ -92,7 +92,7 @@ def main(program_source):
     # # (target_dir / "LICENSE.txt").write_text((program_source / "LICENSE").read_text())
 
     # Create build info file for NSIS installer
-    (BUILD_DIR / "BUILD.tmp").write_text(
+    (BUILD_DIR / "manifest.ini").write_text(
         f'target = "{target_dir}"\n'
         f'program_version = "{program_version}"\n'
         f'python_version = "{PYTHON_VERSION}"\n'

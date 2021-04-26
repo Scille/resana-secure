@@ -19,29 +19,29 @@ Note the Python version embedded inside the build will be taken from the interpr
 you run the script with.
 
 On top of the build, the script will generate `install_files.nsh`, `uninstall_files.nsh`
-and `BUILD.tmp` files that will be used by the packaging nsis script.
+and `manifest.ini` files that will be used by the packaging nsis script.
 It will also download a WinFSP installer which is also needed by the packaging nsis script.
 
 
 ### 2 - Package the application
 
-Run the NSIS script `installer.nsi`:
-```shell
-$ "C:\Program Files (x86)\NSIS\makensis.exe" installer.nsi
-```
+#### Install dependencies
 
-This will generate a `build\resana_secure-<version>-<platform>-setup.exe` installer.
+Under the hood, the packaging script uses `makensis` and `signtool` commands.
 
-
-### 3 - Sign the application
-
-Those instructions are depending on the certificate method we are using at the Parsec team, hence they are incomplete.
-
-#### Install signtool
+The `makensis` command is part of NSIS: https://nsis.sourceforge.io/Main_Page
 The `signtool` command is part of the Windows SDK : https://developer.microsoft.com/en-us/windows/downloads/windows-10-sdk/
 
-#### Add signtool to path
-Can be done for example doing ```@set PATH=C:\Program Files (x86)\Windows Kits\10\bin\$VERSION\x64;%PATH%```
+On top of that, make sure they are in your `PATH` before running the script:
 
-#### Sign an executable
-```signtool sign /n Scille /t http://time.certum.pl /fd sha256 /d "Resana Secure by Scille" /v $EXECUTABLE```
+```shell
+$ set PATH=C:\Program Files (x86)\NSIS;%PATH%
+$ set PATH=C:\Program Files (x86)\Windows Kits\10\bin\10.0.18362.0\x64;%PATH%
+```
+
+#### Run the packaging script
+
+Run the `make_installer.py` Python script:
+```shell
+$ python make_installer.py --sign-mode=exe
+```
