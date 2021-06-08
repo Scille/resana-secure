@@ -11,6 +11,7 @@ from pathlib import Path
 SIGNATURE_AUTHOR = "Scille"
 SIGNATURE_DESCRIPTION = f"Resana Secure by {SIGNATURE_AUTHOR}"
 
+BASE_DIR = Path(__name__).resolve().parent
 
 BUILD_DIR = Path("build").resolve()
 if not which("makensis"):
@@ -46,7 +47,7 @@ if __name__ == "__main__":
 
     if args.sign_mode == "none":
         print("### Building installer ###")
-        run(f"makensis { BUILD_DIR / 'installer.nsi' }")
+        run(f"makensis { BASE_DIR / 'installer.nsi' }")
         print("/!\\ Installer generated with no signature /!\\")
         installer, = BUILD_DIR.glob("resana_secure-*-setup.exe")
         print(f"{installer} is ready")
@@ -74,7 +75,7 @@ if __name__ == "__main__":
                 raise SystemExit("Some file are not signed, aborting")
         # Generate installer
         print("### Building installer ###")
-        run(f"makensis { BUILD_DIR / 'installer.nsi' }")
+        run(f"makensis { BASE_DIR / 'installer.nsi' }")
         # Sign installer
         print("### Signing installer ###")
         installer, = BUILD_DIR.glob("resana_secure-*-setup.exe")
