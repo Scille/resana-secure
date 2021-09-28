@@ -290,6 +290,8 @@ requirements = [
     "async_exit_stack==1.0.1",
     "outcome==1.0.0",
     "packaging==20.4",
+    # tl;dr: embed an entire javascript engine to parse proxy .PAC config :'(
+    "pypac==0.15.0",
 ]
 
 
