@@ -6,12 +6,13 @@ import ssl
 import certifi
 import h11
 from structlog import get_logger
-from typing import Optional
 from parsec.api.protocol.handshake import HandshakeOutOfBallparkError
 from base64 import b64encode
 from async_generator import asynccontextmanager
 from urllib.request import getproxies, proxy_bypass
 from urllib.parse import urlsplit, SplitResult
+from typing import Optional, Union, List, Tuple
+import pypac
 
 from parsec.crypto import SigningKey
 from parsec.api.transport import Transport, TransportError, TransportClosedByPeer
@@ -23,13 +24,17 @@ from parsec.api.protocol import (
     AuthenticatedClientHandshake,
     InvitedClientHandshake,
     APIV1_AnonymousClientHandshake,
+    APIV1_AdministrationClientHandshake,
+    APIV1_AuthenticatedClientHandshake,
 )
 from parsec.core.types import (
+    BackendAddr,
     BackendOrganizationAddr,
     BackendOrganizationBootstrapAddr,
     BackendInvitationAddr,
 )
 from parsec.core.backend_connection.exceptions import (
+    BackendConnectionError,
     BackendNotAvailable,
     BackendConnectionRefused,
     BackendInvitationAlreadyUsed,
@@ -43,19 +48,59 @@ logger = get_logger()
 
 
 async def apiv1_connect(
-    addr: BackendOrganizationBootstrapAddr, keepalive: Optional[int] = None
-) -> Transport:
+    addr: Union[BackendAddr, BackendOrganizationBootstrapAddr, BackendOrganizationAddr],
+    device_id: Optional[DeviceID] = None,
+    signing_key: Optional[SigningKey] = None,
+    administration_token: Optional[str] = None,
+    keepalive: Optional[int] = None,) -> Transport:
     """
     Raises:
         BackendConnectionError
     """
-    handshake = APIV1_AnonymousClientHandshake(addr.organization_id)
+    handshake: BaseClientHandshake
+
+    if administration_token:
+        if not isinstance(addr, BackendAddr):
+            raise BackendConnectionError(f"Invalid url format `{addr}`")
+        handshake = APIV1_AdministrationClientHandshake(administration_token)
+
+    elif not device_id:
+        if isinstance(addr, BackendOrganizationBootstrapAddr):
+            handshake = APIV1_AnonymousClientHandshake(addr.organization_id)
+        elif isinstance(addr, BackendOrganizationAddr):
+            handshake = APIV1_AnonymousClientHandshake(
+                addr.organization_id, addr.root_verify_key
+            )
+        else:
+            raise BackendConnectionError(
+                f"Invalid url format `{addr}` "
+                "(should be an organization url or organization bootstrap url)"
+            )
+
+    else:
+        if not isinstance(addr, BackendOrganizationAddr):
+            raise BackendConnectionError(
+                f"Invalid url format `{addr}` (should be an organization url)"
+            )
+
+        if not signing_key:
+            raise BackendConnectionError(
+                f"Missing signing_key to connect as `{device_id}`"
+            )
+        handshake = APIV1_AuthenticatedClientHandshake(
+            addr.organization_id, device_id, signing_key, addr.root_verify_key
+        )
+
     return await _connect(addr.hostname, addr.port, addr.use_ssl, keepalive, handshake)
 
 
-async def connect_as_invited(addr: BackendInvitationAddr, keepalive: Optional[int] = None):
+async def connect_as_invited(
+    addr: BackendInvitationAddr, keepalive: Optional[int] = None
+):
     handshake = InvitedClientHandshake(
-        organization_id=addr.organization_id, invitation_type=addr.invitation_type, token=addr.token
+        organization_id=addr.organization_id,
+        invitation_type=addr.invitation_type,
+        token=addr.token,
     )
     return await _connect(addr.hostname, addr.port, addr.use_ssl, keepalive, handshake)
 
@@ -127,20 +172,115 @@ def cook_basic_auth_header(username: str, password: str) -> str:
     return f"Basic {step2}"
 
 
-async def _maybe_connect_through_proxy(
+# Global vars to easily set up proxy from config file or cli params
+
+
+__force_proxy_pac_url = None
+
+
+def force_proxy_pac_url(url: str) -> None:
+    global __force_proxy_pac_url
+    __force_proxy_pac_url = url
+
+
+__force_proxy_url = None
+
+
+def force_proxy_url(url: str) -> None:
+    global __force_proxy_url
+    __force_proxy_url = url
+
+
+def _get_proxy_from_pac_config(
     hostname: str, port: int, use_ssl: bool
-) -> Optional[trio.abc.Stream]:
+) -> Optional[str]:
+    # Hack to disable check on content-type (given server migh not be well
+    # configured, and `get_pac` silently fails on wrong content-type by returing None)
+    get_pac_kwargs: dict = {"allowed_content_types": {""}}
+    if __force_proxy_pac_url:
+        get_pac_kwargs["url"] =  __force_proxy_pac_url
+    try:
+        pacfile = pypac.get_pac(**get_pac_kwargs)
+    except Exception as exc:
+        logger.warning("Error while retrieving .PAC proxy configuration", exc_info=exc)
+        return None
+
+    if not pacfile:
+        return None
+
+    if use_ssl:
+        url = f"https://{hostname}"
+        if port != 443:
+            url += f":{port}"
+    else:
+        url = f"http://{hostname}"
+        if port != 80:
+            url += f":{port}"
+    try:
+        proxies = pacfile.find_proxy_for_url(url, hostname)
+        proxies = [p.strip() for p in proxies.split(";")]
+        # We don't handle multiple proxies so keep the first correct one and pray !
+        for proxy in proxies:
+            if proxy in ("DIRECT", ""):
+                # PAC explicitly told us not to use a proxy
+                return ""
+            elif proxy:
+                # Should be of style `PROXY 8.8.8.8:9999`
+                proxy_type, proxy_netloc = proxy.strip().split()
+                proxy_type = proxy_type.upper()
+                if proxy_type in ("PROXY", "HTTP"):
+                    return f"http://{proxy_netloc}"
+                elif proxy_type == "HTTPS":
+                    return f"https://{proxy_netloc}"
+                else:
+                    logger.warning("Unsupported proxy type requested by .PAC proxy configuration", proxy=proxy)
+
+        else:
+            return None
+
+    except Exception as exc:
+        logger.warning(
+            "Error while using .PAC proxy configuration",
+            exc_info=exc,
+            url=url,
+            host=hostname,
+        )
+        return None
+
+
+def _get_proxy_from_os_config(hostname: str, port: int, use_ssl: bool) -> Optional[str]:
+    if __force_proxy_url:
+        return __force_proxy_url
+
     # Proxy config is accessed two times here: first to check proxy bypass,
     # then to retrieve the proxy url. This is okay enough given proxy config
     # is not supposed to change that often.
 
-    if proxy_bypass(hostname):
+    if not proxy_bypass(hostname):
         return None
 
     proxy_type = "https" if use_ssl else "http"
     proxy_url = getproxies().get(proxy_type)
-    if not proxy_url:
+
+    return proxy_url
+
+
+async def _maybe_connect_through_proxy(
+    hostname: str, port: int, use_ssl: bool
+) -> Optional[trio.abc.Stream]:
+
+    # First try to get proxy from the infamous PAC config system
+    proxy_url = _get_proxy_from_pac_config(hostname, port, use_ssl)
+
+    # Fallback on direct proxy url config in environ variables & Windows registers table
+    if proxy_url is None:  # `proxy_url == ""` explicitly indicates no proxy should be use
+        proxy_url = _get_proxy_from_os_config(hostname, port, use_ssl)
+
+    if proxy_url in (None, ""):
         return None
+
+    # A proxy has been retrieve, parse it url and handle potential auth
+
     try:
         proxy = urlsplit(proxy_url)
         # Typing helper, as result could be SplitResultBytes if we have provided bytes instead of str
@@ -154,10 +294,14 @@ async def _maybe_connect_through_proxy(
         proxy_port = 443 if proxy.scheme == "https" else 80
     if not proxy.hostname:
         return None
-    proxy_headers = []
+
+    proxy_headers: List[Tuple[str, str]] = []
     if proxy.username is not None and proxy.password is not None:
         proxy_headers.append(
-            ("Proxy-Authorization", cook_basic_auth_header(proxy.username, proxy.password))
+            (
+                "Proxy-Authorization",
+                cook_basic_auth_header(proxy.username, proxy.password),
+            )
         )
 
     # Connect to the proxy
@@ -213,14 +357,20 @@ async def _maybe_connect_through_proxy(
 
     except trio.BrokenResourceError as exc:
         logger.warning(
-            "Proxy has unexpectedly closed the connection", exc_info=exc, target_host=host
+            "Proxy has unexpectedly closed the connection",
+            exc_info=exc,
+            target_host=host,
         )
-        raise BackendNotAvailable("Proxy has unexpectedly closed the connection") from exc
+        raise BackendNotAvailable(
+            "Proxy has unexpectedly closed the connection"
+        ) from exc
 
     return stream
 
 
-def _upgrade_stream_to_ssl(raw_stream: trio.abc.Stream, hostname: str) -> trio.abc.Stream:
+def _upgrade_stream_to_ssl(
+    raw_stream: trio.abc.Stream, hostname: str
+) -> trio.abc.Stream:
     # The ssl context should be generated once and stored into the config
     # however this is tricky (should ssl configuration be stored per device ?)
 
