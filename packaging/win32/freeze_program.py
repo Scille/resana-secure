@@ -60,8 +60,10 @@ def main(program_source):
         # Generate wheels for Resana Secure and it dependencies (including parsec).
         # Also generate wheels for PyInstaller in the same command so that
         # dependency resolution is done together with resana&parsec.
+        # Note we disable cache to avoid invalid reuse of existing wheel if
+        # we modify `subtree/parsec-cloud` but forget to update it version
         run(
-            f"{ TOOLS_VENV_DIR / 'Scripts/python' } -m pip wheel --use-feature=in-tree-build --wheel-dir {WHEELS_DIR} {program_source.absolute()} pyinstaller"
+            f"{ TOOLS_VENV_DIR / 'Scripts/python' } -m pip wheel --no-cache-dir --use-feature=in-tree-build --wheel-dir {WHEELS_DIR} {program_source.absolute()} pyinstaller"
         )
 
     # Bootstrap PyInstaller virtualenv
@@ -71,7 +73,7 @@ def main(program_source):
         run(f"python -m venv {pyinstaller_venv_dir}")
         run(f"{ pyinstaller_venv_dir / 'Scripts/python' } -m pip install pip --upgrade")
         run(
-            f"{ pyinstaller_venv_dir / 'Scripts/python' } -m pip install --no-index --find-links {WHEELS_DIR} resana_secure pyinstaller"
+            f"{ pyinstaller_venv_dir / 'Scripts/python' } -m pip install --no-cache-dir --no-index --find-links {WHEELS_DIR} resana_secure pyinstaller"
         )
 
     pyinstaller_build = BUILD_DIR / "pyinstaller_build"
