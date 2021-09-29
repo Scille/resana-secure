@@ -12,6 +12,10 @@ from parsec.core.config import CoreConfig
 from parsec.core.backend_connection.transport import force_proxy_url, force_proxy_pac_url
 
 from .app import serve_app
+from ._version import __version__
+
+
+logger = structlog.get_logger()
 
 
 def _cook_website_url(url: str) -> str:
@@ -28,8 +32,11 @@ def _setup_logging(log_level: str, log_file: Optional[Path]) -> None:
 
     def _structlog_renderer(_, __, event_dict):
         event = event_dict.pop("event", "")
-        args = ", ".join(f"{k}: {repr(v)}" for k, v in event_dict.items())
-        return f"{event} ({args})"
+        if event_dict:
+            args = ", ".join(f"{k}: {repr(v)}" for k, v in event_dict.items())
+            return f"{event} ({args})"
+        else:
+            return event
 
     structlog.configure(
         processors=[
@@ -138,6 +145,9 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
     )
 
     _setup_logging(args.log_level, args.log_file)
+    logger.debug(
+        "Starting resana-secure !", version=__version__, **{k: v for (k, v) in args._get_kwargs()}
+    )
 
     if args.disable_mountpoint:
         # TODO: Parsec core factory should allow to do that
