@@ -68,9 +68,7 @@ async def apiv1_connect(
         if isinstance(addr, BackendOrganizationBootstrapAddr):
             handshake = APIV1_AnonymousClientHandshake(addr.organization_id)
         elif isinstance(addr, BackendOrganizationAddr):
-            handshake = APIV1_AnonymousClientHandshake(
-                addr.organization_id, addr.root_verify_key
-            )
+            handshake = APIV1_AnonymousClientHandshake(addr.organization_id, addr.root_verify_key)
         else:
             raise BackendConnectionError(
                 f"Invalid url format `{addr}` "
@@ -84,9 +82,7 @@ async def apiv1_connect(
             )
 
         if not signing_key:
-            raise BackendConnectionError(
-                f"Missing signing_key to connect as `{device_id}`"
-            )
+            raise BackendConnectionError(f"Missing signing_key to connect as `{device_id}`")
         handshake = APIV1_AuthenticatedClientHandshake(
             addr.organization_id, device_id, signing_key, addr.root_verify_key
         )
@@ -94,13 +90,9 @@ async def apiv1_connect(
     return await _connect(addr.hostname, addr.port, addr.use_ssl, keepalive, handshake)
 
 
-async def connect_as_invited(
-    addr: BackendInvitationAddr, keepalive: Optional[int] = None
-):
+async def connect_as_invited(addr: BackendInvitationAddr, keepalive: Optional[int] = None):
     handshake = InvitedClientHandshake(
-        organization_id=addr.organization_id,
-        invitation_type=addr.invitation_type,
-        token=addr.token,
+        organization_id=addr.organization_id, invitation_type=addr.invitation_type, token=addr.token
     )
     return await _connect(addr.hostname, addr.port, addr.use_ssl, keepalive, handshake)
 
@@ -130,16 +122,18 @@ async def _connect(
     stream = await _maybe_connect_through_proxy(hostname, port, use_ssl)
 
     if not stream:
+        logger.debug("Using direct (no proxy) connection", hostname=hostname, port=port)
         try:
             stream = await trio.open_tcp_stream(hostname, port)
 
         except OSError as exc:
-            logger.warning(
+            logger.debug(
                 "Impossible to connect to backend", hostname=hostname, port=port, exc_info=exc
             )
             raise BackendNotAvailable(exc) from exc
 
     if use_ssl:
+        logger.debug("Using TLS to secure connection", hostname=hostname)
         stream = _upgrade_stream_to_ssl(stream, hostname)
 
     try:
@@ -191,23 +185,7 @@ def force_proxy_url(url: str) -> None:
     __force_proxy_url = url
 
 
-def _get_proxy_from_pac_config(
-    hostname: str, port: int, use_ssl: bool
-) -> Optional[str]:
-    # Hack to disable check on content-type (given server migh not be well
-    # configured, and `get_pac` silently fails on wrong content-type by returing None)
-    get_pac_kwargs: dict = {"allowed_content_types": {""}}
-    if __force_proxy_pac_url:
-        get_pac_kwargs["url"] =  __force_proxy_pac_url
-    try:
-        pacfile = pypac.get_pac(**get_pac_kwargs)
-    except Exception as exc:
-        logger.warning("Error while retrieving .PAC proxy configuration", exc_info=exc)
-        return None
-
-    if not pacfile:
-        return None
-
+def _build_http_url(hostname: str, port: int, use_ssl: bool) -> str:
     if use_ssl:
         url = f"https://{hostname}"
         if port != 443:
@@ -216,9 +194,45 @@ def _get_proxy_from_pac_config(
         url = f"http://{hostname}"
         if port != 80:
             url += f":{port}"
+    return url
+
+
+def _get_proxy_from_pac_config(hostname: str, port: int, use_ssl: bool) -> Optional[str]:
+    # Hack to disable check on content-type (given server migh not be well
+    # configured, and `get_pac` silently fails on wrong content-type by returing None)
+    # Also disable WPAD protocol to retrieve PAC from DNS given it produce annoying
+    # WARNING logs (and it shouldn't be needed for Resana-Secure anyway)
+    get_pac_kwargs: dict = {"from_dns": False, "allowed_content_types": {""}}
+    if __force_proxy_pac_url:
+        get_pac_kwargs["url"] = __force_proxy_pac_url
+        logger.debug(
+            "Retreiving .PAC proxy config url from forced location", pac_url=__force_proxy_pac_url
+        )
+    elif __force_proxy_url:
+        # Don' try to superstep the forced config !
+        return None
+    else:
+        logger.debug("Retreiving .PAC proxy config url from system")
+    try:
+        pacfile = pypac.get_pac(**get_pac_kwargs)
+    except Exception as exc:
+        logger.warning("Error while retrieving .PAC proxy config", exc_info=exc)
+        return None
+
+    if not pacfile:
+        return None
+
+    url = _build_http_url(hostname, port, use_ssl)
     try:
         proxies = pacfile.find_proxy_for_url(url, hostname)
+        logger.debug("Found proxies info in .PAC proxy config", target_url=url, proxies=proxies)
         proxies = [p.strip() for p in proxies.split(";")]
+        if len(proxies) > 1:
+            logger.warning(
+                "Found multiple proxies info in .PAC proxy config for target, only the first one is going to be used !",
+                target_url=url,
+                proxies=proxies,
+            )
         # We don't handle multiple proxies so keep the first correct one and pray !
         for proxy in proxies:
             if proxy in ("DIRECT", ""):
@@ -233,24 +247,29 @@ def _get_proxy_from_pac_config(
                 elif proxy_type == "HTTPS":
                     return f"https://{proxy_netloc}"
                 else:
-                    logger.warning("Unsupported proxy type requested by .PAC proxy configuration", proxy=proxy)
+                    logger.warning(
+                        "Unsupported proxy type requested by .PAC proxy config",
+                        proxy=proxy,
+                        target_url=url,
+                    )
 
         else:
             return None
 
     except Exception as exc:
-        logger.warning(
-            "Error while using .PAC proxy configuration",
-            exc_info=exc,
-            url=url,
-            host=hostname,
-        )
+        logger.warning("Error while using .PAC proxy config", target_url=url, exc_info=exc)
         return None
 
 
 def _get_proxy_from_os_config(hostname: str, port: int, use_ssl: bool) -> Optional[str]:
     if __force_proxy_url:
+        logger.debug("Retreiving proxy from forced location", proxy_url=__force_proxy_url)
         return __force_proxy_url
+    elif __force_proxy_pac_url:
+        # Don' try to superstep the forced config !
+        return None
+    else:
+        logger.debug("Retreiving proxy from system")
 
     # Proxy config is accessed two times here: first to check proxy bypass,
     # then to retrieve the proxy url. This is okay enough given proxy config
@@ -268,24 +287,39 @@ def _get_proxy_from_os_config(hostname: str, port: int, use_ssl: bool) -> Option
 async def _maybe_connect_through_proxy(
     hostname: str, port: int, use_ssl: bool
 ) -> Optional[trio.abc.Stream]:
+    target_url = _build_http_url(hostname, port, use_ssl)
 
     # First try to get proxy from the infamous PAC config system
     proxy_url = _get_proxy_from_pac_config(hostname, port, use_ssl)
+    if proxy_url:
+        logger.debug("Got proxy from .PAC config", proxy_url=proxy_url, target_url=target_url)
+    elif proxy_url == "":
+        logger.debug("Got .PAC config explictly specifying direct access", target_url=target_url)
 
     # Fallback on direct proxy url config in environ variables & Windows registers table
     if proxy_url is None:  # `proxy_url == ""` explicitly indicates no proxy should be use
         proxy_url = _get_proxy_from_os_config(hostname, port, use_ssl)
+        if proxy_url:
+            logger.debug("Got proxy", proxy_url=proxy_url, target_url=target_url)
 
     if proxy_url in (None, ""):
         return None
 
-    # A proxy has been retrieve, parse it url and handle potential auth
+    logger.debug("Using proxy to connect", proxy_url=proxy_url, target_url=target_url)
+
+    # A proxy has been retrieved, parse it url and handle potential auth
 
     try:
         proxy = urlsplit(proxy_url)
         # Typing helper, as result could be SplitResultBytes if we have provided bytes instead of str
         assert isinstance(proxy, SplitResult)
-    except ValueError:
+    except ValueError as exc:
+        logger.warning(
+            "Invalid proxy url, switching to no proxy",
+            proxy_url=proxy_url,
+            target_url=target_url,
+            exc_info=exc,
+        )
         # Invalid url
         return None
     if proxy.port:
@@ -293,15 +327,18 @@ async def _maybe_connect_through_proxy(
     else:
         proxy_port = 443 if proxy.scheme == "https" else 80
     if not proxy.hostname:
+        logger.warning(
+            "Missing required hostname in proxy url, switching to no proxy",
+            proxy_url=proxy_url,
+            target_url=target_url,
+        )
         return None
 
     proxy_headers: List[Tuple[str, str]] = []
     if proxy.username is not None and proxy.password is not None:
+        logger.debug("Using `Proxy-Authorization` header with proxy", username=proxy.username)
         proxy_headers.append(
-            (
-                "Proxy-Authorization",
-                cook_basic_auth_header(proxy.username, proxy.password),
-            )
+            ("Proxy-Authorization", cook_basic_auth_header(proxy.username, proxy.password))
         )
 
     # Connect to the proxy
@@ -311,10 +348,17 @@ async def _maybe_connect_through_proxy(
         stream = await trio.open_tcp_stream(proxy.hostname, proxy_port)
 
     except OSError as exc:
-        logger.warning("Impossible to connect to proxy", reason=exc)
+        logger.warning(
+            "Impossible to connect to proxy",
+            proxy_hostname=proxy.hostname,
+            proxy_port=proxy_port,
+            target_url=target_url,
+            exc_info=exc,
+        )
         raise BackendNotAvailable(exc) from exc
 
     if proxy.scheme == "https":
+        logger.debug("Using TLS to secure proxy connection", hostname=proxy.hostname)
         stream = _upgrade_stream_to_ssl(stream, proxy.hostname)
 
     # Ask the proxy to connect the actual host
@@ -329,6 +373,8 @@ async def _maybe_connect_through_proxy(
         while True:
             event = conn.next_event()
             if event is h11.NEED_DATA:
+                # Note there is no need to handle 100 continue here given we are client
+                # (see https://h11.readthedocs.io/en/v0.10.0/api.htm1l#flow-control)
                 data = await stream.receive_some(2048)
                 conn.receive_data(data)
                 continue
@@ -336,41 +382,55 @@ async def _maybe_connect_through_proxy(
 
     host = f"{hostname}:{port}"
     try:
-        await send(
-            h11.Request(
-                method="CONNECT",
-                target=host,
-                headers=[
-                    # According to RFC7230 (https://datatracker.ietf.org/doc/html/rfc7230#section-5.4)
-                    # Client must provide Host header, but the proxy must replace it
-                    # with the host information of the request-target. So in theory
-                    # we could set any dummy value for the Host header here !
-                    ("Host", host),
-                    *proxy_headers,
-                ],
-            )
+        req = h11.Request(
+            method="CONNECT",
+            target=host,
+            headers=[
+                # According to RFC7230 (https://datatracker.ietf.org/doc/html/rfc7230#section-5.4)
+                # Client must provide Host header, but the proxy must replace it
+                # with the host information of the request-target. So in theory
+                # we could set any dummy value for the Host header here !
+                ("Host", host),
+                *proxy_headers,
+            ],
         )
+        logger.debug("Sending CONNECT to proxy", proxy_url=proxy_url, req=req)
+        await send(req)
         answer = await next_event()
+        logger.debug("Receiving CONNECT answer from proxy", proxy_url=proxy_url, answer=answer)
         if not isinstance(answer, h11.Response) or not 200 <= answer.status_code < 300:
-            logger.warning("Bad answer from proxy", answer=answer, target_host=host)
+            logger.warning(
+                "Bad answer from proxy to CONNECT request",
+                proxy_url=proxy_url,
+                target_host=host,
+                target_url=target_url,
+                answer_status=answer.status_code,
+            )
             raise BackendNotAvailable("Bad answer from proxy")
+        # Successful CONNECT should reset the connection's statemachine
+        answer = await next_event()
+        while not isinstance(answer, h11.PAUSED):
+            logger.debug(
+                "Receiving additional answer to our CONNECT from proxy",
+                proxy_url=proxy_url,
+                answer=answer,
+            )
+            answer = await next_event()
 
     except trio.BrokenResourceError as exc:
         logger.warning(
             "Proxy has unexpectedly closed the connection",
-            exc_info=exc,
+            proxy_url=proxy_url,
             target_host=host,
+            target_url=target_url,
+            exc_info=exc,
         )
-        raise BackendNotAvailable(
-            "Proxy has unexpectedly closed the connection"
-        ) from exc
+        raise BackendNotAvailable("Proxy has unexpectedly closed the connection") from exc
 
     return stream
 
 
-def _upgrade_stream_to_ssl(
-    raw_stream: trio.abc.Stream, hostname: str
-) -> trio.abc.Stream:
+def _upgrade_stream_to_ssl(raw_stream: trio.abc.Stream, hostname: str) -> trio.abc.Stream:
     # The ssl context should be generated once and stored into the config
     # however this is tricky (should ssl configuration be stored per device ?)
 
