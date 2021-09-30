@@ -127,7 +127,7 @@ async def _connect(
             stream = await trio.open_tcp_stream(hostname, port)
 
         except OSError as exc:
-            logger.debug(
+            logger.warning(
                 "Impossible to connect to backend", hostname=hostname, port=port, exc_info=exc
             )
             raise BackendNotAvailable(exc) from exc
