@@ -7,6 +7,7 @@ import certifi
 import h11
 from structlog import get_logger
 from parsec.api.protocol.handshake import HandshakeOutOfBallparkError
+from functools import partial
 from base64 import b64encode
 from async_generator import asynccontextmanager
 from urllib.request import getproxies, proxy_bypass
@@ -15,7 +16,7 @@ from typing import Optional, Union, List, Tuple
 import pypac
 
 from parsec.crypto import SigningKey
-from parsec.api.transport import Transport, TransportError, TransportClosedByPeer
+from parsec.api.transport import USER_AGENT, Transport, TransportError, TransportClosedByPeer
 from parsec.api.protocol import (
     DeviceID,
     ProtocolError,
@@ -197,7 +198,7 @@ def _build_http_url(hostname: str, port: int, use_ssl: bool) -> str:
     return url
 
 
-def _get_proxy_from_pac_config(hostname: str, port: int, use_ssl: bool) -> Optional[str]:
+async def _get_proxy_from_pac_config(hostname: str, port: int, use_ssl: bool) -> Optional[str]:
     # Hack to disable check on content-type (given server migh not be well
     # configured, and `get_pac` silently fails on wrong content-type by returing None)
     # Also disable WPAD protocol to retrieve PAC from DNS given it produce annoying
@@ -214,7 +215,9 @@ def _get_proxy_from_pac_config(hostname: str, port: int, use_ssl: bool) -> Optio
     else:
         logger.debug("Retreiving .PAC proxy config url from system")
     try:
-        pacfile = pypac.get_pac(**get_pac_kwargs)
+        pacfile = await trio.to_thread.run_sync(
+            partial(pypac.get_pac, **get_pac_kwargs)
+        )
     except Exception as exc:
         logger.warning("Error while retrieving .PAC proxy config", exc_info=exc)
         return None
@@ -290,7 +293,7 @@ async def _maybe_connect_through_proxy(
     target_url = _build_http_url(hostname, port, use_ssl)
 
     # First try to get proxy from the infamous PAC config system
-    proxy_url = _get_proxy_from_pac_config(hostname, port, use_ssl)
+    proxy_url = await _get_proxy_from_pac_config(hostname, port, use_ssl)
     if proxy_url:
         logger.debug("Got proxy from .PAC config", proxy_url=proxy_url, target_url=target_url)
     elif proxy_url == "":
@@ -391,6 +394,9 @@ async def _maybe_connect_through_proxy(
                 # with the host information of the request-target. So in theory
                 # we could set any dummy value for the Host header here !
                 ("Host", host),
+                # User-Agent is not a mandatory header, however http proxy are
+                # half-broken shenanigans and get suspicious if it is missing
+                ("User-Agent", USER_AGENT),
                 *proxy_headers,
             ],
         )
