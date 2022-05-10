@@ -1,0 +1,5 @@
+#! /bin/sh
+
+PYTHON=${SNAP}/usr/bin/python3.9
+export PYTHONPATH=${SNAP}/site-packages
+exec ${PYTHON} -m parsec.cli $@

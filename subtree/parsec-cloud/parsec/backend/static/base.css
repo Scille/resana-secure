@@ -1,0 +1,59 @@
+html {
+    height: 100%;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: Montserrat, Arial, sans-serif;
+}
+
+.logo {
+    max-width: 10em;
+    margin-bottom: 1em;
+}
+
+.text-secondary {
+    color: #006eff !important;
+}
+
+.text-muted {
+    color: #6c757d!important;
+}
+
+.text-center {
+    text-align: center!important;
+}
+
+.text-left {
+    text-align: left!important;
+}
+
+.main-title-spacer {
+    width: 6em;
+    height: 0.2em;
+    margin: 1em auto 2em auto;
+}
+
+.bg-primary {
+    background-color: #006eff !important;
+}
+
+ul {
+    margin: 1.5em;
+}
+
+li {
+    font-size: 1.5em;
+}
+
+a {
+    color: #6c757d!important;
+    margin: 1em;
+    padding: 1em;
+    font-weight: bold;
+    font-size: 0.8em;
+}
+
+a:hover {
+    color: #006eff!important;
+}
