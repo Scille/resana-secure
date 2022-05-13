@@ -25,8 +25,6 @@ from parsec.api.protocol import (
     AuthenticatedClientHandshake,
     InvitedClientHandshake,
     APIV1_AnonymousClientHandshake,
-    APIV1_AdministrationClientHandshake,
-    APIV1_AuthenticatedClientHandshake,
 )
 from parsec.core.types import (
     BackendAddr,

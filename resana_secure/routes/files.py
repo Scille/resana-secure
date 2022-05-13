@@ -7,7 +7,7 @@ from base64 import b64decode
 
 from parsec.api.data import EntryID, EntryName
 from parsec.core.mountpoint import MountpointNotMounted
-from parsec.core.types import FsPath
+from parsec.core.fs import FsPath
 from parsec.core.fs.exceptions import (
     FSNotADirectoryError,
     FSFileNotFoundError,

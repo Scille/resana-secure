@@ -77,12 +77,12 @@ def get_default_dirs() -> Tuple[Path, Path, Path, Path]:
         data_base_dir = Path(path) / "resana_secure"
 
         path = os.environ.get("XDG_CACHE_HOME") or f"{home}/.cache"
-        cache_base_dir = Path(path) / "resana_secure"
+        # cache_base_dir = Path(path) / "resana_secure"
 
         path = os.environ.get("XDG_CONFIG_HOME") or f"{home}/.config"
         config_dir = Path(path) / "resana_secure"
 
-    return mountpoint_base_dir, data_base_dir, cache_base_dir, config_dir
+    return mountpoint_base_dir, data_base_dir, config_dir
 
 
 def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Optional[Path] = None):
@@ -125,7 +125,6 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
     (
         mountpoint_base_dir,
         default_data_base_dir,
-        cache_base_dir,
         default_config_dir,
     ) = get_default_dirs()
     config_dir = args.config or default_config_dir
@@ -134,7 +133,6 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
     config = CoreConfig(
         config_dir=config_dir,
         data_base_dir=data_base_dir,
-        cache_base_dir=cache_base_dir,
         # Only used on linux (Windows mounts with drive letters)
         mountpoint_base_dir=mountpoint_base_dir,
         # Use a mock to disable mountpoint instead of relying on this option

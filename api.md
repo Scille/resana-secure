@@ -1172,13 +1172,13 @@ ou
 Récupération d'appareil
 =======================
 
-`POST /recovery/export_device`
+`POST /recovery/export`
 ------------------------------
 
 Créé un appareil de récupération à partir d'un workspace donné.
 
 
-`GET /recovery/import_device`
+`GET /recovery/import`
 -----------------------------
 
 Créé un workspace à partir d'un appareil de récupération généré préalablement.

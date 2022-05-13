@@ -267,6 +267,9 @@ async def claimer_4_finalize(apitoken):
         raise APIException(404, {"error": "unknown_token"})
 
     async with check_data() as (data, bad_fields):
+        # Note password is supposed to be base64 data, however we need a string
+        # to save the device. Hence we "cheat" by using the content without
+        # deserializing back from base64.
         password = data.get("key")
         if not isinstance(password, str):
             bad_fields.add("key")
