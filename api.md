@@ -1167,3 +1167,18 @@ ou
 ou
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
 **************/
+
+
+Récupération d'appareil
+=======================
+
+`POST /recovery/export_device`
+------------------------------
+
+Créé un appareil de récupération à partir d'un workspace donné.
+
+
+`GET /recovery/import_device`
+-----------------------------
+
+Créé un workspace à partir d'un appareil de récupération généré préalablement.
