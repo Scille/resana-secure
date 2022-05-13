@@ -61,9 +61,9 @@ async def create_invitation(core):
 
     with backend_errors_to_api_exceptions():
         if type == "user":
-            addr = await core.new_user_invitation(email=claimer_email, send_email=False)
+            addr, _ = await core.new_user_invitation(email=claimer_email, send_email=False)
         else:
-            addr = await core.new_device_invitation(send_email=False)
+            addr, _ = await core.new_device_invitation(send_email=False)
 
     apitoken = build_apitoken(
         backend_addr=addr,

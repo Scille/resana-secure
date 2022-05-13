@@ -6,17 +6,17 @@ from collections import namedtuple
 
 from parsec.crypto import PrivateKey, SigningKey
 from parsec.api.data import UserCertificateContent, DeviceCertificateContent, UserProfile
-from parsec.api.protocol import OrganizationID, HumanHandle, DeviceID, DeviceName
+from parsec.api.protocol import OrganizationID, HumanHandle, DeviceID, DeviceName, DeviceLabel
 from parsec.core.types import BackendOrganizationBootstrapAddr, BackendAddr
 from parsec.core.invite import bootstrap_organization
 from parsec.core.backend_connection import apiv1_backend_anonymous_cmds_factory
-from parsec.core.local_device import save_device_with_password
+from parsec.core.local_device import save_device_with_password_in_config
 from parsec.backend import backend_app_factory
 from parsec.backend.user import User as BackendUser, Device as BackendDevice
 from parsec.backend.config import BackendConfig, MockedBlockStoreConfig
 
 from resana_secure.app import app_factory
-from resana_secure.cli import build_config
+from resana_secure.cli import CoreConfig
 
 
 @pytest.fixture(scope="session")
@@ -61,10 +61,14 @@ def core_config_dir(tmp_path):
 
 @pytest.fixture
 def core_config(tmp_path, core_config_dir):
-    return build_config(
+    return CoreConfig(
         config_dir=core_config_dir,
         data_base_dir=tmp_path / "data",
-        cache_base_dir=tmp_path / "cache",
+        mountpoint_base_dir=tmp_path / "mountpoint",
+        mountpoint_enabled=False,
+        ipc_win32_mutex_name="resana-secure",
+        ipc_socket_file=tmp_path / "resana-secure.lock",
+        preferred_org_creation_backend_addr=None,
     )
 
 
@@ -100,7 +104,7 @@ async def running_backend(_backend_addr_register):
         backend_addr=None,
         forward_proto_enforce_https=None,
         ssl_context=False,
-        spontaneous_organization_bootstrap=True,
+        organization_spontaneous_bootstrap=True,
         organization_bootstrap_webhook_url=None,
     )
     async with backend_app_factory(config) as backend:
@@ -122,7 +126,7 @@ LocalDeviceTestbed = namedtuple("LocalDeviceTestbed", "device,email,key")
 @pytest.fixture
 async def local_device(running_backend, backend_addr, core_config_dir):
     organization_id = OrganizationID("CoolOrg")
-    device_label = "alice's desktop"
+    device_label = DeviceLabel("alice's desktop")
     password = "P@ssw0rd."
     human_handle = HumanHandle(email="alice@example.com", label="Alice")
     bootstrap_addr = BackendOrganizationBootstrapAddr.build(
@@ -133,7 +137,9 @@ async def local_device(running_backend, backend_addr, core_config_dir):
         new_device = await bootstrap_organization(
             cmds=cmds, human_handle=human_handle, device_label=device_label
         )
-        save_device_with_password(config_dir=core_config_dir, device=new_device, password=password)
+        save_device_with_password_in_config(
+            config_dir=core_config_dir, device=new_device, password=password
+        )
     return LocalDeviceTestbed(device=new_device, email=human_handle.email, key=password)
 
 
@@ -151,7 +157,7 @@ async def other_device(running_backend, local_device):
         author=author,
         timestamp=now,
         device_id=DeviceID(f"{local_device.device.user_id}@{DeviceName.new()}"),
-        device_label="-unknown-",
+        device_label=DeviceLabel("-unknown-"),
         verify_key=SigningKey.generate().verify_key,
     )
     redacted_device_certificate = device_certificate.evolve(device_label=None)
@@ -191,7 +197,7 @@ async def other_user(running_backend, local_device):
         author=author,
         timestamp=now,
         device_id=device_id,
-        device_label="-unknown-",
+        device_label=DeviceLabel("-unknown-"),
         verify_key=SigningKey.generate().verify_key,
     )
     redacted_device_certificate = device_certificate.evolve(device_label=None)
