@@ -17,7 +17,7 @@ async def list_workspaces(core):
     return (
         {
             "workspaces": [
-                {"id": entry.id.hex, "name": entry.name, "role": entry.role.value}
+                {"id": entry.id.hex, "name": entry.name.str, "role": entry.role.value}
                 for entry in user_manifest.workspaces
             ]
         },
@@ -65,7 +65,7 @@ async def sync_workspaces(core):
 @authenticated
 async def rename_workspaces(core, workspace_id):
     try:
-        workspace_id = EntryID(workspace_id)
+        workspace_id = EntryID.from_hex(workspace_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
@@ -106,7 +106,7 @@ async def rename_workspaces(core, workspace_id):
 @authenticated
 async def get_workspace_share_info(core, workspace_id):
     try:
-        workspace_id = EntryID(workspace_id)
+        workspace_id = EntryID.from_hex(workspace_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
@@ -127,7 +127,7 @@ async def get_workspace_share_info(core, workspace_id):
 @authenticated
 async def share_workspace(core, workspace_id):
     try:
-        workspace_id = EntryID(workspace_id)
+        workspace_id = EntryID.from_hex(workspace_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 

@@ -91,7 +91,7 @@ async def test_multi_authentication(test_app, local_device):
     assert len(response.headers.get_all("set-cookie")) == 1
     assert (
         response.headers.get("set-cookie")
-        == "session=; Expires=Thu, 01-Jan-1970 00:00:00 GMT; Max-Age=0; Path=/"
+        == "session=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; Path=/"
     )
 
 
@@ -202,6 +202,8 @@ async def test_authenticated_routes(test_app, routes_samples):
         if method == "OPTIONS":
             continue
         if "/claimer/" in route:
+            continue
+        if route == "/recovery/import":
             continue
         test_client = test_app.test_client()
         response = await getattr(test_client, method.lower())(route)

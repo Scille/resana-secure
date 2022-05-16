@@ -155,7 +155,7 @@ async def other_device(running_backend, local_device):
         author=author,
         timestamp=now,
         device_id=DeviceID(f"{local_device.device.user_id}@{DeviceName.new()}"),
-        device_label="-unknown-",
+        device_label=DeviceLabel("-unknown-"),
         verify_key=SigningKey.generate().verify_key,
     )
     redacted_device_certificate = device_certificate.evolve(device_label=None)
@@ -195,7 +195,7 @@ async def other_user(running_backend, local_device):
         author=author,
         timestamp=now,
         device_id=device_id,
-        device_label="-unknown-",
+        device_label=DeviceLabel("-unknown-"),
         verify_key=SigningKey.generate().verify_key,
     )
     redacted_device_certificate = device_certificate.evolve(device_label=None)

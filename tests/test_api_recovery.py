@@ -9,7 +9,7 @@ async def test_recovery_ok(test_app, local_device, authenticated_client):
     )
     body = await response.get_json()
     assert response.status_code == 200
-    assert body["file_name"] == f"resana-secure-recovery-{local_device.organization_id}-{local_device.short_user_display}.psrk"
+    assert body["file_name"] == f"resana-secure-recovery-{local_device.device.organization_id}-{local_device.device.short_user_display}.psrk"
     assert "file_content" in body
     assert "passphrase" in body
 
@@ -28,6 +28,6 @@ async def test_recovery_ok(test_app, local_device, authenticated_client):
 
     # New user should be able to connect
     response = await anonymous_client.post(
-        "/auth", json={"email": local_device.human_handle.email, "key": b64encode(new_device_key).decode("ascii")}
+        "/auth", json={"email": local_device.device.human_handle.email, "key": b64encode(new_device_key).decode("ascii")}
     )
     assert response.status_code == 200
