@@ -3,7 +3,7 @@ from typing import Optional
 from functools import wraps
 from base64 import urlsafe_b64decode, urlsafe_b64encode
 from contextlib import asynccontextmanager, contextmanager
-from quart import jsonify, Response, current_app, session, request
+from quart import jsonify, current_app, session, request
 from werkzeug.exceptions import HTTPException
 from werkzeug.routing import BaseConverter
 

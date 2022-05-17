@@ -3,7 +3,12 @@ from base64 import b64encode, b64decode
 import tempfile
 from pathlib import Path
 
-from parsec.core.local_device import save_recovery_device, get_recovery_device_file_name, load_recovery_device, save_device_with_password_in_config
+from parsec.core.local_device import (
+    save_recovery_device,
+    get_recovery_device_file_name,
+    load_recovery_device,
+    save_device_with_password_in_config,
+)
 
 from ..utils import authenticated, check_data
 
@@ -24,11 +29,10 @@ async def export_device(core):
 
     file_name = get_recovery_device_file_name(core.device).replace("parsec-", "resana-secure-", 1)
 
-    return {
-        "file_content": b64encode(raw).decode(),
-        "file_name": file_name,
-        "passphrase": passphrase,
-    }, 200
+    return (
+        {"file_content": b64encode(raw).decode(), "file_name": file_name, "passphrase": passphrase},
+        200,
+    )
 
 
 @recovery_bp.route("/recovery/import", methods=["POST"])

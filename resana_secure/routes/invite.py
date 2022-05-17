@@ -228,7 +228,6 @@ async def claimer_2_check_trust(apitoken):
         except ValueError:
             bad_fields.add("greeter_sas")
 
-
     with backend_errors_to_api_exceptions():
         async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()

@@ -137,7 +137,9 @@ async def local_device(running_backend, backend_addr, core_config_dir):
         new_device = await bootstrap_organization(
             cmds=cmds, human_handle=human_handle, device_label=device_label
         )
-        save_device_with_password_in_config(config_dir=core_config_dir, device=new_device, password=password)
+        save_device_with_password_in_config(
+            config_dir=core_config_dir, device=new_device, password=password
+        )
     return LocalDeviceTestbed(device=new_device, email=human_handle.email, key=password)
 
 
