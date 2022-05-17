@@ -9,7 +9,6 @@ import logging
 import structlog
 
 from parsec.core.config import CoreConfig
-from parsec.core.backend_connection.transport import force_proxy_url, force_proxy_pac_url
 
 from .app import serve_app
 from ._version import __version__
@@ -61,13 +60,12 @@ def _setup_logging(log_level: str, log_file: Optional[Path]) -> None:
         logging.basicConfig(format=format, datefmt=datefmt, stream=sys.stdout, level=level)
 
 
-def get_default_dirs() -> Tuple[Path, Path, Path, Path]:
+def get_default_dirs() -> Tuple[Path, Path, Path]:
     mountpoint_base_dir = Path.home() / "Resana-Secure"
 
     if os.name == "nt":
         appdata = Path(os.environ["APPDATA"])
         data_base_dir = appdata / "resana_secure/data"
-        cache_base_dir = appdata / "resana_secure/cache"
         config_dir = appdata / "resana_secure/config"
 
     else:
@@ -77,12 +75,11 @@ def get_default_dirs() -> Tuple[Path, Path, Path, Path]:
         data_base_dir = Path(path) / "resana_secure"
 
         path = os.environ.get("XDG_CACHE_HOME") or f"{home}/.cache"
-        cache_base_dir = Path(path) / "resana_secure"
 
         path = os.environ.get("XDG_CONFIG_HOME") or f"{home}/.config"
         config_dir = Path(path) / "resana_secure"
 
-    return mountpoint_base_dir, data_base_dir, cache_base_dir, config_dir
+    return mountpoint_base_dir, data_base_dir, config_dir
 
 
 def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Optional[Path] = None):
@@ -104,37 +101,15 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
         "--log-level", choices=("DEBUG", "INFO", "WARNING", "ERROR"), default=default_log_level
     )
     parser.add_argument("--log-file", type=Path, default=default_log_file)
-    parser.add_argument(
-        "--force-proxy", type=_cook_website_url, metavar="URL", help="Force use of proxy server"
-    )
-    parser.add_argument(
-        "--force-proxy-pac",
-        type=_cook_website_url,
-        metavar="URL",
-        help="Force use of server provided proxy .PAC configuration",
-    )
     args = parser.parse_args(args=args)
 
-    if args.force_proxy and args.force_proxy_pac:
-        raise SystemExit("`--force-proxy-pac` and `--force-proxy` are mutually exclusive")
-    if args.force_proxy:
-        force_proxy_url(args.force_proxy)
-    if args.force_proxy_pac:
-        force_proxy_pac_url(args.force_proxy_pac)
-
-    (
-        mountpoint_base_dir,
-        default_data_base_dir,
-        cache_base_dir,
-        default_config_dir,
-    ) = get_default_dirs()
+    (mountpoint_base_dir, default_data_base_dir, default_config_dir) = get_default_dirs()
     config_dir = args.config or default_config_dir
     data_base_dir = args.data or default_data_base_dir
 
     config = CoreConfig(
         config_dir=config_dir,
         data_base_dir=data_base_dir,
-        cache_base_dir=cache_base_dir,
         # Only used on linux (Windows mounts with drive letters)
         mountpoint_base_dir=mountpoint_base_dir,
         # Use a mock to disable mountpoint instead of relying on this option

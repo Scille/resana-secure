@@ -1,4 +1,4 @@
-# Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2019 Scille SAS
+# Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2016-2021 Scille SAS
 
 from uuid import uuid4
 from typing import Optional, Type, Union
@@ -21,7 +21,6 @@ from wsproto.events import (
 )
 
 from parsec._version import __version__
-from parsec.api.protocol.handshake import ServerHandshake
 
 
 __all__ = ("TransportError", "Transport")
@@ -55,23 +54,6 @@ class Transport:
         self.conn_id = uuid4().hex
         self.logger = logger.bind(conn_id=self.conn_id)
         self._ws_events = ws.events()
-        self._handshake: Optional[ServerHandshake] = None
-
-    # Application handshake interface
-    # TODO: Investigate a better place for providing an access to the peer API version
-    # Note: This should not be confused with the websocket handshake
-
-    @property
-    def handshake(self) -> ServerHandshake:
-        if self._handshake is None:
-            raise TypeError("The handshake has not been set")
-        return self._handshake
-
-    @handshake.setter
-    def handshake(self, handshake: ServerHandshake) -> None:
-        if self._handshake is not None:
-            raise TypeError("The handshake has already been set")
-        self._handshake = handshake
 
     async def _next_ws_event(self) -> Event:
         try:
@@ -112,14 +94,21 @@ class Transport:
             raise TransportError(*exc.args) from exc
 
     @classmethod
-    async def init_for_client(cls: Type["Transport"], stream: Stream, host: str) -> "Transport":
+    async def init_for_client(
+        cls: Type["Transport"], stream: Stream, host: str, keepalive: Optional[int] = None
+    ) -> "Transport":
         ws = WSConnection(ConnectionType.CLIENT)
-        transport = cls(stream, ws)
+        transport = cls(stream, ws, keepalive)
 
         # Because this is a client WebSocket, we need to initiate the connection
         # handshake by sending a Request event.
-        await transport._net_send(Request(host=host, target=TRANSPORT_TARGET,
-            extra_headers=[(b"User-Agent", USER_AGENT.encode())]))
+        await transport._net_send(
+            Request(
+                host=host,
+                target=TRANSPORT_TARGET,
+                extra_headers=[(b"User-Agent", USER_AGENT.encode())],
+            )
+        )
 
         # Get handshake answer
         event = await transport._next_ws_event()

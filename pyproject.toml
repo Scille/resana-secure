@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "resana_secure"
+version = "0.7.0"
+description = ""
+authors = ["Scille SAS"]
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.11"
+quart = "~=0.14"
+quart-trio = "~=0.7"
+quart-cors = "~=0.4"
+hypercorn = "~=0.11"
+parsec-cloud = { path = "./subtree/parsec-cloud", extras = ["backend", "core"], develop = false }
+pyinstaller = "^5.1"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

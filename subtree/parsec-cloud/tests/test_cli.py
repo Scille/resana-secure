@@ -1,7 +1,9 @@
-# Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2019 Scille SAS
+# Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2016-2021 Scille SAS
 
 import re
 import os
+import trio
+from uuid import UUID
 from pathlib import Path
 from functools import partial
 
@@ -13,7 +15,7 @@ import sys
 import subprocess
 from time import sleep
 from contextlib import contextmanager
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import ANY, patch
 
 import attr
 import pytest
@@ -22,13 +24,29 @@ from click.testing import CliRunner
 from async_generator import asynccontextmanager
 
 from parsec import __version__ as parsec_version
-from parsec.backend.postgresql import MigrationItem
-from parsec.core.local_device import save_device_with_password
 from parsec.cli import cli
+from parsec.backend.postgresql import MigrationItem
+from parsec.core.types import BackendAddr
+from parsec.core.local_device import save_device_with_password_in_config
+from parsec.core.types import (
+    LocalDevice,
+    UserInfo,
+    BackendOrganizationAddr,
+    BackendPkiEnrollmentAddr,
+)
+from parsec.core.cli.share_workspace import WORKSPACE_ROLE_CHOICES
+
+from tests.common import AsyncMock
 
 CWD = Path(__file__).parent.parent
 BACKEND_ADDR = "parsec://localhost"
 EMAIL_HOST = "MOCKED"
+
+
+@pytest.fixture(params=WORKSPACE_ROLE_CHOICES.keys())
+def cli_workspace_role(request):
+    expected_role = WORKSPACE_ROLE_CHOICES[request.param]
+    return request.param, expected_role
 
 
 def test_version():
@@ -38,39 +56,65 @@ def test_version():
     assert f"parsec, version {parsec_version}\n" in result.output
 
 
-def test_share_workspace(tmpdir, alice, bob):
-    # As usual Windows path require a big hack...
-    config_dir = tmpdir.strpath.replace("\\", "\\\\")
+def test_share_workspace(tmp_path, monkeypatch, alice, bob, cli_workspace_role):
+    config_dir = tmp_path / "config"
     # Mocking
-    factory_mock = MagicMock()
-    share_mock = MagicMock()
+    factory_mock = AsyncMock()
+    workspace_role, expected_workspace_role = cli_workspace_role
 
     @asynccontextmanager
     async def logged_core_factory(*args, **kwargs):
         yield factory_mock(*args, **kwargs)
 
-    async def share(*args, **kwargs):
-        return share_mock(*args, **kwargs)
-
-    factory_mock.return_value.user_fs.workspace_share = share
-
     password = "S3cr3t"
-    save_device_with_password(Path(config_dir), bob, password)
-
-    with patch("parsec.core.cli.share_workspace.logged_core_factory", logged_core_factory):
-        runner = CliRunner()
-        args = (
-            f"core share_workspace --password {password} "
-            f"--device={bob.slughash} --config-dir={config_dir} "
-            f"ws1 {alice.user_id}"
+    save_device_with_password_in_config(config_dir, bob, password)
+    alice_info = [
+        UserInfo(
+            user_id=alice.user_id,
+            human_handle=alice.human_handle,
+            profile=alice.profile,
+            created_on=alice.timestamp(),
+            revoked_on=None,
         )
+    ]
+
+    def _run_cli_share_workspace_test(args, expected_error_code, use_recipiant):
+        factory_mock.reset_mock()
+
+        factory_mock.return_value.user_fs.workspace_share.is_async = True
+        factory_mock.return_value.find_humans.is_async = True
+        factory_mock.return_value.find_humans.return_value = (alice_info, 1)
+        factory_mock.return_value.find_workspace_from_name.return_value.id = "ws1_id"
+
+        monkeypatch.setattr(
+            "parsec.core.cli.share_workspace.logged_core_factory", logged_core_factory
+        )
+        runner = CliRunner()
         result = runner.invoke(cli, args)
 
-    print(result.output)
-    assert result.exit_code == 0
+        assert result.exit_code == expected_error_code
+        factory_mock.assert_called_once_with(ANY, bob)
+        factory_mock.return_value.user_fs.workspace_share.assert_called_once_with(
+            "ws1_id", alice.user_id, expected_workspace_role
+        )
+        if use_recipiant:
+            factory_mock.return_value.find_humans.assert_called_once()
+        else:
+            factory_mock.return_value.find_humans.assert_not_called()
 
-    factory_mock.assert_called_once_with(ANY, bob)
-    share_mock.assert_called_once_with("/ws1", alice.user_id)
+    default_args = (
+        f"core share_workspace --password {password} "
+        f"--device={bob.slughash} --config-dir={config_dir.as_posix()} "
+        f"--role={workspace_role} "
+        f"--workspace-name=ws1 "
+    )
+
+    # Test with user-id
+    args = default_args + f"--user-id={alice.user_id}"
+    _run_cli_share_workspace_test(args, 0, False)
+    # Test with recipiant
+    args = default_args + f"--recipiant=alice@example.com"
+    _run_cli_share_workspace_test(args, 0, True)
 
 
 def _short_cmd(cmd):
@@ -171,7 +215,8 @@ def _wait_for_regex(p, regex):
         raise AssertionError("Too slow")
 
 
-@pytest.mark.skipif(os.name == "nt", reason="Hard to test on Windows...")
+@pytest.mark.postgresql
+@pytest.mark.skipif(sys.platform == "win32", reason="Hard to test on Windows...")
 def test_migrate_backend(postgresql_url, unused_tcp_port):
     sql = "SELECT current_database();"  # Dummy migration content
     dry_run_args = f"backend migrate --db {postgresql_url} --dry-run"
@@ -238,15 +283,18 @@ def ssl_conf(request):
 
             yield SSLConf(
                 backend_opts=f" --ssl-keyfile={server_keyfile} --ssl-certfile={server_certfile} ",
-                client_env={"SSL_CAFILE": ca_certfile},
+                # SSL_CERT_FILE is the env var used by default by ssl.SSLContext
+                # TODO: replace those by proper params in the api ?
+                client_env={"SSL_CAFILE": ca_certfile, "SSL_CERT_FILE": ca_certfile},
             )
 
 
 @pytest.mark.slow
-@pytest.mark.skipif(os.name == "nt", reason="Hard to test on Windows...")
-def test_full_run(coolorg, unused_tcp_port, tmpdir, ssl_conf):
-    # As usual Windows path require a big hack...
-    config_dir = tmpdir.strpath.replace("\\", "\\\\")
+@pytest.mark.skipif(sys.platform == "win32", reason="Hard to test on Windows...")
+def test_full_run(coolorg, unused_tcp_port, tmp_path, ssl_conf):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+
     org = coolorg.organization_id
 
     alice_human_handle_label = "Alice"
@@ -255,6 +303,7 @@ def test_full_run(coolorg, unused_tcp_port, tmpdir, ssl_conf):
     bob_human_handle_email = "bob@example.com"
     alice1_device_label = "PC1"
     alice2_device_label = "PC2"
+    alice3_device_label = "PC3"
     bob_device_label = "Desktop"
 
     password = "P@ssw0rd."
@@ -290,7 +339,8 @@ def test_full_run(coolorg, unused_tcp_port, tmpdir, ssl_conf):
 
         print("####### Bootstrap organization #######")
         with _running(
-            "core bootstrap_organization " f"{url} --config-dir={config_dir} --password={password}",
+            "core bootstrap_organization "
+            f"{url} --config-dir={config_dir.as_posix()} --password={password}",
             env=ssl_conf.client_env,
             wait_for="User fullname:",
         ) as p:
@@ -329,7 +379,7 @@ def test_full_run(coolorg, unused_tcp_port, tmpdir, ssl_conf):
         print("####### Create user&device invitations #######")
         p = _run(
             "core invite_user "
-            f"--config-dir={config_dir} --device={alice1_slughash} "
+            f"--config-dir={config_dir.as_posix()} --device={alice1_slughash} "
             f"--password={password} bob@example.com",
             env=ssl_conf.client_env,
         )
@@ -338,18 +388,36 @@ def test_full_run(coolorg, unused_tcp_port, tmpdir, ssl_conf):
 
         p = _run(
             "core invite_device "
-            f"--config-dir={config_dir} --device={alice1_slughash} "
+            f"--config-dir={config_dir.as_posix()} --device={alice1_slughash} "
             f"--password={password}",
             env=ssl_conf.client_env,
         )
         device_invitation_url = re.search(r"^url: (.*)$", p.stdout.decode(), re.MULTILINE).group(1)
         device_invitation_token = re.search(r"token=([^&]+)", device_invitation_url).group(1)
 
+        print("####### Cancel invitation #######")
+
+        p = _run(
+            "core invite_user "
+            f"--config-dir={config_dir.as_posix()} --device={alice1_slughash} "
+            f"--password={password} zack@example.com",
+            env=ssl_conf.client_env,
+        )
+        to_cancel_invitation_url = re.search(r"^url: (.*)$", p.stdout.decode(), re.MULTILINE).group(
+            1
+        )
+        p = _run(
+            "core cancel_invitation "
+            f"--config-dir={config_dir.as_posix()} --device={alice1_slughash} "
+            f"--password={password} {to_cancel_invitation_url}",
+            env=ssl_conf.client_env,
+        )
+
         print("####### List invitations #######")
 
         p = _run(
             "core list_invitations "
-            f"--config-dir={config_dir} --device={alice1_slughash} "
+            f"--config-dir={config_dir.as_posix()} --device={alice1_slughash} "
             f"--password={password}",
             env=ssl_conf.client_env,
         )
@@ -360,12 +428,12 @@ def test_full_run(coolorg, unused_tcp_port, tmpdir, ssl_conf):
         print("####### Claim user invitation #######")
         with _running(
             "core claim_invitation "
-            f"--config-dir={config_dir} --password={password} {user_invitation_url} ",
+            f"--config-dir={config_dir.as_posix()} --password={password} {user_invitation_url} ",
             env=ssl_conf.client_env,
         ) as p_claimer:
             with _running(
                 "core greet_invitation "
-                f"--config-dir={config_dir} --device={alice1_slughash} "
+                f"--config-dir={config_dir.as_posix()} --device={alice1_slughash} "
                 f"--password={password} {user_invitation_token}",
                 env=ssl_conf.client_env,
             ) as p_greeter:
@@ -424,7 +492,7 @@ def test_full_run(coolorg, unused_tcp_port, tmpdir, ssl_conf):
                 p_greeter.stdin.write(f"{bob_device_label}\n".encode())
                 p_greeter.stdin.flush()
 
-                stdout_greeter = p_greeter.wait_for("New user profile (0, 1, 2) [0]:")
+                stdout_greeter = p_greeter.wait_for("New user profile (0, 1, 2) [1]:")
                 p_greeter.stdin.write(b"1\n")
                 p_greeter.stdin.flush()
 
@@ -439,13 +507,13 @@ def test_full_run(coolorg, unused_tcp_port, tmpdir, ssl_conf):
         print("####### Claim device invitation #######")
         with _running(
             "core claim_invitation "
-            f"--config-dir={config_dir} --password={password} {device_invitation_url} ",
+            f"--config-dir={config_dir.as_posix()} --password={password} {device_invitation_url} ",
             env=ssl_conf.client_env,
         ) as p_claimer:
             with _running(
                 "core greet_invitation "
-                f"--config-dir={config_dir} --device={alice1_slughash} "
-                f"--password={password} {device_invitation_token}",
+                f"--config-dir={config_dir.as_posix()} --device={alice1_slughash} "
+                f"--password={password} {device_invitation_url}",
                 env=ssl_conf.client_env,
             ) as p_greeter:
 
@@ -499,7 +567,7 @@ def test_full_run(coolorg, unused_tcp_port, tmpdir, ssl_conf):
                 p_claimer.wait()
 
         print("####### List users #######")
-        p = _run(f"core list_devices --config-dir={config_dir}", env=ssl_conf.client_env)
+        p = _run(f"core list_devices --config-dir={config_dir.as_posix()}", env=ssl_conf.client_env)
         stdout = p.stdout.decode()
         assert alice1_slughash[:3] in stdout
         assert (
@@ -520,12 +588,44 @@ def test_full_run(coolorg, unused_tcp_port, tmpdir, ssl_conf):
         print("####### New users can communicate with backend #######")
         _run(
             "core create_workspace wksp1 "
-            f"--config-dir={config_dir} --device={bob1_slughash} --password={password}",
+            f"--config-dir={config_dir.as_posix()} --device={bob1_slughash} --password={password}",
             env=ssl_conf.client_env,
         )
         _run(
             "core create_workspace wksp2 "
-            f"--config-dir={config_dir} --device={alice2_slughash} --password={password}",
+            f"--config-dir={config_dir.as_posix()} --device={alice2_slughash} --password={password}",
+            env=ssl_conf.client_env,
+        )
+
+        print("####### Recovery device #######")
+        recovery_dir = tmp_path / "recovery"
+        recovery_dir.mkdir()
+        p = _run(
+            f"core export_recovery_device --output={recovery_dir.as_posix()} "
+            f"--config-dir={config_dir.as_posix()} --device={alice1_slughash} --password={password}",
+            env=ssl_conf.client_env,
+        )
+        stdout = p.stdout.decode()
+        # Retrieve passphrase
+        match = re.search(r"Save the recovery passphrase in a safe place: ([a-zA-Z0-9\-]+)", stdout)
+        passphrase = match.group(1)
+        # Retrieve recovery file
+        recovery_file = next(recovery_dir.glob("*.psrk"))
+        # Do the import
+        p = _run(
+            f"core import_recovery_device {recovery_file.as_posix()} "
+            f"--passphrase={passphrase} --device-label={alice3_device_label} "
+            f"--config-dir={config_dir.as_posix()} --password={password}",
+            env=ssl_conf.client_env,
+        )
+        stdout = p.stdout.decode()
+        match = re.search(r"Saving device ([a-zA-Z0-9]+)", stdout)
+        alice3_slughash = match.group(1)
+
+        print("####### Recovered device can communicate with backend #######")
+        _run(
+            "core create_workspace wksp3 "
+            f"--config-dir={config_dir.as_posix()} --device={alice3_slughash} --password={password}",
             env=ssl_conf.client_env,
         )
 
@@ -539,14 +639,264 @@ def test_full_run(coolorg, unused_tcp_port, tmpdir, ssl_conf):
         pytest.param(
             {"WINFSP_LIBRARY_PATH": "nope"},
             id="Wrong winfsp library path",
-            marks=pytest.mark.skipif(os.name != "nt", reason="Windows only"),
+            marks=pytest.mark.skipif(sys.platform != "win32", reason="Windows only"),
         ),
         pytest.param(
             {"WINFSP_DEBUG_PATH": "nope"},
             id="Wrong winfsp binary path",
-            marks=pytest.mark.skipif(os.name != "nt", reason="Windows only"),
+            marks=pytest.mark.skipif(sys.platform != "win32", reason="Windows only"),
         ),
     ],
 )
 def test_gui_with_diagnose_option(env):
     _run(f"core gui --diagnose", env=env, capture=False)
+
+
+@pytest.fixture
+def no_parsec_extension():
+    saved_parsec_ext = sys.modules.get("parsec_ext")
+    sys.modules["parsec_ext"] = None
+    yield
+    if saved_parsec_ext is None:
+        del sys.modules["parsec_ext"]
+    else:
+        sys.modules["parsec_ext"] = saved_parsec_ext
+
+
+def test_pki_enrollment_not_available(tmp_path, alice, no_parsec_extension):
+    # First need to have alice device on the disk
+    config_dir = tmp_path / "config"
+    alice_password = "S3cr3t"
+    save_device_with_password_in_config(config_dir, alice, alice_password)
+
+    # Now Run the cli
+    runner = CliRunner()
+    for cmd in [
+        f"core pki_enrollment_submit --config-dir={config_dir.as_posix()} parsec://parsec.example.com/my_org?action=pki_enrollment",
+        f"core pki_enrollment_poll --config-dir={config_dir.as_posix()}",
+        f"core pki_enrollment_review_pendings --config-dir={config_dir.as_posix()} --device {alice.slughash} --password {alice_password}",
+    ]:
+        result = runner.invoke(cli, cmd)
+        assert result.exit_code == 1
+        assert "Error: Parsec smartcard extension not available" in result.output
+
+
+@asynccontextmanager
+async def cli_with_running_backend_testbed(backend, *devices):
+    # Must use real TCP sockets instead of the tcp_stream_spy here, this is required
+    # given the cli commands are going to run in a separate thread with they own
+    # trio loop. Hence sharing memory channel between trio loops is going to create
+    # unexpected errors !
+    async with trio.open_service_nursery() as nursery:
+        listeners = await nursery.start(
+            lambda task_status: trio.serve_tcp(
+                backend.handle_client, host="0.0.0.0", port=0, task_status=task_status
+            )
+        )
+        _, port, *_ = listeners[0].socket.getsockname()
+        # Given we specified host=0.0.0.0, we are sure the listener is for IPv4 and
+        # hence is accessible with 127.0.0.1
+        backend_addr = BackendAddr("127.0.0.1", port, use_ssl=False)
+
+        # Now the local device point to an invalid backend address, must fix this
+        def _correct_local_device_backend_addr(device):
+            organization_addr = BackendOrganizationAddr.build(
+                backend_addr,
+                organization_id=device.organization_addr.organization_id,
+                root_verify_key=device.organization_addr.root_verify_key,
+            )
+            return LocalDevice(
+                organization_addr=organization_addr,
+                device_id=device.device_id,
+                device_label=device.device_label,
+                human_handle=device.human_handle,
+                signing_key=device.signing_key,
+                private_key=device.private_key,
+                profile=device.profile,
+                user_manifest_id=device.user_manifest_id,
+                user_manifest_key=device.user_manifest_key,
+                local_symkey=device.local_symkey,
+            )
+
+        yield (backend_addr,) + tuple(_correct_local_device_backend_addr(d) for d in devices)
+
+        nursery.cancel_scope.cancel()
+
+
+@pytest.mark.trio
+@pytest.mark.real_tcp
+async def test_pki_enrollment(tmp_path, mocked_parsec_ext_smartcard, backend, alice):
+    async with cli_with_running_backend_testbed(backend, alice) as (backend_addr, alice):
+        # First, save the local device needed for pki_enrollment_review_pendings command
+        config_dir = tmp_path / "config"
+        alice_password = "S3cr3t"
+        save_device_with_password_in_config(config_dir, alice, alice_password)
+
+        runner = CliRunner()
+
+        async def _cli_invoke_in_thread(cmd: str):
+            # We must run the command from another thread given it will create it own trio loop
+            with trio.fail_after(1):
+                # Pass DEBUG environment variable for better output on crash
+                return await trio.to_thread.run_sync(
+                    lambda: runner.invoke(cli, cmd, env={"DEBUG": "1"})
+                )
+
+        async def run_review_pendings(extra_args: str = "", check_result: bool = True):
+            result = await _cli_invoke_in_thread(
+                f"core pki_enrollment_review_pendings --config-dir={config_dir.as_posix()} --device {alice.slughash} --password {alice_password} {extra_args}"
+            )
+            if not check_result:
+                return result
+            if result.exception:
+                raise AssertionError(
+                    f"CliRunner raise an exception: {result.exception}"
+                ) from result.exception
+            assert (
+                result.exit_code == 0
+            ), f"Bad exit_code: {result.exit_code}\nOutput: {result.output}"
+
+            first_line, *other_lines = result.output.splitlines()
+            match = re.match(r"^Found ([0-9]+) pending enrollment\(s\):", first_line)
+            assert match
+            enrollments_count = int(match.group(1))
+            # Just retrieve the enrollment ID
+            enrollments = []
+            for line in other_lines:
+                match = re.match(r"^Pending enrollment ([a-f0-9]+)", line)
+                if match:
+                    enrollments.append(match.group(1))
+            assert len(enrollments) == enrollments_count
+            return enrollments
+
+        addr = BackendPkiEnrollmentAddr.build(backend_addr, organization_id=alice.organization_id)
+
+        async def run_submit(extra_args: str = "", check_result: bool = True):
+            result = await _cli_invoke_in_thread(
+                f"core pki_enrollment_submit --config-dir={config_dir.as_posix()} {addr} --device-label PC1 {extra_args}"
+            )
+            if not check_result:
+                return result
+            if result.exception:
+                raise result.exception
+            assert (
+                result.exit_code == 0
+            ), f"Bad exit_code: {result.exit_code}\nOutput: {result.output}"
+            match = re.match(
+                r"PKI enrollment ([a-f0-9]+) submitted", result.output.splitlines()[-1]
+            )
+            assert match
+            return UUID(match.group(1))
+
+        async def run_poll(extra_args: str = "", check_result: bool = True):
+            result = await _cli_invoke_in_thread(
+                f"core pki_enrollment_poll --config-dir={config_dir.as_posix()} --password S3cr3t {extra_args}"
+            )
+            if not check_result:
+                return result
+            if result.exception:
+                raise AssertionError(
+                    f"CliRunner raise an exception: {result.exception}"
+                ) from result.exception
+            assert (
+                result.exit_code == 0
+            ), f"Bad exit_code: {result.exit_code}\nOutput: {result.output}"
+
+            first_line, *other_lines = result.output.splitlines()
+            match = re.match(r"^Found ([0-9]+) pending enrollment\(s\):", first_line)
+            assert match
+            enrollments_count = int(match.group(1))
+            # Just retrieve the enrollment ID
+            enrollments = []
+            for line in other_lines:
+                match = re.match(r"^Pending enrollment ([a-f0-9]+)", line)
+                if match:
+                    enrollments.append(match.group(1))
+            assert len(enrollments) == enrollments_count
+            return enrollments
+
+        # Time for testing !
+
+        # List with no enrollments
+        assert await run_review_pendings(extra_args="--list-only") == []
+
+        # Poll with no local enrollments
+        assert await run_poll() == []
+
+        # New enrollment
+        enrollment_id1 = await run_submit()
+        assert await run_poll() == [enrollment_id1.hex[:3]]
+        # Poll doesn't modify the pending enrollment
+        assert await run_poll() == [enrollment_id1.hex[:3]]
+
+        # List new enrollment
+        assert await run_review_pendings(extra_args="--list-only") == [enrollment_id1.hex[:3]]
+
+        # Try to reply enrollment without force
+        result = await run_submit(check_result=False)
+        assert result.exit_code == 1
+        assert (
+            f"The certificate `{mocked_parsec_ext_smartcard.default_x509_certificate.certificate_sha1.hex()}` has already been submitted"
+            in result.output
+        )
+        assert await run_review_pendings(extra_args="--list-only") == [
+            enrollment_id1.hex[:3]
+        ]  # No change
+
+        # Actually reply enrollment with force
+        enrollment_id3 = await run_submit(extra_args="--force")
+        assert await run_review_pendings(extra_args="--list-only") == [enrollment_id3.hex[:3]]
+
+        # Reject enrollment
+        await run_review_pendings(extra_args=f"--reject {enrollment_id3.hex}")
+        assert await run_review_pendings(extra_args="--list-only") == []
+
+        # Accept enrollment
+        enrollment_id4 = await run_submit()
+        await run_review_pendings(
+            extra_args=f"--accept {enrollment_id4.hex} --pki-extra-trust-root {mocked_parsec_ext_smartcard.default_trust_root_path}"
+        )
+        assert await run_review_pendings(extra_args="--list-only") == []
+
+        # It is no longer possible to do another enrollment with the same certificate (until the user is revoked)
+        result = await run_submit(check_result=False)
+        assert (
+            f"The certificate `{mocked_parsec_ext_smartcard.default_x509_certificate.certificate_sha1.hex()}` has already been enrolled"
+            in result.output
+        )
+
+        # Reject/Accept not possible against unknown/cancelled/accepted enrollments
+        for extra_args in (
+            # Unknown
+            f"--reject e499f9aed05e4287875a177909d62d90",
+            f"--accept e499f9aed05e4287875a177909d62d90",
+            # Already Cancelled
+            f"--reject {enrollment_id1.hex[:3]}",
+            f"--accept {enrollment_id1.hex[:3]}",
+            # Already Rejected
+            f"--reject {enrollment_id3.hex[:3]}",
+            f"--accept {enrollment_id3.hex[:3]}",
+            # Already Accepted
+            f"--reject {enrollment_id4.hex[:3]}",
+            f"--accept {enrollment_id4.hex[:3]}",
+        ):
+            result = await run_review_pendings(extra_args=extra_args, check_result=False)
+            assert result.exit_code == 1
+            assert "Additional --accept/--reject elements not used" in result.output
+
+        # Poll to handle the accepted enrollments, and discard the non-pendings ones
+        ids = await run_poll(
+            extra_args=f"--finalize {enrollment_id4.hex[:3]} --pki-extra-trust-root {mocked_parsec_ext_smartcard.default_trust_root_path}"
+        )
+        assert set(ids) == {enrollment_id1.hex[:3], enrollment_id3.hex[:3], enrollment_id4.hex[:3]}
+
+        # Now we should have a new local device !
+        result = await _cli_invoke_in_thread(
+            f"core list_devices --config-dir={config_dir.as_posix()}"
+        )
+        assert result.exit_code == 0
+        assert result.output.startswith("Found 2 device(s)")
+        assert "CoolOrg: John Doe <john@example.com> @ PC1" in result.output
+
+        # And all the enrollments should have been taken care of
+        assert await run_poll() == []

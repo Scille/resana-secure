@@ -1,4 +1,4 @@
-# Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2019 Scille SAS
+# Parsec Cloud (https://parsec.cloud) Copyright (c) BSLv1.1 (eventually AGPLv3) 2016-2021 Scille SAS
 
 import attr
 from typing import List, Optional, Union, Tuple
@@ -7,7 +7,10 @@ from parsec.core.types import BackendAddr
 
 
 class BaseBlockStoreConfig:
-    pass
+    # Overloaded by children
+    @property
+    def type(self) -> str:
+        raise NotImplementedError
 
 
 @attr.s(frozen=True, auto_attribs=True)
@@ -22,6 +25,7 @@ class RAID1BlockStoreConfig(BaseBlockStoreConfig):
     type = "RAID1"
 
     blockstores: List[BaseBlockStoreConfig]
+    partial_create_ok: bool = False
 
 
 @attr.s(frozen=True, auto_attribs=True)
@@ -29,6 +33,7 @@ class RAID5BlockStoreConfig(BaseBlockStoreConfig):
     type = "RAID5"
 
     blockstores: List[BaseBlockStoreConfig]
+    partial_create_ok: bool = False
 
 
 @attr.s(frozen=True, auto_attribs=True)
@@ -65,6 +70,8 @@ class MockedBlockStoreConfig(BaseBlockStoreConfig):
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class SmtpEmailConfig:
+    type = "SMTP"
+
     host: str
     port: int
     host_user: Optional[str]
@@ -79,6 +86,8 @@ class SmtpEmailConfig:
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class MockedEmailConfig:
+    type = "MOCKED"
+
     sender: str
     tmpdir: str
 
@@ -104,10 +113,12 @@ class BackendConfig:
     forward_proto_enforce_https: Optional[Tuple[bytes, bytes]]
     backend_addr: Optional[BackendAddr]
 
-    spontaneous_organization_bootstrap: bool
-    organization_bootstrap_webhook_url: Optional[str]
-
     debug: bool
+
+    organization_bootstrap_webhook_url: Optional[str] = None
+    organization_spontaneous_bootstrap: bool = False
+    organization_initial_active_users_limit: Optional[int] = None
+    organization_initial_user_profile_outsider_allowed: bool = True
 
     @property
     def db_type(self):

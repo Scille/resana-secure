@@ -1,4 +1,4 @@
-# Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2019 Scille SAS
+# Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2016-2021 Scille SAS
 
 from parsec.api.data.base import (
     DataError,
@@ -9,7 +9,14 @@ from parsec.api.data.base import (
     BaseAPISignedData,
     BaseSignedDataSchema,
 )
-from parsec.api.data.entry import EntryID, EntryIDField, EntryName, EntryNameField
+from parsec.api.data.entry import (
+    EntryID,
+    EntryIDField,
+    EntryName,
+    EntryNameField,
+    EntryNameTooLongError,
+)
+
 from parsec.api.data.certif import (
     UserProfile,
     UserProfileField,
@@ -17,11 +24,6 @@ from parsec.api.data.certif import (
     DeviceCertificateContent,
     RevokedUserCertificateContent,
     RealmRoleCertificateContent,
-)
-from parsec.api.data.invite_claim import (
-    APIV1_UserClaimContent,
-    APIV1_DeviceClaimContent,
-    APIV1_DeviceClaimAnswerContent,
 )
 from parsec.api.data.invite import (
     SASCode,
@@ -50,6 +52,7 @@ from parsec.api.data.manifest import (
     FolderManifest,
     FileManifest,
 )
+from parsec.api.data.pki import PkiEnrollmentSubmitPayload, PkiEnrollmentAcceptPayload
 
 
 __all__ = (
@@ -66,6 +69,7 @@ __all__ = (
     "EntryIDField",
     "EntryName",
     "EntryNameField",
+    "EntryNameTooLongError",
     # Certifs
     "UserProfile",
     "UserProfileField",
@@ -73,10 +77,6 @@ __all__ = (
     "DeviceCertificateContent",
     "RevokedUserCertificateContent",
     "RealmRoleCertificateContent",
-    # Invite&Claim
-    "APIV1_UserClaimContent",
-    "APIV1_DeviceClaimContent",
-    "APIV1_DeviceClaimAnswerContent",
     # Invite
     "SASCode",
     "generate_sas_codes",
@@ -101,4 +101,7 @@ __all__ = (
     "WorkspaceManifest",
     "FolderManifest",
     "FileManifest",
+    # PKI enrollment
+    "PkiEnrollmentSubmitPayload",
+    "PkiEnrollmentAcceptPayload",
 )

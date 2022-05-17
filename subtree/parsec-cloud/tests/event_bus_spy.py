@@ -1,4 +1,4 @@
-# Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2019 Scille SAS
+# Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2016-2021 Scille SAS
 
 import trio
 import attr
@@ -8,6 +8,8 @@ from unittest.mock import ANY
 from enum import Enum
 
 from parsec.event_bus import EventBus
+
+from tests.common import real_clock_fail_after
 
 
 class PartialDict(dict):
@@ -51,11 +53,51 @@ class PartialObj:
         return True
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, eq=False)
 class SpiedEvent:
     event = attr.ib()
     kwargs = attr.ib(factory=dict)
     dt = attr.ib(factory=pendulum.now)
+
+    # When using Rust with pyo3 with some types,
+    # unittest.mock.ANY cannot be passed to the binding
+    # without implementing some specific magic in the binding
+    # itself.
+    # Instead, we try to let the ANY class to the comparaison.
+    # So, calls that were EntryID.__eq__(self, ANY) (which causes
+    # problems because ANY cannot be converted to EntryID) become
+    # ANY.__eq__(self, EntryID) instead.
+    def __eq__(self, other):
+        ret = True
+
+        if other.event is ANY:
+            ret &= other.event == self.event
+        else:
+            ret &= self.event == other.event
+
+        if other.dt is ANY:
+            ret &= other.dt == self.dt
+        else:
+            ret &= self.dt == other.dt
+
+        if other.kwargs is ANY:
+            return ret
+        elif self.kwargs is ANY:
+            return ret
+
+        ret &= len(other.kwargs) == len(self.kwargs)
+        ret &= all(k in self.kwargs for k in other.kwargs)
+
+        if not ret:
+            return ret
+
+        for k, v in other.kwargs.items():
+            if v is ANY:
+                ret &= v == self.kwargs[k]
+            else:
+                ret &= self.kwargs[k] == v
+
+        return ret
 
 
 @attr.s(repr=False, eq=False)
@@ -82,22 +124,31 @@ class EventBusSpy:
     def clear(self):
         self.events.clear()
 
-    async def wait_with_timeout(self, event, kwargs=ANY, dt=ANY, timeout=1):
-        with trio.fail_after(timeout):
-            await self.wait(event, kwargs, dt)
+    async def wait_with_timeout(self, event, kwargs=ANY, dt=ANY, timeout=1, update_event_func=None):
+        async with real_clock_fail_after(timeout):
+            await self.wait(event, kwargs, dt, update_event_func)
 
-    async def wait(self, event, kwargs=ANY, dt=ANY):
+    async def wait(self, event, kwargs=ANY, dt=ANY, update_event_func=None):
         expected = SpiedEvent(event, kwargs, dt)
         for occured_event in reversed(self.events):
+            if update_event_func:
+                occured_event = update_event_func(occured_event)
             if expected == occured_event:
                 return occured_event
 
-        return await self._wait(expected)
+        return await self._wait(expected, update_event_func)
 
-    async def _wait(self, cooked_expected_event):
+    async def _wait(self, cooked_expected_event, update_event_func=None):
         send_channel, receive_channel = trio.open_memory_channel(1)
 
         def _waiter(cooked_event):
+            from parsec.core.core_events import CoreEvent
+
+            if update_event_func:
+                cooked_event = update_event_func(cooked_event)
+            if cooked_event.event == CoreEvent.SHARING_UPDATED:
+                print("a", cooked_event)
+                print("b", cooked_expected_event)
             if cooked_expected_event == cooked_event:
                 send_channel.send_nowait(cooked_event)
                 self._waiters.remove(_waiter)
@@ -106,7 +157,7 @@ class EventBusSpy:
         return await receive_channel.receive()
 
     async def wait_multiple_with_timeout(self, events, timeout=1, in_order=True):
-        with trio.fail_after(timeout):
+        async with real_clock_fail_after(timeout):
             await self.wait_multiple(events, in_order=in_order)
 
     async def wait_multiple(self, events, in_order=True):
@@ -169,7 +220,7 @@ class EventBusSpy:
 
     def assert_events_exactly_occured(self, events):
         events = self._cook_events_params(events)
-        assert self.events == events
+        assert events == self.events
 
 
 class SpiedEventBus(EventBus):

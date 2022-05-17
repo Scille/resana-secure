@@ -3,8 +3,8 @@ from typing import Optional
 from functools import wraps
 from base64 import urlsafe_b64decode, urlsafe_b64encode
 from contextlib import asynccontextmanager, contextmanager
-from quart import jsonify, Response, current_app, session, request
-from quart.exceptions import HTTPException
+from quart import jsonify, current_app, session, request
+from werkzeug.exceptions import HTTPException
 from werkzeug.routing import BaseConverter
 
 from parsec.api.protocol import OrganizationID, InvitationType
@@ -47,13 +47,9 @@ class EntryIDConverter(BaseConverter):
 
 class APIException(HTTPException):
     def __init__(self, status_code, data) -> None:
-        super().__init__(status_code, "", "")
-        self.data = data
-
-    def get_response(self) -> Response:
-        response = jsonify(self.data)
-        response.status_code = self.status_code
-        return response
+        response = jsonify(data)
+        response.status_code = status_code
+        super().__init__(response=response)
 
 
 def get_auth_token() -> Optional[str]:

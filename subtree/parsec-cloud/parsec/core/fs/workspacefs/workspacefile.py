@@ -1,4 +1,4 @@
-# Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2019 Scille SAS
+# Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2016-2021 Scille SAS
 
 import os
 import re
@@ -6,7 +6,8 @@ from enum import IntEnum
 from typing import Union, Optional, NoReturn, Type, Dict
 
 from parsec.core.fs.workspacefs.entry_transactions import EntryTransactions
-from parsec.core.types import FsPath, AnyPath, FileDescriptor
+from parsec.core.types import FileDescriptor
+from parsec.core.fs.path import FsPath, AnyPath
 from parsec.core.fs.exceptions import (
     FSUnsupportedOperation,
     FSOffsetError,
@@ -122,14 +123,15 @@ class WorkspaceFile:
                     # Flush the file (typically causes the manifest to be reshaped)
                     await self._transactions.fd_flush(self.fileno())
                 except FSLocalStorageClosedError:
-                    return
+                    pass
             finally:
                 # Ignore storage closed exceptions, since it follows an operational error
                 try:
                     # Close the file
                     await self._transactions.fd_close(self.fileno())
                 except FSLocalStorageClosedError:
-                    return
+                    # Careful here: do not return as this would silence a possible exception raised during the flush
+                    pass
         finally:
             self._state = FileState.CLOSED
 

@@ -1,20 +1,22 @@
-# Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2019 Scille SAS
+# Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2016-2021 Scille SAS
 
 import trio
 import pytest
 import pendulum
 
+from parsec.backend.utils import ClientType
 from parsec.api.transport import Transport, Ping, Pong
 from parsec.api.data import RevokedUserCertificateContent
-from parsec.api.protocol import ServerHandshake, HandshakeType, AUTHENTICATED_CMDS, APIEvent
+from parsec.api.protocol import ServerHandshake, AUTHENTICATED_CMDS, APIEvent, OrganizationID
 from parsec.core.types import BackendOrganizationAddr
 from parsec.core.backend_connection import (
     BackendNotAvailable,
     BackendConnectionRefused,
     backend_authenticated_cmds_factory,
 )
-
 from parsec.backend.backend_events import BackendEvent
+
+from tests.common import real_clock_fail_after
 from tests.core.backend_connection.common import ALL_CMDS
 
 
@@ -70,8 +72,8 @@ async def test_handshake_unknown_device(running_backend, alice, mallory):
 @pytest.mark.trio
 async def test_handshake_unknown_organization(running_backend, alice):
     unknown_org_addr = BackendOrganizationAddr.build(
-        backend_addr=alice.organization_addr,
-        organization_id="dummy",
+        backend_addr=alice.organization_addr.get_backend_addr(),
+        organization_id=OrganizationID("dummy"),
         root_verify_key=alice.organization_addr.root_verify_key,
     )
     with pytest.raises(BackendConnectionRefused) as exc:
@@ -85,7 +87,7 @@ async def test_handshake_unknown_organization(running_backend, alice):
 @pytest.mark.trio
 async def test_handshake_rvk_mismatch(running_backend, alice, otherorg):
     bad_rvk_org_addr = BackendOrganizationAddr.build(
-        backend_addr=alice.organization_addr,
+        backend_addr=alice.organization_addr.get_backend_addr(),
         organization_id=alice.organization_id,
         root_verify_key=otherorg.root_verify_key,
     )
@@ -166,7 +168,8 @@ async def test_backend_disconnect_during_handshake(tcp_stream_spy, alice, backen
 
 
 @pytest.mark.trio
-async def test_events_listen_wait_has_watchdog(monkeypatch, mock_clock, running_backend, alice):
+async def test_events_listen_wait_has_watchdog(monkeypatch, autojump_clock, running_backend, alice):
+    autojump_clock.setup()
     # Spy on the transport events to detect the Pings/Pongs
     # (Note we are talking about websocket ping, not our own higher-level ping api)
     transport_events_sender, transport_events_receiver = trio.open_memory_channel(100)
@@ -189,7 +192,7 @@ async def test_events_listen_wait_has_watchdog(monkeypatch, mock_clock, running_
     # event that will be returned to the client
     backend_received_cmd = trio.Event()
     backend_client_ctx = None
-    vanilla_api_events_listen = running_backend.backend.apis[HandshakeType.AUTHENTICATED][
+    vanilla_api_events_listen = running_backend.backend.apis[ClientType.AUTHENTICATED][
         "events_listen"
     ]
 
@@ -199,7 +202,7 @@ async def test_events_listen_wait_has_watchdog(monkeypatch, mock_clock, running_
         backend_received_cmd.set()
         return await vanilla_api_events_listen(client_ctx, msg)
 
-    running_backend.backend.apis[HandshakeType.AUTHENTICATED][
+    running_backend.backend.apis[ClientType.AUTHENTICATED][
         "events_listen"
     ] = _mocked_api_events_listen
 
@@ -207,7 +210,6 @@ async def test_events_listen_wait_has_watchdog(monkeypatch, mock_clock, running_
     async with backend_authenticated_cmds_factory(
         alice.organization_addr, alice.device_id, alice.signing_key, keepalive=2
     ) as cmds:
-        mock_clock.rate = 1
         async with trio.open_service_nursery() as nursery:
 
             async def _cmd():
@@ -217,13 +219,13 @@ async def test_events_listen_wait_has_watchdog(monkeypatch, mock_clock, running_
             nursery.start_soon(_cmd)
 
             # Wait for the connection to be established with the backend
-            with trio.fail_after(1):
+            async with real_clock_fail_after(1):
                 await backend_received_cmd.wait()
 
             # Now advance time until ping is requested
             await trio.testing.wait_all_tasks_blocked()
-            mock_clock.jump(2)
-            with trio.fail_after(2):
+            await trio.sleep(2)
+            async with real_clock_fail_after(1):
                 backend_transport, event = await next_ping_related_event()
                 assert isinstance(event, Ping)
                 client_transport, event = await next_ping_related_event()
@@ -232,8 +234,8 @@ async def test_events_listen_wait_has_watchdog(monkeypatch, mock_clock, running_
 
             # Wait for another ping, just to be sure...
             await trio.testing.wait_all_tasks_blocked()
-            mock_clock.jump(2)
-            with trio.fail_after(1):
+            await trio.sleep(2)
+            async with real_clock_fail_after(1):
                 backend_transport2, event = await next_ping_related_event()
                 assert isinstance(event, Ping)
                 assert backend_transport is backend_transport2

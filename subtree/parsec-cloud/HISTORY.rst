@@ -5,6 +5,428 @@ History
 .. towncrier release notes start
 
 
+Parsec v2.9.0-rc1 (2022-05-17)
+------------------------------
+
+Features
+~~~~~~~~
+
+* Improved how users and workspaces are filtered   (`#2082
+  <https://github.com/Scille/parsec-cloud/issues/2082>`__)
+* Added a "Recover device" button when the login devices list is empty (`#2184
+  <https://github.com/Scille/parsec-cloud/issues/2184>`__)
+* Added a spinner while retrieving the information during a claim  (`#2215
+  <https://github.com/Scille/parsec-cloud/issues/2215>`__)
+
+Bugfixes
+~~~~~~~~
+
+* Fix the print dialog pop-up in snap builds (introduced in 2.7.0).  (`#2161
+  <https://github.com/Scille/parsec-cloud/issues/2161>`__)
+* Fixed small error when pressing Enter on the log in screen (`#2178
+  <https://github.com/Scille/parsec-cloud/issues/2178>`__)
+* Fixed a bug preventing file saving with Apple softwares such as TextEdit or
+  Preview.  (`#2211 <https://github.com/Scille/parsec-cloud/issues/2211>`__)
+* Fixed clicking on a file link in some instances  (`#2223
+  <https://github.com/Scille/parsec-cloud/issues/2223>`__)
+* Fixed an error message when dragging files  (`#2237
+  <https://github.com/Scille/parsec-cloud/issues/2237>`__)
+
+Miscellaneous internal changes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Updated links to term and conditions  (`#1692
+  <https://github.com/Scille/parsec-cloud/issues/1692>`__)
+* Improve server-side error logging when S3/Swift blockstore is not working
+  (`#2160 <https://github.com/Scille/parsec-cloud/issues/2160>`__)
+* Added an installation guide for FUSE for MacOS.  (`#2210
+  <https://github.com/Scille/parsec-cloud/issues/2210>`__)
+* Updated error message when the backend cannot be reached during an invitation
+  (`#2216 <https://github.com/Scille/parsec-cloud/issues/2216>`__)
+* Add support for HTTP proxy  (`#2217 <https://github.com/Scille/parsec-
+  cloud/issues/2217>`__)
+* Added an error message when failing to load a certificate  (`#2235
+  <https://github.com/Scille/parsec-cloud/issues/2235>`__)
+* Improve handling of keyboard interrupt in client CLI (`#2240
+  <https://github.com/Scille/parsec-cloud/issues/2240>`__)
+* Stacktraces in error messages are more consistent  (`#2253
+  <https://github.com/Scille/parsec-cloud/issues/2253>`__)
+* Add pki certificate email address check in parsec backend on pki enrollment
+  submit.  (`#2255 <https://github.com/Scille/parsec-cloud/issues/2255>`__)
+* Gives more details when an error occurs (`#2275
+  <https://github.com/Scille/parsec-cloud/issues/2275>`__)
+
+
+Parsec v2.8.1 (2022-04-08)
+--------------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix regression in Parsec server introduced in version 2.7.0 leading to block
+  being stored and fetched with an incorrect ID  (`#2153
+  <https://github.com/Scille/parsec-cloud/issues/2153>`__)
+
+
+Parsec v2.8.0 (2022-04-06)
+--------------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fixed a bug in the navigation bar where clicking a parent folder didn't change
+  the current directory.  (`#2138 <https://github.com/Scille/parsec-
+  cloud/issues/2138>`__)
+
+Miscellaneous internal changes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Add support for PKI based enrollement  (`#2113
+  <https://github.com/Scille/parsec-cloud/issues/2113>`__)
+
+
+Parsec v2.7.0 (2022-04-01)
+--------------------------
+
+Features
+~~~~~~~~
+
+* Reduces the size of users and devices  (`#1445
+  <https://github.com/Scille/parsec-cloud/issues/1445>`__)
+* Added an explicit message for a revoked user  (`#1464
+  <https://github.com/Scille/parsec-cloud/issues/1464>`__)
+* Better display disabled items in combo boxes (`#1864
+  <https://github.com/Scille/parsec-cloud/issues/1864>`__)
+* Added option to copy the server address (`#1882
+  <https://github.com/Scille/parsec-cloud/issues/1882>`__)
+* Added snackbars for quick messages (`#1885 <https://github.com/Scille/parsec-
+  cloud/issues/1885>`__)
+* Improve the detection and management of clients that have out-of-sync clocks
+  compare to the backend.  (`#1894 <https://github.com/Scille/parsec-
+  cloud/issues/1894>`__)
+* Added a navigation bar to help navigate through a workspace  (`#1916
+  <https://github.com/Scille/parsec-cloud/issues/1916>`__)
+* Added --recipiant option to share_workspace command and the human_find command
+  in the CLI  (`#1940 <https://github.com/Scille/parsec-cloud/issues/1940>`__)
+* Added new right click option for a file in a workspace, that shows the status
+  of a file (created and updated when and by whom, type, location, number of
+  part of a file present locally / remotely)  (`#1941
+  <https://github.com/Scille/parsec-cloud/issues/1941>`__)
+* The cache size per workspace can now be configured through the entry
+  `workspace_storage_cache_size` in the configuration file. The default value is
+  524288000, i.e. 512 MB.  (`#1983 <https://github.com/Scille/parsec-
+  cloud/issues/1983>`__)
+* Display some messages using snackbars instead of dialogs (`#2014
+  <https://github.com/Scille/parsec-cloud/issues/2014>`__)
+* Force the choice of a role when greeting a new user (`#2057
+  <https://github.com/Scille/parsec-cloud/issues/2057>`__)
+
+Bugfixes
+~~~~~~~~
+
+* Logging out of one tab now correctly update the list of available login device
+  (`#1896 <https://github.com/Scille/parsec-cloud/issues/1896>`__)
+* Fix refresh in workspaces when displaying a timestamped workspace on the gui
+  (`#1909 <https://github.com/Scille/parsec-cloud/issues/1909>`__)
+* Improve client/server handshake mechanism (`#2047
+  <https://github.com/Scille/parsec-cloud/issues/2047>`__)
+* Updated the documentation (in particular, a lot of missing French translations
+  were added) (`#2080 <https://github.com/Scille/parsec-cloud/issues/2080>`__)
+
+Miscellaneous internal changes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Changed user icons depending on their role (`#1889
+  <https://github.com/Scille/parsec-cloud/issues/1889>`__)
+* Fixed some graphical gliches on MacOS when using dark mode.  (`#2037
+  <https://github.com/Scille/parsec-cloud/issues/2037>`__)
+* Show a dedicated message when getting a local storage error during file import
+  indicating that the disk might be full  (`#2083
+  <https://github.com/Scille/parsec-cloud/issues/2083>`__)
+* Fix connection reset on client side in case of internal server errors.
+  (`#2100 <https://github.com/Scille/parsec-cloud/issues/2100>`__)
+* Fix telemetry support, replace --sentry-url by --sentry-dsn/--sentry-
+  environment parameters for client and server.  (`#2102
+  <https://github.com/Scille/parsec-cloud/issues/2102>`__)
+
+
+Parsec v2.6.0 (2021-11-09)
+--------------------------
+
+Features
+~~~~~~~~
+
+* Add filters for revoked users and pending invitations in User gui  (`#1744
+  <https://github.com/Scille/parsec-cloud/issues/1744>`__)
+* Show a window with the invitation link when an invitation is failing to be
+  sent via email  (`#1751 <https://github.com/Scille/parsec-
+  cloud/issues/1751>`__)
+* Added the ability to recover device via exporting recovery device and
+  importing them when needed  (`#1855 <https://github.com/Scille/parsec-
+  cloud/issues/1855>`__)
+
+Bugfixes
+~~~~~~~~
+
+* Fix sporadic errors that might occur when clients with slightly different
+  clocks perform actions sur as reading/writing to workspaces and changing roles
+  concurrently.  (`#1811 <https://github.com/Scille/parsec-
+  cloud/issues/1811>`__)
+* Fix rare error when offline while accessing a workspace mounpoint for the
+  first time.  (`#1812 <https://github.com/Scille/parsec-cloud/issues/1812>`__)
+* Fix the logic to solve the conflict in the core  (`#1820
+  <https://github.com/Scille/parsec-cloud/issues/1820>`__)
+* Do not refresh workspace list when mounting/unmounting a workspace (`#1858
+  <https://github.com/Scille/parsec-cloud/issues/1858>`__)
+* Fixed app behaviour on MacOS when closing with command-Q and red X.  (`#1860
+  <https://github.com/Scille/parsec-cloud/issues/1860>`__)
+
+Miscellaneous internal changes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Create a pop-up notification when trying to edit a workspace as a Reader
+  (`#1479 <https://github.com/Scille/parsec-cloud/issues/1479>`__)
+* Add GUI support for extension-based smartcard authentication.  (`#1878
+  <https://github.com/Scille/parsec-cloud/issues/1878>`__)
+
+
+Parsec v2.5.5 (2021-09-30)
+--------------------------
+
+Miscellaneous internal changes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Bundle Mozilla’s carefully curated collection of SSL Root Certificates and use
+  them instead of system certificates to improve reliability.  (`#1871
+  <https://github.com/Scille/parsec-cloud/issues/1871>`__)
+
+
+Parsec v2.5.4 (2021-09-21)
+--------------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix 400 errors when accessing organization containing non-ascii characters
+  with REST API. (`#1849 <https://github.com/Scille/parsec-
+  cloud/issues/1849>`__)
+* Fix incorrect maximum file length detection on linux, e.g in the Nautilus file
+  explorer.  (`#1854 <https://github.com/Scille/parsec-cloud/issues/1854>`__)
+* Fix a freeze when a user import a file or a folder from another parsec
+  workspace through the file explorer provided by the application.  (`#1856
+  <https://github.com/Scille/parsec-cloud/issues/1856>`__)
+
+
+Parsec v2.5.3 (2021-09-10)
+--------------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix mountpoint bug on Linux where some text editor could still edit files in
+  a workspace as reader  (`#1836 <https://github.com/Scille/parsec-cloud/issues/1836>`__)
+
+Miscellaneous internal changes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Added a native menu and keyboard shortcuts for MacOS  (`#1838
+  <https://github.com/Scille/parsec-cloud/issues/1838>`__)
+
+
+Parsec v2.5.2 (2021-09-08)
+--------------------------
+
+Miscellaneous internal changes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Make Standard profile the default choice when greeting new user in GUI.
+  (`#1830 <https://github.com/Scille/parsec-cloud/issues/1830>`__)
+
+
+Parsec v2.5.1 (2021-09-02)
+--------------------------
+
+Miscellaneous internal changes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Update Linux Snap packaging to base image core20  (`#1826
+  <https://github.com/Scille/parsec-cloud/issues/1826>`__)
+
+
+Parsec v2.5.0 (2021-09-02)
+--------------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fixed a bug on MacOS where the window would freeze after the invitation
+  process  (`#1786 <https://github.com/Scille/parsec-cloud/issues/1786>`__)
+* Made the QR code easier to read by removing the logo and changing its color
+  (`#1787 <https://github.com/Scille/parsec-cloud/issues/1787>`__)
+* Generate the proper error when creating a file with a name larger than 255
+  bytes on linux  (`#1813 <https://github.com/Scille/parsec-
+  cloud/issues/1813>`__)
+* Fix file opening on Windows and MacOS (`#1822
+  <https://github.com/Scille/parsec-cloud/issues/1822>`__)
+
+Client/Backend API evolutions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Add active user limit configurable on a per-organization basis. Also add
+  --organization-initial-user-profile-outsider-allowed and --organization-
+  initial-active-users-limit options in `backend run` command.  (`#1766
+  <https://github.com/Scille/parsec-cloud/issues/1766>`__)
+* Remove most parts of APIv1 (only `organization_bootsrap` command is kept from
+  APIv1 for backward compatibility). Remove `expiration_date` from
+  `organization_config` command. Introduce the administration REST api to create
+  & get informations on organizations.  (`#1810
+  <https://github.com/Scille/parsec-cloud/issues/1810>`__)
+
+Miscellaneous internal changes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Images from email invitations are now hosted directly on the Parsec server
+  instead of relying on parsec.cloud website. (`#1780
+  <https://github.com/Scille/parsec-cloud/issues/1780>`__)
+* Change Parsec server license to Business Source License 1.1 (BSLv1.1).
+  (`#1785 <https://github.com/Scille/parsec-cloud/issues/1785>`__)
+* Improve claim/greet dialog in GUI when invitation is deleted.  (`#1806
+  <https://github.com/Scille/parsec-cloud/issues/1806>`__)
+* Improve the file size formatting by displaying for significant figures when
+  needed.  (`#1808 <https://github.com/Scille/parsec-cloud/issues/1808>`__)
+* Improve error reports sent by telemetry and CLI arguments documentation.
+  (`#1823 <https://github.com/Scille/parsec-cloud/issues/1823>`__)
+
+
+Parsec v2.4.2 (2021-07-06)
+--------------------------
+
+Miscellaneous internal changes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Made the macFUSE pop-up during MacOS installation more user-friendly  (`#1777
+  <https://github.com/Scille/parsec-cloud/issues/1777>`__)
+
+
+Parsec v2.4.1 (2021-06-29)
+--------------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix database migration script n°6.  (`#1774 <https://github.com/Scille/parsec-
+  cloud/issues/1774>`__)
+
+
+Parsec v2.4.0 (2021-06-29)
+--------------------------
+
+Features
+~~~~~~~~
+
+* Adds the outsider profile management in the GUI  (`#1720
+  <https://github.com/Scille/parsec-cloud/issues/1720>`__)
+* Add QR code on device invitation (`#1652 <https://github.com/Scille/parsec-
+  cloud/issues/1652>`__)
+* Introduce OUTSIDER organization user profile: an outsider cannot see the
+  identity of other users within the organization. On top of that it is only
+  allowed to be READER/CONTRIBUTOR on shared workspaces.  (`#1727
+  <https://github.com/Scille/parsec-cloud/issues/1727>`__)
+* Add `.sb-` temporary directories to the confined pattern list. Those
+  directories appear on MacOS when editing `.doc` and `.docx` files.  (`#1764
+  <https://github.com/Scille/parsec-cloud/issues/1764>`__)
+
+Bugfixes
+~~~~~~~~
+
+* Added the pop-up widget to download latest app version on MacOS  (`#1736
+  <https://github.com/Scille/parsec-cloud/issues/1736>`__)
+* Fix some alignments issues with the workspace widgets.  (`#1761
+  <https://github.com/Scille/parsec-cloud/issues/1761>`__)
+* Fix error handling for drag&drop in GUI. (`#1732
+  <https://github.com/Scille/parsec-cloud/issues/1732>`__)
+* Fix possible crash when sync occurs right after a workspace reencryption.
+  (`#1730 <https://github.com/Scille/parsec-cloud/issues/1730>`__)
+
+Deprecations and Removals
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Change the file link URL format so that file path is encrypted. This change
+  breaks compatibility with previous file url format.  (`#1637
+  <https://github.com/Scille/parsec-cloud/issues/1637>`__)
+
+Miscellaneous internal changes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Server on-organization-bootstrap webhook now allow 2xx return status instead
+  of only 200.  (`#1750 <https://github.com/Scille/parsec-cloud/issues/1750>`__)
+* Add red color to remove widget dialogue confirmation button in GUI.  (`#1758
+  <https://github.com/Scille/parsec-cloud/issues/1758>`__)
+* Reword telemetry related dialogue in GUI. (`#1759
+  <https://github.com/Scille/parsec-cloud/issues/1759>`__)
+
+
+Parsec v2.3.1 (2021-05-10)
+--------------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix blocking calls related to the local storage that might slow down the
+  application.  (`#1713 <https://github.com/Scille/parsec-cloud/issues/1713>`__)
+* Fix a regression that broke the "Remount workspace at a given timestamp"
+  button.  (`#1723 <https://github.com/Scille/parsec-cloud/issues/1723>`__)
+
+Miscellaneous internal changes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Update recommanded macFUSE version to 4.1.0 for mountpoint on macOS.  (`#1718
+  <https://github.com/Scille/parsec-cloud/issues/1718>`__)
+
+
+Parsec v2.3.0 (2021-05-04)
+--------------------------
+
+Features
+~~~~~~~~
+
+* Allow read access to a workspace during a re-encryption.  (`#1650
+  <https://github.com/Scille/parsec-cloud/issues/1650>`__)
+
+Bugfixes
+~~~~~~~~
+
+* Fixed Dock icon behaviour on MacOS when app was closed with red X.  (`#1519
+  <https://github.com/Scille/parsec-cloud/issues/1519>`__)
+* Fix the server's stucking while it waits for a peer.  (`#1625
+  <https://github.com/Scille/parsec-cloud/issues/1625>`__)
+* Added filename normalization to fix conflicts on special characters on MacOS.
+  (`#1645 <https://github.com/Scille/parsec-cloud/issues/1645>`__)
+* Fix confusing dialog when logging out with an on-going reencryption.  (`#1663
+  <https://github.com/Scille/parsec-cloud/issues/1663>`__)
+* Fix some blinking with the workspace buttons, especially while doing a
+  reencryption.  (`#1665 <https://github.com/Scille/parsec-
+  cloud/issues/1665>`__)
+* Enforce NFC string normalization for organization/device/user/entry id and
+  human handle.  (`#1708 <https://github.com/Scille/parsec-
+  cloud/issues/1708>`__)
+* Fix an issue with fuse mounpoints on linux where the shutdown procedure might
+  block forever  (`#1716 <https://github.com/Scille/parsec-
+  cloud/issues/1716>`__)
+
+Miscellaneous internal changes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Update CLI command `parsec core bootstrap_organization` to accept params for
+  human/device label/email.  (`#1674 <https://github.com/Scille/parsec-
+  cloud/issues/1674>`__)
+* Improve synchronization performance by running the block uploads in parallel
+  (`#1678 <https://github.com/Scille/parsec-cloud/issues/1678>`__)
+* Improve Windows installer for smaller size and faster install time. Also fix
+  uninstall when previous version has been installed in a custom location.
+  (`#1690 <https://github.com/Scille/parsec-cloud/issues/1690>`__)
+
+
 Parsec v2.2.4 (2021-03-18)
 --------------------------
 

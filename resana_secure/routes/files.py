@@ -4,10 +4,11 @@ import trio
 import subprocess
 from quart import Blueprint
 from base64 import b64decode
+from typing import Optional
 
 from parsec.api.data import EntryID, EntryName
 from parsec.core.mountpoint import MountpointNotMounted
-from parsec.core.types import FsPath
+from parsec.core.fs import FsPath
 from parsec.core.fs.exceptions import (
     FSNotADirectoryError,
     FSFileNotFoundError,
@@ -44,20 +45,20 @@ async def entry_id_to_path(workspace, needle_entry_id):
 @authenticated
 async def get_workspace_folders_tree(core, workspace_id):
     try:
-        workspace_id = EntryID(workspace_id)
+        workspace_id = EntryID.from_hex(workspace_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
     with backend_errors_to_api_exceptions():
         workspace = core.user_fs.get_workspace(workspace_id)
 
-        async def _recursive_build_tree(path, name):
+        async def _recursive_build_tree(path: str, name: Optional[EntryName]):
             entry_info = await workspace.path_info(path=path)
             if entry_info["type"] != "folder":
                 return
             stat = {
                 "id": entry_info["id"].hex,
-                "name": name,
+                "name": name.str if name is not None else "/",
                 "created": entry_info["created"].to_iso8601_string(),
                 "updated": entry_info["updated"].to_iso8601_string(),
             }
@@ -67,11 +68,11 @@ async def get_workspace_folders_tree(core, workspace_id):
                     path=f"{path}/{child_name}", name=child_name
                 )
                 if child_cooked_tree:
-                    cooked_children[child_name] = child_cooked_tree
+                    cooked_children[child_name.str] = child_cooked_tree
             stat["children"] = cooked_children
             return stat
 
-        cooked_tree = await _recursive_build_tree(path="/", name="/")
+        cooked_tree = await _recursive_build_tree(path="/", name=None)
 
     return cooked_tree, 200
 
@@ -84,7 +85,7 @@ async def create_workspace_folder(core, workspace_id):
 
 async def _create_workspace_entry(core, workspace_id, type):
     try:
-        workspace_id = EntryID(workspace_id)
+        workspace_id = EntryID.from_hex(workspace_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
@@ -96,7 +97,7 @@ async def _create_workspace_entry(core, workspace_id, type):
             bad_fields.add("name")
         parent_entry_id = data.get("parent")
         try:
-            parent_entry_id = EntryID(parent_entry_id)
+            parent_entry_id = EntryID.from_hex(parent_entry_id)
         except (TypeError, ValueError):
             bad_fields.add("parent")
         if type == "file":
@@ -136,14 +137,14 @@ async def rename_workspace_folder(core, workspace_id):
 
 async def _rename_workspace_entry(core, workspace_id, expected_entry_type):
     try:
-        workspace_id = EntryID(workspace_id)
+        workspace_id = EntryID.from_hex(workspace_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
     async with check_data() as (data, bad_fields):
         entry_id = data.get("id")
         try:
-            entry_id = EntryID(entry_id)
+            entry_id = EntryID.from_hex(entry_id)
         except (TypeError, ValueError):
             bad_fields.add("id")
         new_name = data.get("new_name")
@@ -154,7 +155,7 @@ async def _rename_workspace_entry(core, workspace_id, expected_entry_type):
         new_parent_entry_id = data.get("new_parent")
         if new_parent_entry_id is not None:
             try:
-                new_parent_entry_id = EntryID(new_parent_entry_id)
+                new_parent_entry_id = EntryID.from_hex(new_parent_entry_id)
             except (TypeError, ValueError):
                 bad_fields.add("new_parent")
 
@@ -206,12 +207,12 @@ async def delete_workspace_folder(core, workspace_id, folder_id):
 
 async def _delete_workspace_entry(core, workspace_id, entry_id, expected_entry_type):
     try:
-        workspace_id = EntryID(workspace_id)
+        workspace_id = EntryID.from_hex(workspace_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
     try:
-        entry_id = EntryID(entry_id)
+        entry_id = EntryID.from_hex(entry_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_entry"})
 
@@ -248,12 +249,12 @@ async def _delete_workspace_entry(core, workspace_id, entry_id, expected_entry_t
 @authenticated
 async def get_workspace_folder_content(core, workspace_id, folder_id):
     try:
-        workspace_id = EntryID(workspace_id)
+        workspace_id = EntryID.from_hex(workspace_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
     try:
-        folder_id = EntryID(folder_id)
+        folder_id = EntryID.from_hex(folder_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_folder"})
 
@@ -266,15 +267,15 @@ async def get_workspace_folder_content(core, workspace_id, folder_id):
                 raise APIException(404, {"error": "unknown_folder"})
             cooked_files = []
             for child_name in folder_stat["children"]:
-                child_stat = await workspace.path_info(path=folder_path / child_name)
+                child_stat = await workspace.path_info(path=folder_path / child_name.str)
                 if child_stat["type"] == "folder":
                     continue
-                extension = child_name.rsplit(".", 1)[-1]
-                extension = extension if extension != child_name else ""
+                extension = child_name.str.rsplit(".", 1)[-1]
+                extension = extension if extension != child_name.str else ""
                 cooked_files.append(
                     {
                         "id": child_stat["id"].hex,
-                        "name": child_name,
+                        "name": child_name.str,
                         "created": child_stat["created"].to_iso8601_string(),
                         "updated": child_stat["updated"].to_iso8601_string(),
                         "size": child_stat["size"],
@@ -311,12 +312,12 @@ async def delete_workspace_file(core, workspace_id, file_id):
 @authenticated
 async def open_workspace_item(core, workspace_id, entry_id):
     try:
-        workspace_id = EntryID(workspace_id)
+        workspace_id = EntryID.from_hex(workspace_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
     try:
-        entry_id = EntryID(entry_id)
+        entry_id = EntryID.from_hex(entry_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_file"})
 
