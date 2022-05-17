@@ -133,13 +133,12 @@ async def local_device(running_backend, backend_addr, core_config_dir):
         backend_addr=backend_addr, organization_id=organization_id
     )
 
-    async with apiv1_backend_anonymous_cmds_factory(addr=bootstrap_addr) as cmds:
-        new_device = await bootstrap_organization(
-            cmds=cmds, human_handle=human_handle, device_label=device_label
-        )
-        save_device_with_password_in_config(
-            config_dir=core_config_dir, device=new_device, password=password
-        )
+    new_device = await bootstrap_organization(
+        addr=bootstrap_addr, human_handle=human_handle, device_label=device_label
+    )
+    save_device_with_password_in_config(
+        config_dir=core_config_dir, device=new_device, password=password
+    )
     return LocalDeviceTestbed(device=new_device, email=human_handle.email, key=password)
 
 
