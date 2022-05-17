@@ -9,7 +9,6 @@ import logging
 import structlog
 
 from parsec.core.config import CoreConfig
-from parsec.core.backend_connection.transport import force_proxy_url, force_proxy_pac_url
 
 from .app import serve_app
 from ._version import __version__
@@ -102,23 +101,7 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
         "--log-level", choices=("DEBUG", "INFO", "WARNING", "ERROR"), default=default_log_level
     )
     parser.add_argument("--log-file", type=Path, default=default_log_file)
-    parser.add_argument(
-        "--force-proxy", type=_cook_website_url, metavar="URL", help="Force use of proxy server"
-    )
-    parser.add_argument(
-        "--force-proxy-pac",
-        type=_cook_website_url,
-        metavar="URL",
-        help="Force use of server provided proxy .PAC configuration",
-    )
     args = parser.parse_args(args=args)
-
-    if args.force_proxy and args.force_proxy_pac:
-        raise SystemExit("`--force-proxy-pac` and `--force-proxy` are mutually exclusive")
-    if args.force_proxy:
-        force_proxy_url(args.force_proxy)
-    if args.force_proxy_pac:
-        force_proxy_pac_url(args.force_proxy_pac)
 
     (mountpoint_base_dir, default_data_base_dir, default_config_dir) = get_default_dirs()
     config_dir = args.config or default_config_dir
