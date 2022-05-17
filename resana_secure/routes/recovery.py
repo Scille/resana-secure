@@ -8,9 +8,10 @@ from parsec.core.local_device import (
     get_recovery_device_file_name,
     load_recovery_device,
     save_device_with_password_in_config,
+    LocalDeviceCryptoError,
 )
 
-from ..utils import authenticated, check_data
+from ..utils import APIException, authenticated, check_data
 
 
 recovery_bp = Blueprint("recovery_api", __name__)
@@ -60,7 +61,10 @@ async def import_device():
     with tempfile.NamedTemporaryFile(suffix=".psrk") as fp:
         path = Path(fp.name)
         path.write_bytes(file_content)
-        new_device = await load_recovery_device(path, passphrase)
+        try:
+            new_device = await load_recovery_device(path, passphrase)
+        except LocalDeviceCryptoError:
+            raise APIException(400, {"error": "invalid_passphrase"})
 
     save_device_with_password_in_config(
         config_dir=current_app.config["CORE_CONFIG"].config_dir,
