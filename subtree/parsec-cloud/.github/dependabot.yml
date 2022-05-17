@@ -1,0 +1,47 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    pull-request-branch-name:
+      separator: "-"
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: pip
+    directory: "/requirement"
+    ignore:
+      - dependency-name: "toastedmarshmallow"
+      - dependency-name: "trio_typing"
+      - dependency-name: "typing-extensions"
+    pull-request-branch-name:
+      separator: "-"
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: pip
+    directory: "/oxidation/libparsec_python"
+    pull-request-branch-name:
+      separator: "-"
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: cargo
+    directory: "/"
+    pull-request-branch-name:
+      separator: "-"
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: "npm"
+    directory: "/oxidation/client"
+    pull-request-branch-name:
+      separator: "-"
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: "npm"
+    directory: "/oxidation/client/android"
+    pull-request-branch-name:
+      separator: "-"
+    schedule:
+      interval: monthly
