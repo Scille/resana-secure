@@ -1,4 +1,4 @@
-# Parsec - Resan Secure version
+# Parsec - Resana Secure version
 
 ## Subtree
 
