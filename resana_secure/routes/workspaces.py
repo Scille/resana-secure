@@ -1,6 +1,6 @@
 from quart import Blueprint
 
-from parsec.api.data import EntryID
+from parsec.api.data import EntryID, EntryName
 from parsec.api.protocol import RealmRole
 
 from ..utils import APIException, authenticated, check_data, backend_errors_to_api_exceptions
@@ -17,7 +17,7 @@ async def list_workspaces(core):
     return (
         {
             "workspaces": [
-                {"id": entry.id.hex, "name": entry.name, "role": entry.role.value}
+                {"id": entry.id.hex, "name": entry.name.str, "role": entry.role.value}
                 for entry in user_manifest.workspaces
             ]
         },
@@ -31,6 +31,10 @@ async def create_workspaces(core):
     async with check_data() as (data, bad_fields):
         name = data.get("name")
         if not isinstance(name, str):
+            bad_fields.add("name")
+        try:
+            name = EntryName(name)
+        except ValueError:
             bad_fields.add("name")
 
     with backend_errors_to_api_exceptions():
@@ -61,7 +65,7 @@ async def sync_workspaces(core):
 @authenticated
 async def rename_workspaces(core, workspace_id):
     try:
-        workspace_id = EntryID(workspace_id)
+        workspace_id = EntryID.from_hex(workspace_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
@@ -69,8 +73,16 @@ async def rename_workspaces(core, workspace_id):
         old_name = data.get("old_name")
         if not isinstance(old_name, str):
             bad_fields.add("old_name")
+        try:
+            old_name = EntryName(old_name)
+        except ValueError:
+            bad_fields.add("old_name")
         new_name = data.get("new_name")
         if not isinstance(new_name, str):
+            bad_fields.add("new_name")
+        try:
+            new_name = EntryName(new_name)
+        except ValueError:
             bad_fields.add("new_name")
 
     for entry in core.user_fs.get_user_manifest().workspaces:
@@ -94,7 +106,7 @@ async def rename_workspaces(core, workspace_id):
 @authenticated
 async def get_workspace_share_info(core, workspace_id):
     try:
-        workspace_id = EntryID(workspace_id)
+        workspace_id = EntryID.from_hex(workspace_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
@@ -115,7 +127,7 @@ async def get_workspace_share_info(core, workspace_id):
 @authenticated
 async def share_workspace(core, workspace_id):
     try:
-        workspace_id = EntryID(workspace_id)
+        workspace_id = EntryID.from_hex(workspace_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 

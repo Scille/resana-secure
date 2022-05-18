@@ -1,20 +1,22 @@
-# Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2019 Scille SAS
+# Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2016-2021 Scille SAS
 
 import pytest
-from uuid import UUID, uuid4
-from pendulum import datetime, now as pendulum_now
+from typing import Optional
+from pendulum import datetime
 from async_generator import asynccontextmanager
+from structlog import get_logger
 
 from parsec.api.data import RealmRoleCertificateContent
 from parsec.api.protocol import (
     OrganizationID,
+    VlobID,
+    RealmID,
     RealmRole,
+    InvitationToken,
     InvitationType,
     AuthenticatedClientHandshake,
     InvitedClientHandshake,
-    APIV1_AuthenticatedClientHandshake,
     APIV1_AnonymousClientHandshake,
-    APIV1_AdministrationClientHandshake,
 )
 from parsec.api.transport import Transport
 from parsec.backend.realm import RealmGrantedRole
@@ -22,15 +24,16 @@ from parsec.backend.backend_events import BackendEvent
 from parsec.core.types import LocalDevice
 
 from tests.common import FreezeTestOnTransportError
+from tests.backend.common import do_http_request
 
 
 @pytest.fixture
 def backend_raw_transport_factory(server_factory):
     @asynccontextmanager
-    async def _backend_sock_factory(backend, freeze_on_transport_error=True):
+    async def _backend_sock_factory(backend, freeze_on_transport_error=True, keepalive=None):
         async with server_factory(backend.handle_client) as server:
             stream = server.connection_factory()
-            transport = await Transport.init_for_client(stream, server.addr.hostname)
+            transport = await Transport.init_for_client(stream, server.addr.hostname, keepalive)
             if freeze_on_transport_error:
                 transport = FreezeTestOnTransportError(transport)
 
@@ -55,14 +58,9 @@ def apiv1_backend_sock_factory(backend_raw_transport_factory, coolorg):
                     # TODO: for legacy test, refactorise this ?
                     ch = APIV1_AnonymousClientHandshake(coolorg.organization_id)
                 elif auth_as == "administration":
-                    ch = APIV1_AdministrationClientHandshake(backend.config.administration_token)
+                    assert False, "APIv1 Administration sock no longer supported"
                 else:
-                    ch = APIV1_AuthenticatedClientHandshake(
-                        auth_as.organization_id,
-                        auth_as.device_id,
-                        auth_as.signing_key,
-                        auth_as.root_verify_key,
-                    )
+                    assert False, "APIv1 Authenticated sock no longer supported"
                 challenge_req = await transport.recv()
                 answer_req = ch.process_challenge_req(challenge_req)
                 await transport.send(answer_req)
@@ -118,13 +116,15 @@ async def apiv1_bob_backend_sock(apiv1_backend_sock_factory, backend, bob):
 
 
 @pytest.fixture
-def backend_sock_factory(backend_raw_transport_factory, coolorg):
+def backend_sock_factory(backend_raw_transport_factory):
     # APIv2's invited handshake is not compatible with this
     # fixture because it requires purpose information (invitation_type/token)
     @asynccontextmanager
-    async def _backend_sock_factory(backend, auth_as: LocalDevice, freeze_on_transport_error=True):
+    async def _backend_sock_factory(
+        backend, auth_as: LocalDevice, freeze_on_transport_error=True, keepalive=None
+    ):
         async with backend_raw_transport_factory(
-            backend, freeze_on_transport_error=freeze_on_transport_error
+            backend, freeze_on_transport_error=freeze_on_transport_error, keepalive=keepalive
         ) as transport:
             # Handshake
             ch = AuthenticatedClientHandshake(
@@ -181,7 +181,7 @@ def backend_invited_sock_factory(backend_raw_transport_factory):
         backend,
         organization_id: OrganizationID,
         invitation_type: InvitationType,
-        token: UUID,
+        token: InvitationToken,
         freeze_on_transport_error: bool = True,
     ):
         async with backend_raw_transport_factory(
@@ -201,11 +201,60 @@ def backend_invited_sock_factory(backend_raw_transport_factory):
     return _backend_sock_factory
 
 
+class AnonymousTransport:
+    """
+    Mimic regular Transport to be compatible with the `tests.backend.common.CmdSock`,
+    the trick is given we use regular HTTP instead of Websocket we create a new
+    socket each time and do send&recv at the same time.
+    """
+
+    def __init__(self, connection_factory, organization_id: OrganizationID):
+        self.connection_factory = connection_factory
+        self.organization_id = organization_id
+        self.last_request_response: Optional[bytes] = None
+        self.logger = get_logger()
+
+    async def send(self, msg: bytes) -> None:
+        assert self.last_request_response is None
+        async with self.connection_factory() as stream:
+            status, _, body = await do_http_request(
+                stream=stream,
+                target=f"/anonymous/{self.organization_id}",
+                method="POST",
+                headers={"Content-Type": "application/msgpack"},
+                body=msg,
+            )
+            assert status[0] == 200
+            self.last_request_response = body
+
+    async def recv(self) -> bytes:
+        assert self.last_request_response is not None
+        rep = self.last_request_response
+        self.last_request_response = None
+        return rep
+
+
 @pytest.fixture
-def realm_factory():
+def anonymous_backend_sock_factory(server_factory):
+    @asynccontextmanager
+    async def _backend_sock_factory(backend, organization_id: OrganizationID):
+        async with server_factory(backend.handle_client) as server:
+            yield AnonymousTransport(server.connection_factory, organization_id)
+
+    return _backend_sock_factory
+
+
+@pytest.fixture
+async def anonymous_backend_sock(anonymous_backend_sock_factory, backend, coolorg):
+    async with anonymous_backend_sock_factory(backend, coolorg.organization_id) as sock:
+        yield sock
+
+
+@pytest.fixture
+def realm_factory(next_timestamp):
     async def _realm_factory(backend, author, realm_id=None, now=None):
-        realm_id = realm_id or uuid4()
-        now = now or pendulum_now()
+        realm_id = realm_id or RealmID.new()
+        now = now or next_timestamp()
         certif = RealmRoleCertificateContent.build_realm_root_certif(
             author=author.device_id, timestamp=now, realm_id=realm_id
         ).dump_and_sign(author.signing_key)
@@ -229,20 +278,23 @@ def realm_factory():
 
 @pytest.fixture
 async def realm(backend, alice, realm_factory):
-    realm_id = UUID("A0000000000000000000000000000000")
+    realm_id = RealmID.from_hex("A0000000000000000000000000000000")
     return await realm_factory(backend, alice, realm_id, datetime(2000, 1, 2))
 
 
 @pytest.fixture
 async def vlobs(backend, alice, realm):
-    vlob_ids = (UUID("10000000000000000000000000000000"), UUID("20000000000000000000000000000000"))
+    vlob_ids = (
+        VlobID.from_hex("10000000000000000000000000000000"),
+        VlobID.from_hex("20000000000000000000000000000000"),
+    )
     await backend.vlob.create(
         organization_id=alice.organization_id,
         author=alice.device_id,
         realm_id=realm,
         encryption_revision=1,
         vlob_id=vlob_ids[0],
-        timestamp=datetime(2000, 1, 2),
+        timestamp=datetime(2000, 1, 2, 1),
         blob=b"r:A b:1 v:1",
     )
     await backend.vlob.update(
@@ -273,11 +325,11 @@ async def vlob_atoms(vlobs):
 
 @pytest.fixture
 async def other_realm(backend, alice, realm_factory):
-    realm_id = UUID("B0000000000000000000000000000000")
+    realm_id = RealmID.from_hex("B0000000000000000000000000000000")
     return await realm_factory(backend, alice, realm_id, datetime(2000, 1, 2))
 
 
 @pytest.fixture
 async def bob_realm(backend, bob, realm_factory):
-    realm_id = UUID("C0000000000000000000000000000000")
+    realm_id = RealmID.from_hex("C0000000000000000000000000000000")
     return await realm_factory(backend, bob, realm_id, datetime(2000, 1, 2))

@@ -1,9 +1,9 @@
 from quart import Blueprint, current_app
 import platform
 
-from parsec.api.protocol import InvitationType, HumanHandle
-from parsec.api.data import UserProfile
-from parsec.core.local_device import save_device_with_password
+from parsec.api.protocol import InvitationType, HumanHandle, DeviceLabel
+from parsec.api.data import UserProfile, SASCode
+from parsec.core.local_device import save_device_with_password_in_config
 from parsec.core.invite import (
     UserClaimInitialCtx,
     DeviceClaimInitialCtx,
@@ -54,7 +54,7 @@ async def greeter_1_wait_peer_ready(core, apitoken):
     return (
         {
             "type": "user" if addr.invitation_type == InvitationType.USER else "device",
-            "greeter_sas": in_progress_ctx.greeter_sas,
+            "greeter_sas": in_progress_ctx.greeter_sas.str,
         },
         200,
     )
@@ -80,7 +80,7 @@ async def greeter_2_wait_peer_trust(core, apitoken):
             lifetime_ctx.update_in_progress_ctx(in_progress_ctx)
 
             candidate_claimer_sas = [
-                str(x) for x in in_progress_ctx.generate_claimer_sas_choices(size=4)
+                x.str for x in in_progress_ctx.generate_claimer_sas_choices(size=4)
             ]
 
     return {"candidate_claimer_sas": candidate_claimer_sas}, 200
@@ -97,6 +97,10 @@ async def greeter_3_check_trust(core, apitoken):
     async with check_data() as (data, bad_fields):
         claimer_sas = data.get("claimer_sas")
         if not isinstance(claimer_sas, str):
+            bad_fields.add("claimer_sas")
+        try:
+            claimer_sas = SASCode(claimer_sas)
+        except ValueError:
             bad_fields.add("claimer_sas")
 
     with backend_errors_to_api_exceptions():
@@ -202,7 +206,7 @@ async def claimer_1_wait_peer_ready(apitoken):
             in_progress_ctx = await in_progress_ctx.do_wait_peer()
             lifetime_ctx.update_in_progress_ctx(in_progress_ctx)
             candidate_greeter_sas = [
-                str(x) for x in in_progress_ctx.generate_greeter_sas_choices(size=4)
+                x.str for x in in_progress_ctx.generate_greeter_sas_choices(size=4)
             ]
 
     return {"candidate_greeter_sas": candidate_greeter_sas}, 200
@@ -219,6 +223,10 @@ async def claimer_2_check_trust(apitoken):
         greeter_sas = data.get("greeter_sas")
         if not isinstance(greeter_sas, str):
             bad_fields.add("greeter_sas")
+        try:
+            greeter_sas = SASCode(greeter_sas)
+        except ValueError:
+            bad_fields.add("greeter_sas")
 
     with backend_errors_to_api_exceptions():
         async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
@@ -233,9 +241,9 @@ async def claimer_2_check_trust(apitoken):
 
             in_progress_ctx = await in_progress_ctx.do_signify_trust()
             lifetime_ctx.update_in_progress_ctx(in_progress_ctx)
-            claimer_sas = str(in_progress_ctx.claimer_sas)
+            claimer_sas = in_progress_ctx.claimer_sas
 
-    return {"claimer_sas": claimer_sas}, 200
+    return {"claimer_sas": claimer_sas.str}, 200
 
 
 @invite_bp.route("/invitations/<string:apitoken>/claimer/3-wait-peer-trust", methods=["POST"])
@@ -267,6 +275,9 @@ async def claimer_4_finalize(apitoken):
         raise APIException(404, {"error": "unknown_token"})
 
     async with check_data() as (data, bad_fields):
+        # Note password is supposed to be base64 data, however we need a string
+        # to save the device. Hence we "cheat" by using the content without
+        # deserializing back from base64.
         password = data.get("key")
         if not isinstance(password, str):
             bad_fields.add("key")
@@ -275,7 +286,10 @@ async def claimer_4_finalize(apitoken):
         async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
 
-            requested_device_label = platform.node() or "-unknown-"
+            try:
+                requested_device_label = DeviceLabel(platform.node() or "-unknown-")
+            except ValueError:
+                requested_device_label = DeviceLabel("-unknown-")
             if isinstance(in_progress_ctx, UserClaimInProgress3Ctx):
                 new_device = await in_progress_ctx.do_claim_user(
                     requested_device_label=requested_device_label, requested_human_handle=None
@@ -289,7 +303,7 @@ async def claimer_4_finalize(apitoken):
             else:
                 raise APIException(409, {"error": "invalid_state"})
 
-            save_device_with_password(
+            save_device_with_password_in_config(
                 config_dir=current_app.config["CORE_CONFIG"].config_dir,
                 device=new_device,
                 password=password,

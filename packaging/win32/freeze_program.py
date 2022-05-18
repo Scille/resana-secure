@@ -1,5 +1,6 @@
 # Resana Secure (https://parsec.cloud) Copyright (c) 2021 Scille SAS
 
+import os
 import sys
 import shutil
 import argparse
@@ -18,6 +19,7 @@ TOOLS_VENV_DIR = BUILD_DIR / "tools_venv"
 WHEELS_DIR = BUILD_DIR / "wheels"
 
 PYTHON_VERSION = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+PYTHON_EXECUTABLE = sys.executable
 
 
 def get_archslug():
@@ -35,6 +37,8 @@ def run(cmd, **kwargs):
 def main(program_source):
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
 
+    print(f"### Detected Python version {PYTHON_VERSION} ###")
+
     # Retrieve program version
     global_dict = {}
     exec((program_source / "resana_secure/_version.py").read_text(), global_dict)
@@ -49,32 +53,27 @@ def main(program_source):
         assert sha256(data).hexdigest() == WINFSP_HASH
         winfsp_installer.write_bytes(data)
 
+    # It's complicated to control the virtualenv's path when using Poetry.
+    # Instead we manually create the virtualenv, install Poetry inside it, then
+    # use Poetry to install Parsec and dependencies
+
     # Bootstrap tools virtualenv
     if not TOOLS_VENV_DIR.is_dir():
         print("### Create tool virtualenv ###")
         run(f"python -m venv {TOOLS_VENV_DIR}")
-        run(f"{ TOOLS_VENV_DIR / 'Scripts/python' } -m pip install pip wheel setuptools --upgrade")
-
-    if not WHEELS_DIR.is_dir():
-        print("### Generate wheels from Resana Secure, Parsec and dependencies ###")
-        # Generate wheels for Resana Secure and it dependencies (including parsec).
-        # Also generate wheels for PyInstaller in the same command so that
-        # dependency resolution is done together with resana&parsec.
-        # Note we disable cache to avoid invalid reuse of existing wheel if
-        # we modify `subtree/parsec-cloud` but forget to update it version
-        run(
-            f"{ TOOLS_VENV_DIR / 'Scripts/python' } -m pip wheel --no-cache-dir --use-feature=in-tree-build --wheel-dir {WHEELS_DIR} {program_source.absolute()} pyinstaller"
-        )
+        run(f"{ TOOLS_VENV_DIR / 'Scripts/python' } -m pip install pip --upgrade")
+        run(f"{ TOOLS_VENV_DIR / 'Scripts/python' } -m pip install poetry --upgrade")
 
     # Bootstrap PyInstaller virtualenv
     pyinstaller_venv_dir = BUILD_DIR / "pyinstaller_venv"
     if not pyinstaller_venv_dir.is_dir():
-        print("### Installing wheels & PyInstaller in temporary virtualenv ###")
-        run(f"python -m venv {pyinstaller_venv_dir}")
-        run(f"{ pyinstaller_venv_dir / 'Scripts/python' } -m pip install pip --upgrade")
-        run(
-            f"{ pyinstaller_venv_dir / 'Scripts/python' } -m pip install --no-cache-dir --no-index --find-links {WHEELS_DIR} resana_secure pyinstaller"
-        )
+        print("### Installing Resana Secure, Parsec, dependencies & PyInstaller in temporary virtualenv ###")
+        run(f"{ PYTHON_EXECUTABLE } -m venv {pyinstaller_venv_dir}")
+    run(
+        f"{ TOOLS_VENV_DIR.absolute() / 'Scripts/python' } -m poetry install --no-dev --no-interaction",
+        cwd=program_source.absolute(),
+        env={**os.environ, "VIRTUAL_ENV": str(pyinstaller_venv_dir.absolute())}
+    )
 
     pyinstaller_build = BUILD_DIR / "pyinstaller_build"
     pyinstaller_dist = BUILD_DIR / "pyinstaller_dist"

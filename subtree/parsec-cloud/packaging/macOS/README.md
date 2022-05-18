@@ -39,10 +39,11 @@ You can also use the `-i` or `--install` option to directly install the applicat
 ### 3 - Sign the application
 
 ```shell
-$ codesign --deep -s <identity> --timestamp -v --entitlements entitlements.plist -o runtime dist/parsec.app
+$ codesign --deep --force -s <identity> --timestamp -v --entitlements entitlements.plist -o runtime dist/parsec.app
 ```
 
 `identity` being the signing certificate, to be downloaded with proper access here : https://developer.apple.com/account/resources/certificates/list
+From PyInstaller versions >=4.4, the bundle will already be signed. To avoid notarization issues with this signature, the `--force` option is used to override it.
 
 You can check the codesign using:
 ```shell
@@ -52,6 +53,8 @@ The next step can only be successful if this check is.
 
 
 ### 4 - Zip and Notarize the app
+
+A version of Xcode must be installed locally to use the following `xcrun altool` commands.
 
 Going through this process for the first time, an application-specific password has to be generated here:
 https://appleid.apple.com/account/manage
@@ -127,4 +130,4 @@ Drag and arrange the icons to match the background, then eject the Disk Image.
 
 The `.dmg` can now be compressed and set as read-only.
 
-Open `Disk Utility` again, then *Images > Convert*, select the `.dmg` and compress it with the name that will be used for distribution, in our case `Parsec.dmg`.
+Open `Disk Utility` again, then *Images > Convert*, select the `.dmg` and compress it with the name that will be used for distribution, in our case `parsec-{version}-macos-amd64.dmg`.

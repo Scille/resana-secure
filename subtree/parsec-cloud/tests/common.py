@@ -1,18 +1,20 @@
-# Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2019 Scille SAS
+# Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2016-2021 Scille SAS
 
-from parsec.core.core_events import CoreEvent
 from unittest.mock import Mock
 from inspect import iscoroutinefunction
-from contextlib import ExitStack, contextmanager
+from contextlib import ExitStack, contextmanager, asynccontextmanager
+import time
 
 import trio
 import attr
 import pendulum
 
+from parsec.core.core_events import CoreEvent
 from parsec.core.types import WorkspaceRole
 from parsec.core.logged_core import LoggedCore
 from parsec.core.fs import UserFS
 from parsec.api.transport import Transport, TransportError
+from parsec.core.types.local_device import LocalDevice, DeviceID
 
 
 def addr_with_device_subdomain(addr, device_id):
@@ -24,12 +26,147 @@ def addr_with_device_subdomain(addr, device_id):
     return type(addr).from_url(addr.to_url().replace(addr.hostname, device_specific_hostname, 1))
 
 
+@asynccontextmanager
+async def real_clock_fail_after(seconds: float):
+    # In tests we use a mock clock to make parsec code faster by not staying idle,
+    # however we might also want ensure some test code doesn't take too long.
+    # Hence using `trio.fail_after` in test code doesn't play nice with mock clock
+    # (especially given the CI can be unpredictably slow)...
+    # The solution is to have our own fail_after that use the real monotonic clock.
+
+    # Starting a thread can be very slow (looking at you, Windows) so better
+    # take the starting time here
+    start = time.monotonic()
+    event_occured = False
+    async with trio.open_nursery() as nursery:
+
+        def _run_until_timeout_or_event_occured():
+            while not event_occured and time.monotonic() - start < seconds:
+                # cancelling `_watchdog` coroutine doesn't stop the thread,
+                # so we sleep only by a short amount of time in order to
+                # detect early enough that we are no longer needed
+                time.sleep(0.01)
+
+        async def _watchdog():
+            await trio.to_thread.run_sync(_run_until_timeout_or_event_occured)
+            if not event_occured:
+                raise trio.TooSlowError()
+
+        # Note: We could have started the thread directly instead of using
+        # trio's thread support.
+        # This would allow us to use a non-async contextmanager to better mimic
+        # `trio.fail_after`, however this would prevent us from using trio's
+        # threadpool system which is good given it allows us to reuse the thread
+        # and hence avoid most of it cost
+        nursery.start_soon(_watchdog)
+        try:
+            yield
+        finally:
+            event_occured = True
+        nursery.cancel_scope.cancel()
+
+
+__freeze_time_dict = {}
+
+
+def _timestamp_mockup(device):
+    _, time = __freeze_time_dict.get(device.device_id, (None, None))
+    return time if time is not None else pendulum.now()
+
+
 @contextmanager
-def freeze_time(time):
+def freeze_device_time(device, current_time):
+    # Parse time
+    if isinstance(current_time, str):
+        current_time = pendulum.parse(current_time)
+
+    # Get device id
+    if isinstance(device, LocalDevice):
+        device_id = device.device_id
+    elif isinstance(device, DeviceID):
+        device_id = device
+    else:
+        assert False, device
+
+    # Apply mockup (idempotent)
+    type(device).timestamp = _timestamp_mockup
+
+    # Save previous context
+    previous_task, previous_time = __freeze_time_dict.get(device_id, (None, None))
+
+    # Get current trio task
+    try:
+        current_task = trio.lowlevel.current_task()
+    except RuntimeError:
+        current_task = None
+
+    # Ensure time has not been frozen from another coroutine
+    assert previous_task in (None, current_task)
+
+    try:
+        # Set new context
+        __freeze_time_dict[device_id] = (current_task, current_time)
+        yield current_time
+    finally:
+        # Restore previous context
+        __freeze_time_dict[device_id] = (previous_task, previous_time)
+
+
+__freeze_time_task = None
+
+
+@contextmanager
+def freeze_time(time=None, device=None):
+    # Get current time if not provided
+    if time is None:
+        time = pendulum.now()
+
+    # Freeze a single device
+    if device is not None:
+        with freeze_device_time(device, time) as time:
+            yield time
+        return
+
+    # Parse time
+    global __freeze_time_task
     if isinstance(time, str):
         time = pendulum.parse(time)
-    with pendulum.test(time):
+
+    # Save previous context
+    previous_task = __freeze_time_task
+    previous_time = pendulum.get_test_now()
+
+    # Get current trio task
+    try:
+        current_task = trio.lowlevel.current_task()
+    except RuntimeError:
+        current_task = None
+
+    # Ensure time has not been frozen from another coroutine
+    assert previous_task in (None, current_task)
+
+    try:
+        # Set new context
+        __freeze_time_task = current_task
+        pendulum.set_test_now(time)
+        try:
+            from libparsec.types import freeze_time as _Rs_freeze_time
+        except ImportError:
+            pass
+        else:
+            _Rs_freeze_time(time)
+
         yield time
+    finally:
+        # Restore previous context
+        __freeze_time_task = previous_task
+        pendulum.set_test_now(previous_time)
+        try:
+            from libparsec.types import freeze_time as _Rs_freeze_time
+        except ImportError:
+            pass
+        else:
+            _Rs_freeze_time(previous_time)
 
 
 class AsyncMock(Mock):
@@ -183,7 +320,7 @@ async def create_shared_workspace(name, creator, *shared_with):
             if not recipient_core:
                 await recipient_user_fs.process_last_messages()
 
-        with trio.fail_after(1):
+        async with real_clock_fail_after(1):
             if creator_spy:
                 await creator_spy.wait_multiple(
                     [CoreEvent.FS_WORKSPACE_CREATED, CoreEvent.BACKEND_REALM_ROLES_UPDATED]
@@ -229,24 +366,36 @@ def compare_fs_dumps(entry_1, entry_2):
 
 _FIXTURES_CUSTOMIZATIONS = {
     "alice_profile",
+    "alice_initial_local_user_manifest",
+    "alice2_initial_local_user_manifest",
+    "alice_initial_remote_user_manifest",
     "alice_has_human_handle",
     "alice_has_device_label",
     "bob_profile",
+    "bob_initial_local_user_manifest",
+    "bob_initial_remote_user_manifest",
     "bob_has_human_handle",
     "bob_has_device_label",
     "adam_profile",
+    "adam_initial_local_user_manifest",
+    "adam_initial_remote_user_manifest",
     "adam_has_human_handle",
     "adam_has_device_label",
     "mallory_profile",
+    "mallory_initial_local_user_manifest",
     "mallory_has_human_handle",
     "mallory_has_device_label",
     "backend_not_populated",
     "backend_has_webhook",
+    "backend_force_mocked",
     "backend_over_ssl",
     "backend_forward_proto_enforce_https",
     "backend_spontaneous_organization_boostrap",
     "logged_gui_as_admin",
     "fake_preferred_org_creation_backend_addr",
+    "blockstore_mode",
+    "real_data_storage",
+    "gui_language",
 }
 
 

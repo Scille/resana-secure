@@ -1,13 +1,16 @@
-# Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2019 Scille SAS
+# Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2016-2021 Scille SAS
 
 from enum import Enum
-
+from typing import TYPE_CHECKING
+from parsec.types import UUID4
 from parsec.serde import fields
 from parsec.api.protocol.base import BaseReqSchema, BaseRepSchema, CmdSerializer
 from parsec.api.protocol.types import UserIDField, DeviceIDField
 
 
 __all__ = (
+    "RealmID",
+    "RealmIDField",
     "RealmRole",
     "RealmRoleField",
     "MaintenanceType",
@@ -20,6 +23,20 @@ __all__ = (
     "realm_start_reencryption_maintenance_serializer",
     "realm_finish_reencryption_maintenance_serializer",
 )
+
+
+class RealmID(UUID4):
+    __slots__ = ()
+
+
+_PyRealmID = RealmID
+if not TYPE_CHECKING:
+    try:
+        from libparsec.types import RealmID as _RsRealmID
+    except:
+        pass
+    else:
+        RealmID = _RsRealmID
 
 
 class MaintenanceType(Enum):
@@ -36,6 +53,7 @@ class RealmRole(Enum):
 
 RealmRoleField = fields.enum_field_factory(RealmRole)
 MaintenanceTypeField = fields.enum_field_factory(MaintenanceType)
+RealmIDField = fields.uuid_based_field_factory(RealmID)
 
 
 class RealmCreateReqSchema(BaseReqSchema):
@@ -50,12 +68,12 @@ realm_create_serializer = CmdSerializer(RealmCreateReqSchema, RealmCreateRepSche
 
 
 class RealmStatusReqSchema(BaseReqSchema):
-    realm_id = fields.UUID(required=True)
+    realm_id = RealmIDField(required=True)
 
 
 class RealmStatusRepSchema(BaseRepSchema):
     in_maintenance = fields.Boolean(required=True)
-    maintenance_type = MaintenanceTypeField(allow_none=True)
+    maintenance_type = MaintenanceTypeField(required=True, allow_none=True)
     maintenance_started_on = fields.DateTime(required=True, allow_none=True)
     maintenance_started_by = DeviceIDField(required=True, allow_none=True)
     encryption_revision = fields.Integer(required=True)
@@ -65,7 +83,7 @@ realm_status_serializer = CmdSerializer(RealmStatusReqSchema, RealmStatusRepSche
 
 
 class RealmStatsReqSchema(BaseReqSchema):
-    realm_id = fields.UUID(required=True)
+    realm_id = RealmIDField(required=True)
 
 
 class RealmStatsRepSchema(BaseRepSchema):
@@ -77,8 +95,7 @@ realm_stats_serializer = CmdSerializer(RealmStatsReqSchema, RealmStatsRepSchema)
 
 
 class RealmGetRoleCertificatesReqSchema(BaseReqSchema):
-    realm_id = fields.UUID(required=True)
-    since = fields.DateTime(missing=None)
+    realm_id = RealmIDField(required=True)
 
 
 class RealmGetRoleCertificatesRepSchema(BaseRepSchema):
@@ -103,7 +120,7 @@ realm_update_roles_serializer = CmdSerializer(RealmUpdateRolesReqSchema, RealmUp
 
 
 class RealmStartReencryptionMaintenanceReqSchema(BaseReqSchema):
-    realm_id = fields.UUID(required=True)
+    realm_id = RealmIDField(required=True)
     encryption_revision = fields.Integer(required=True)
     timestamp = fields.DateTime(required=True)
     per_participant_message = fields.Map(UserIDField(), fields.Bytes(required=True), required=True)
@@ -119,7 +136,7 @@ realm_start_reencryption_maintenance_serializer = CmdSerializer(
 
 
 class RealmFinishReencryptionMaintenanceReqSchema(BaseReqSchema):
-    realm_id = fields.UUID(required=True)
+    realm_id = RealmIDField(required=True)
     encryption_revision = fields.Integer(required=True)
 
 
