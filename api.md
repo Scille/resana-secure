@@ -1167,3 +1167,54 @@ ou
 ou
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
 **************/
+
+
+Récupération d'appareil
+=======================
+
+`POST /recovery/export`
+-----------------------
+
+Créé un appareil de récupération à partir d'un workspace donné.
+
+Request:
+```
+{
+}
+```
+
+Response:
+```
+HTTP 200
+{
+    "file_content": <bytes>,
+    "file_name": <string>,
+    "passphrase": <string>
+}
+```
+
+`POST /recovery/import`
+-----------------------
+
+Créé un workspace à partir d'un appareil de récupération généré préalablement.
+
+Request:
+```
+{
+    "recovery_device_file_content": <string>
+    "recovery_device_passphrase": <string>
+    "new_device_key": <string>
+}
+```
+
+Response:
+```
+HTTP 200
+{
+}
+```
+ou
+HTTP 400
+{
+    "error": "invalid_passphrase"
+}
