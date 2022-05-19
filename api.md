@@ -1175,7 +1175,10 @@ Récupération d'appareil
 `POST /recovery/export`
 -----------------------
 
-Créé un appareil de récupération à partir d'un workspace donné.
+Créé un fichier de récupération pour le device authentifié.
+Ce fichier de récupération sert à créer de nouveaux devices pour l'utilateur, cela permet
+notamment de récupérer son compte en cas de perte de son ordinateur ou bien d'oublie
+de mot de passe.
 
 Request:
 ```
@@ -1187,16 +1190,21 @@ Response:
 ```
 HTTP 200
 {
-    "file_content": <bytes>,
+    "file_content": <base64>,
     "file_name": <string>,
     "passphrase": <string>
 }
 ```
 
+Le fichier doit être téléchargée par l'utilisateur et stockée dans un endroit limitant
+les risques de pertes.
+La passphrase doit être affiché à l'utilisateur et celui-ci doit être invité à stocker
+la passphrase dans un endroit sûr et non accessible par un tier.
+
 `POST /recovery/import`
 -----------------------
 
-Créé un workspace à partir d'un appareil de récupération généré préalablement.
+Créé un nouveau device à partir du fichier de récupération généré préalablement.
 
 Request:
 ```
