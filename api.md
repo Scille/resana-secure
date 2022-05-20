@@ -93,7 +93,7 @@ Authorization: Bearer <token>
 `DELETE /auth`
 --------------
 
-Met fin à l'authentification auprès du client Parsec et invalide the token d'authentification.
+Met fin à l'authentification auprès du client Parsec et invalide le token d'authentification.
 
 Response:
 ```
@@ -107,7 +107,7 @@ Set-Cookie: session=; Expires=Thu, 01-Jan-1970 00:00:00 GMT; Max-Age=0; Path=/
 `DELETE /auth`
 --------------
 
-Met fin à l'authentification auprès du client Parsec et invalide the token d'authentification.
+Met fin à l'authentification auprès du client Parsec et invalide le token d'authentification.
 
 Response:
 ```
@@ -125,8 +125,8 @@ Utilisateurs & invitations
 `GET /humans?q=<query>&page=<int>&per_page=<int>&omit_revoked=<bool>`
 ------------
 
-`query` est recherchée contre les champs human_handle.email et human_handle.label, les match partiel sont acceptés.
-(par example, `query=john` va matcher contre `email:john.doe@example.com` et contre `Bob Johnson`)
+`query` est recherchée contre les champs human_handle.email et human_handle.label, les matchs partiels sont acceptés.
+(par exemple, `query=john` va matcher contre `email:john.doe@example.com` et contre `Bob Johnson`)
 
 Response:
 ```
@@ -150,7 +150,7 @@ HTTP 200
 ```
 ou
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 `profile` peut être: `ADMIN` ou `STANDARD`
 **************/
@@ -174,13 +174,13 @@ ou
 - HTTP 404 si email inconnu
 - HTTP 403 si l'utilisateur actuel n'a pas le profil administrateur sur l'organisation Parsec
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 
 `GET /invitations`
 ------------------
 
-Récupère la list des invitations en cours.
+Récupère la liste des invitations en cours.
 
 Response:
 ```
@@ -204,7 +204,7 @@ HTTP 200
 ```
 ou
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 `status` peut être: `IDLE` ou `READY`
 Notes:
@@ -217,7 +217,7 @@ avec pour intention de procéder à l'enrôlement.
 `POST /invitations`
 -------------------
 
-Créer une nouvelle invitation.
+Créé une nouvelle invitation.
 
 Request:
 ```
@@ -252,7 +252,7 @@ HTTP 400
 ou
 - HTTP 403 si l'utilisateur actuel n'a pas le profil administrateur sur l'organisation Parsec et tente d'inviter un autre utilisateur.
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 La création d'invitation est idempotent (si une invitation existe déjà, elle ne sera pas recréée et le token existant sera retourné).
 
@@ -286,7 +286,7 @@ HTTP 400
 ou
 - HTTP 404 si le token n'existe pas
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 
 Enrôlement (greeter)
@@ -295,7 +295,7 @@ Enrôlement (greeter)
 `POST /invitations/<token>/greeter/1-wait-peer-ready`
 -------------------------------------------------------
 
-Démarre la phase d'enrôlement et attend que le pair à enrôler ait rejoins le serveur Parsec.
+Démarre la phase d'enrôlement et attend que le pair à enrôler ait rejoint le serveur Parsec.
 
 Request:
 ```
@@ -322,7 +322,7 @@ ou
 - HTTP 403 si l'utilisateur n'a pas le profil `ADMIN` et tente d'inviter un nouvel utilisateur
 - HTTP 404 si le token est inconnu
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 `type` est `DEVICE` ou `USER`
 `greeter_sas` est le code de 4 caractère à transmettre par un canal tiers au pair.
@@ -351,7 +351,7 @@ ou
 - HTTP 404 si le token est inconnu
 - HTTP 409 si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 `candidate_claimer_sas` est une liste de quatre codes dont un seul correspond
 au code SAS du pair. L'utilisateur est donc obligé de se concerter avec le pair
@@ -382,7 +382,7 @@ ou
 - HTTP 400 si claimer_sas n'est pas le bon
 - HTTP 409 si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 
 `POST /invitations/<token>/greeter/4-finalize`
@@ -417,7 +417,7 @@ ou
 - HTTP 404 si le token est inconnu
 - HTTP 409 si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 
 Enrôlement (claimer)
@@ -427,7 +427,7 @@ Enrôlement (claimer)
 `POST /invitations/<token>/claimer/0-retreive-info`
 -------------------------------------------------------
 
-Démarre la phase d'enrôlement et récupères des informations de base sur l'invitation.
+Démarre la phase d'enrôlement et récupère des informations de base sur l'invitation.
 
 Request:
 ```
@@ -447,7 +447,7 @@ HTTP 200
 ou
 - HTTP 404 si le token est inconnu
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 `type` est `DEVICE` ou `USER`
 `candidate_greeter_sas` est une liste de quatre codes dont un seul correspond
@@ -458,7 +458,7 @@ pour déterminer lequel est le bon.
 `POST /invitations/<token>/claimer/1-wait-peer-ready`
 -------------------------------------------------------
 
-Attend que le pair qui enrôle ait rejoins le serveur Parsec.
+Attend que le pair qui enrôle ait rejoint le serveur Parsec.
 
 Request:
 ```
@@ -477,7 +477,7 @@ HTTP 200
 ou
 - HTTP 404 si le token est inconnu
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 `type` est `DEVICE` ou `USER`
 `candidate_greeter_sas` est une liste de quatre codes dont un seul correspond
@@ -510,7 +510,7 @@ ou
 - HTTP 400 si greeter_sas n'est pas le bon
 - HTTP 409 si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 `greeter_sas` est le code de 4 caractère à transmettre par un canal tiers au pair.
 
@@ -536,7 +536,7 @@ ou
 - HTTP 404 si le token est inconnu
 - HTTP 409 si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 
 `POST /invitations/<token>/claimer/4-finalize`
@@ -561,7 +561,7 @@ ou
 - HTTP 404 si le token est inconnu
 - HTTP 409 si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 `key` est utilisé pour chiffrer le fichier de clé de Device résultant de l'opération d'enrôlement.
 
@@ -573,7 +573,7 @@ Workspace
 `GET /workspaces`
 -----------------
 
-Récupère la list des workspaces.
+Récupère la liste des workspaces.
 
 Response:
 ```
@@ -644,7 +644,7 @@ Note: le renommage d'un workspace n'impacte que l'utilisateur réalisant ce reno
 `GET /workspace/<id>/share`
 ----------------------------
 
-Récupère le informations de partage d'un workspace.
+Récupère les informations de partage d'un workspace.
 
 Response:
 ```
@@ -658,13 +658,13 @@ HTTP 200
 ou
 - HTTP 404: le workspace n'existe pas
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refusé sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 
 `PATCH /workspace/<id>/share`
 -----------------------------
 
-Partager un workspace.
+Partage un workspace.
 
 Request:
 ```
@@ -738,13 +738,13 @@ HTTP 404
 }
 ```
 ou
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accèder n'est pas dans le cache local)
+- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 
 `POST /workspace/<id>/folders`
 ------------------------------
 
-Créer un nouveau répertoire.
+Créé un nouveau répertoire.
 
 Request:
 ```
@@ -776,13 +776,13 @@ HTTP 404
 }
 ```
 ou
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accèder n'est pas dans le cache local)
+- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 
 `POST /workspace/<id>/folders/rename`
 -----------------------------
 
-Déplacer/renommer un repertoire.
+Déplace/renomme un repertoire.
 
 Request:
 ```
@@ -843,13 +843,13 @@ HTTP 404
 ```
 ou
 - HTTP 403 si l'utilisateur n'a pas le profil `OWNER`/`MANAGER`/`CONTRIBUTER` sur le workspace
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accèder n'est pas dans le cache local)
+- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 
 `DELETE /workspace/<id>/folders/<id>`
 -----------------------------------
 
-Supprimer un répertoire.
+Supprime un répertoire.
 
 Request:
 ```
@@ -899,7 +899,7 @@ HTTP 404
 }
 ```
 ou
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accèder n'est pas dans le cache local)
+- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 
 Fichiers
@@ -909,7 +909,7 @@ Fichiers
 `GET /workspace/<id>/files/<folder_id>`
 ----------------------------------
 
-Consulter l'arborescence des fichiers d'un workspace.
+Consulte l'arborescence des fichiers d'un workspace.
 
 Response:
 ```
@@ -943,13 +943,13 @@ HTTP 404
 }
 ```
 ou
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accèder n'est pas dans le cache local)
+- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 
 `POST /workspace/<id>/files`
 ----------------------------
 
-Créer un nouveau fichier.
+Créé un nouveau fichier.
 
 Request:
 ```
@@ -982,13 +982,13 @@ HTTP 404
 }
 ```
 ou
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accèder n'est pas dans le cache local)
+- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 
 `POST /workspace/<id>/files/rename`
 -----------------------------
 
-Déplacer/renommer un fichier
+Déplace/renomme un fichier
 
 Request:
 ```
@@ -1027,13 +1027,13 @@ HTTP 404
 }
 ```
 ou
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accèder n'est pas dans le cache local)
+- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 
 `DELETE /workspace/<id>/files/<id>`
 -----------------------------------
 
-Supprimer un fichier.
+Supprime un fichier.
 
 Request:
 ```
@@ -1062,13 +1062,13 @@ HTTP 404
 }
 ```
 ou
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accèder n'est pas dans le cache local)
+- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 
 `POST /workspace/<id>/open/<id>`
 --------------------------------
 
-Ouvrir un fichier/répertoire.
+Ouvre un fichier/répertoire.
 
 Request:
 ```
@@ -1176,8 +1176,8 @@ Récupération d'appareil
 -----------------------
 
 Créé un fichier de récupération pour le device authentifié.
-Ce fichier de récupération sert à créer de nouveaux devices pour l'utilateur, cela permet
-notamment de récupérer son compte en cas de perte de son ordinateur ou bien d'oublie
+Ce fichier de récupération sert à créer de nouveaux devices pour l'utilisateur, cela permet
+notamment de récupérer son compte en cas de perte de son ordinateur ou bien d'oubli
 de mot de passe.
 
 Request:
@@ -1196,10 +1196,10 @@ HTTP 200
 }
 ```
 
-Le fichier doit être téléchargée par l'utilisateur et stockée dans un endroit limitant
+Le fichier doit être téléchargé par l'utilisateur et stocké dans un endroit limitant
 les risques de pertes.
-La passphrase doit être affiché à l'utilisateur et celui-ci doit être invité à stocker
-la passphrase dans un endroit sûr et non accessible par un tier.
+La passphrase doit être affichée à l'utilisateur et celui-ci doit être invité à stocker
+la passphrase dans un endroit sûr et non accessible par un tiers.
 
 `POST /recovery/import`
 -----------------------
@@ -1222,8 +1222,9 @@ HTTP 200
 }
 ```
 ou
+```
 HTTP 400
 {
     "error": "invalid_passphrase"
 }
-
+```
