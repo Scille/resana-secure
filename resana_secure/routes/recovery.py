@@ -24,9 +24,11 @@ async def export_device(core):
         bad_fields |= data.keys()  # No fields allowed
 
     with tempfile.NamedTemporaryFile(suffix=".psrk") as fp:
+        path = Path(fp.name)
+        # On Windows, can't open on the same temporary file twice
+        fp.close()
         passphrase = await save_recovery_device(Path(fp.name), core.device, True)
-        fp.seek(0)
-        raw = fp.read()
+        raw = path.read_bytes()
 
     file_name = get_recovery_device_file_name(core.device).replace("parsec-", "resana-secure-", 1)
 
@@ -60,6 +62,8 @@ async def import_device():
 
     with tempfile.NamedTemporaryFile(suffix=".psrk") as fp:
         path = Path(fp.name)
+        # On Windows, can't open on the same temporary file twice
+        fp.close()
         path.write_bytes(file_content)
         try:
             new_device = await load_recovery_device(path, passphrase)
