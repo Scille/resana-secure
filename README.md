@@ -20,6 +20,7 @@ To update the Parsec subtree to a new version:
 
     # 1) Modify version in renasa_secure/_version.py
     # 2) Modify version in pyproject.toml
+    # 3) git commit -a -m "Bump version $VERSION"
 
     pushd packaging/win32
     # Ensure we are building from scratch !
