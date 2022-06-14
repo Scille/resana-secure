@@ -121,8 +121,7 @@ Set-Cookie: session=; Expires=Thu, 01-Jan-1970 00:00:00 GMT; Max-Age=0; Path=/
 Utilisateurs & invitations
 ==========================
 
-/**************
-`GET /humans?q=<query>&page=<int>&per_page=<int>&omit_revoked=<bool>`
+[NOT IMPLEMENTED] `GET /humans?q=<query>&page=<int>&per_page=<int>&omit_revoked=<bool>`
 ------------
 
 `query` est recherchée contre les champs human_handle.email et human_handle.label, les matchs partiels sont acceptés.
@@ -153,7 +152,6 @@ ou
 - HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 `profile` peut être: `ADMIN` ou `STANDARD`
-**************/
 
 `POST /humans/<email>/revoke`
 -----------------------------
@@ -1100,8 +1098,7 @@ ou
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
 
 
-/**************
-`GET /workspace/<id>/reencryption`
+[NOT IMPLEMENTED] `GET /workspace/<id>/reencryption`
 ----------------------------------
 
 Récupère les information de rechiffrement du workspace.
@@ -1138,7 +1135,7 @@ ou
 `reencryption_already_in_progress` le rechiffrement est déjà en cours
 
 
-`POST /workspace/<id>/reencryption`
+[NOT IMPLEMENTED] `POST /workspace/<id>/reencryption`
 ----------------------------------------
 
 Lance le rechiffrement du workspace.
@@ -1166,7 +1163,6 @@ ou
 - HTTP 403 si l'utilisateur n'a pas le profil `OWNER` sur le workspace
 ou
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-**************/
 
 
 Récupération d'appareil
