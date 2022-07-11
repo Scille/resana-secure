@@ -1,0 +1,82 @@
+name: CI build
+on:
+  push:
+    branches:
+    - master
+  pull_request:
+    branches:
+    - master
+
+
+# Global Settings
+env:
+  PYTHON_VERSION: "3.9"
+
+
+jobs:
+
+
+#################################################################################
+
+
+  linux-build:
+    name: '🐧 Linux build'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Checkout'
+        uses: actions/checkout@f1d3225b5376a0791fdee5a0e8eac5289355e43a  # pin@v2
+        with:
+            submodules: true
+      - name: 'Set up Python'
+        uses: actions/setup-python@0291cefc54fa79cd1986aee8fa5ecb89ad4defea  # pin@v2
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: 'Setup env'
+        run: |
+          set -eux
+          python --version
+          python -m pip install --user pipx
+          pipx install poetry
+          poetry --version
+      - name: 'Install project'
+        run: |
+          set -eux
+          poetry install
+      - name: 'Run tests'
+        run: |
+          set -eux
+          py.test tests
+
+
+#################################################################################
+
+
+  windows-build:
+    name: '🏁 Windows build'
+    runs-on: windows-latest
+    steps:
+      - name: 'Checkout'
+        uses: actions/checkout@f1d3225b5376a0791fdee5a0e8eac5289355e43a  # pin@v2
+        with:
+            submodules: true
+      - name: 'Set up Python'
+        uses: actions/setup-python@0291cefc54fa79cd1986aee8fa5ecb89ad4defea  # pin@v2
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: 'Setup env'
+        shell: bash
+        run: |
+          set -eux
+          python --version
+          python -m pip install --user pipx
+          pipx install poetry
+          poetry --version
+      - name: 'Install project'
+        run: |
+          set -eux
+          poetry install
+      - name: 'Run tests'
+        shell: bash
+        run: |
+          set -eux
+          py.test tests
