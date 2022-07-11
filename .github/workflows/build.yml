@@ -45,7 +45,7 @@ jobs:
       - name: 'Run tests'
         run: |
           set -eux
-          py.test tests
+          poetry run py.test tests
 
 
 #################################################################################
@@ -72,6 +72,7 @@ jobs:
           pipx install poetry
           poetry --version
       - name: 'Install project'
+        shell: bash
         run: |
           set -eux
           poetry install
@@ -79,4 +80,4 @@ jobs:
         shell: bash
         run: |
           set -eux
-          py.test tests
+          poetry run py.test tests
