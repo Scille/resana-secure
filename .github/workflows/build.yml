@@ -11,7 +11,7 @@ on:
 # Global Settings
 env:
   PYTHON_VERSION: "3.9"
-
+  WINFSP_VERSION: "1.8.20304"
 
 jobs:
 
@@ -71,6 +71,11 @@ jobs:
           python -m pip install --user pipx
           pipx install poetry
           poetry --version
+      - name: 'Install WinFSP'
+        shell: bash
+        run: |
+          set -eux
+          choco install -y --limit-output winfsp --version=${{ env.WINFSP_VERSION }}
       - name: 'Install project'
         shell: bash
         run: |
