@@ -24,11 +24,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 'Checkout'
-        uses: actions/checkout@f1d3225b5376a0791fdee5a0e8eac5289355e43a  # pin@v2
+        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # pin@v3.0.2
         with:
             submodules: true
       - name: 'Set up Python'
-        uses: actions/setup-python@0291cefc54fa79cd1986aee8fa5ecb89ad4defea  # pin@v2
+        uses: actions/setup-python@d09bd5e6005b175076f227b13d9730d56e9dcfcb  # pin@v4.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: 'Setup env'
@@ -56,11 +56,11 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: 'Checkout'
-        uses: actions/checkout@f1d3225b5376a0791fdee5a0e8eac5289355e43a  # pin@v2
+        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # pin@v3.0.2
         with:
             submodules: true
       - name: 'Set up Python'
-        uses: actions/setup-python@0291cefc54fa79cd1986aee8fa5ecb89ad4defea  # pin@v2
+        uses: actions/setup-python@d09bd5e6005b175076f227b13d9730d56e9dcfcb  # pin@v4.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: 'Setup env'
@@ -86,3 +86,31 @@ jobs:
         run: |
           set -eux
           poetry run py.test tests
+
+
+#################################################################################
+
+
+  windows-packing:
+    name: '🏁 Windows packaging'
+    runs-on: windows-latest
+    steps:
+      - name: 'Checkout'
+        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # pin@v3.0.2
+        with:
+            submodules: true
+      - name: 'Set up Python'
+        uses: actions/setup-python@d09bd5e6005b175076f227b13d9730d56e9dcfcb  # pin@v4.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Freeze Parsec
+        run: python freeze_program.py ../..
+        working-directory: packaging/win32/
+      - name: Generate installer
+        run: python make_installer.py --sign-mode none
+        working-directory: packaging/win32/
+      - name: 'Upload installer as artifact'
+        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # pin v3.1.0
+        with:
+          name: ${{ runner.os }}-${{ runner.arch }}-installer
+          path: packaging/win32/build/resana*-setup.exe
