@@ -14,10 +14,6 @@ SIGNATURE_DESCRIPTION = f"Resana Secure by {SIGNATURE_AUTHOR}"
 BASE_DIR = Path(__name__).resolve().parent
 
 BUILD_DIR = Path("build").resolve()
-if not which("makensis"):
-    raise RuntimeError("makensis command not in PATH !")
-if not which("signtool"):
-    raise RuntimeError("signtool command not in PATH !")
 
 
 def run(cmd, **kwargs):
@@ -45,14 +41,18 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
+    assert which("makensis"), "makensis command not in PATH !"
+
     if args.sign_mode == "none":
         print("### Building installer ###")
         run(f"makensis { BASE_DIR / 'installer.nsi' }")
         print("/!\\ Installer generated with no signature /!\\")
-        installer, = BUILD_DIR.glob("resana_secure-*-setup.exe")
+        (installer,) = BUILD_DIR.glob("resana_secure-*-setup.exe")
         print(f"{installer} is ready")
 
     else:
+        assert which("signtool"), "signtool command not in PATH !"
+
         build_manifest = (BUILD_DIR / "manifest.ini").read_text()
         match = re.match(r"^target = \"(.*)\"$", build_manifest, re.MULTILINE)
         if not match:
@@ -78,6 +78,6 @@ if __name__ == "__main__":
         run(f"makensis { BASE_DIR / 'installer.nsi' }")
         # Sign installer
         print("### Signing installer ###")
-        installer, = BUILD_DIR.glob("resana_secure-*-setup.exe")
+        (installer,) = BUILD_DIR.glob("resana_secure-*-setup.exe")
         sign(installer)
         print(f"{installer} is ready")
