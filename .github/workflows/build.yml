@@ -105,12 +105,14 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Freeze Parsec
         run: python freeze_program.py ../..
-        working-directory: packaging/win32/
-      - name: Generate installer
-        run: python make_installer.py --sign-mode none
-        working-directory: packaging/win32/
+        working-directory: packaging/windows/
       - name: 'Upload installer as artifact'
         uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # pin v3.1.0
         with:
-          name: ${{ runner.os }}-${{ runner.arch }}-installer
-          path: packaging/win32/build/resana*-setup.exe
+          name: ${{ runner.os }}-${{ runner.arch }}-installer-content
+          path: |
+            packaging/windows/build/manifest.ini
+            packaging/windows/build/install_files.nsh
+            packaging/windows/build/uninstall_files.nsh
+            packaging/windows/build/resana_secure-*/
+            packaging/windows/build/winfsp-*
