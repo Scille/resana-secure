@@ -67,12 +67,14 @@ def main(program_source):
     # Bootstrap PyInstaller virtualenv
     pyinstaller_venv_dir = BUILD_DIR / "pyinstaller_venv"
     if not pyinstaller_venv_dir.is_dir():
-        print("### Installing Resana Secure, Parsec, dependencies & PyInstaller in temporary virtualenv ###")
+        print(
+            "### Installing Resana Secure, Parsec, dependencies & PyInstaller in temporary virtualenv ###"
+        )
         run(f"{ PYTHON_EXECUTABLE } -m venv {pyinstaller_venv_dir}")
     run(
         f"{ TOOLS_VENV_DIR.absolute() / 'Scripts/python' } -m poetry install --no-dev --no-interaction",
         cwd=program_source.absolute(),
-        env={**os.environ, "VIRTUAL_ENV": str(pyinstaller_venv_dir.absolute())}
+        env={**os.environ, "VIRTUAL_ENV": str(pyinstaller_venv_dir.absolute())},
     )
 
     pyinstaller_build = BUILD_DIR / "pyinstaller_build"
