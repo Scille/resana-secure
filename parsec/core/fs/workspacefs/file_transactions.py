@@ -2,18 +2,16 @@
 
 from parsec.core.core_events import CoreEvent
 from typing import Tuple, List, Callable, Dict, Optional, cast, AsyncIterator
-
 from collections import defaultdict
-from async_generator import asynccontextmanager
+from contextlib import asynccontextmanager
 
 from parsec.event_bus import EventBus
+from parsec.api.data import BlockAccess
 from parsec.api.protocol import DeviceID
 from parsec.core.types import FileDescriptor, EntryID, LocalDevice
-
 from parsec.core.fs.remote_loader import RemoteLoader
 from parsec.core.fs.storage import BaseWorkspaceStorage
 from parsec.core.fs.exceptions import FSLocalMissError, FSInvalidFileDescriptor, FSEndOfFileError
-
 from parsec.core.types import (
     Chunk,
     WorkspaceEntry,
@@ -28,7 +26,6 @@ from parsec.core.fs.workspacefs.file_operations import (
     prepare_resize,
     prepare_reshape,
 )
-from parsec.api.data import BlockAccess
 
 
 __all__ = ("FSInvalidFileDescriptor", "FileTransactions")
@@ -334,7 +331,7 @@ class FileTransactions:
         missing = []
 
         # Perform operations
-        for source, destination, update, removed_ids in prepare_reshape(manifest):
+        for block, source, destination, write_back, removed_ids in prepare_reshape(manifest):
 
             # Build data block
             data, extra_missing = await self._build_data(source)
@@ -346,11 +343,11 @@ class FileTransactions:
 
             # Write data if necessary
             new_chunk = destination.evolve_as_block(data)
-            if source != (destination,):
+            if write_back:
                 await self._write_chunk(new_chunk, data)
 
             # Craft the new manifest
-            manifest = update(manifest, new_chunk)
+            manifest = manifest.evolve_single_block(block, new_chunk)
 
             # Set the new manifest, acting as a checkpoint
             await self.local_storage.set_manifest(

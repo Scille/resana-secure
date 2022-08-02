@@ -1,6 +1,7 @@
 # Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2016-2021 Scille SAS
+
 from typing import Tuple, cast, Optional, AsyncIterator, Dict, List, NamedTuple
-from async_generator import asynccontextmanager
+from contextlib import asynccontextmanager
 
 from parsec.api.data import BlockAccess
 from parsec.core.types import (
@@ -13,8 +14,6 @@ from parsec.core.types import (
     FileDescriptor,
     LocalFolderishManifests,
 )
-
-
 from parsec.core.core_events import CoreEvent
 from parsec.core.fs.path import FsPath
 from parsec.core.fs.workspacefs.file_transactions import FileTransactions
@@ -215,11 +214,9 @@ class EntryTransactions(FileTransactions):
 
         # To avoid concurrency problems block storage is called first
         local_and_remote_block_ids = set(
-            await self.local_storage.block_storage.get_local_chunk_ids(list(block_ids))
+            await self.local_storage.get_local_block_ids(list(block_ids))
         )
-        local_only_block_ids = set(
-            await self.local_storage.chunk_storage.get_local_chunk_ids(list(block_ids))
-        )
+        local_only_block_ids = set(await self.local_storage.get_local_chunk_ids(list(block_ids)))
         remote_only_block_ids = block_ids - local_and_remote_block_ids - local_only_block_ids
 
         local_only_blocks = [block_dict[block_id].access for block_id in local_only_block_ids]

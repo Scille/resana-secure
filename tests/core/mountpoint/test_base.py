@@ -23,7 +23,7 @@ from parsec.core import logged_core_factory
 from parsec.core.types import WorkspaceRole
 from parsec.core.fs import FsPath
 
-from tests.common import create_shared_workspace
+from tests.common import create_shared_workspace, real_clock_timeout
 
 
 # Helper
@@ -84,9 +84,6 @@ async def test_base_mountpoint_not_created(base_mountpoint, alice_user_fs, event
 @pytest.mark.trio
 @pytest.mark.mountpoint
 @pytest.mark.skipif(sys.platform == "win32", reason="Windows uses drive")
-@pytest.mark.skipif(
-    sys.platform == "darwin", reason="Inconsistent on Catalina. TODO: bring back with Monterey CI"
-)
 async def test_mountpoint_path_already_in_use(
     base_mountpoint, running_backend, alice_user_fs, alice2_user_fs
 ):
@@ -221,9 +218,6 @@ async def test_idempotent_mount(base_mountpoint, alice_user_fs, event_bus, manua
 
 @pytest.mark.trio
 @pytest.mark.mountpoint
-@pytest.mark.skipif(
-    sys.platform == "darwin", reason="Inconsistent on Catalina. TODO: bring back with Monterey CI"
-)
 async def test_work_within_logged_core(base_mountpoint, core_config, alice, tmpdir):
     core_config = core_config.evolve(mountpoint_base_dir=base_mountpoint)
 
@@ -332,7 +326,9 @@ def test_unhandled_crash_in_fs_operation(caplog, mountpoint_service, monkeypatch
 @pytest.mark.trio
 @pytest.mark.mountpoint
 @pytest.mark.parametrize("revoking", ["read", "write"])
-@pytest.mark.skipif(sys.platform == "darwin", reason="TODO : crash on macOS")
+@pytest.mark.skipif(
+    sys.platform == "darwin", reason="Does not raise PermissionError in assert_cannot_read"
+)
 async def test_mountpoint_revoke_access(
     base_mountpoint,
     alice_user_fs,
@@ -550,9 +546,6 @@ def test_nested_rw_access(mountpoint_service):
 @pytest.mark.mountpoint
 @pytest.mark.parametrize("n", [10, 100, 1000])
 @pytest.mark.parametrize("base_path", ["/", "/foo"])
-@pytest.mark.skipif(
-    sys.platform == "darwin", reason="Inconsistent on Catalina. TODO: bring back with Monterey CI"
-)
 async def test_mountpoint_iterdir_with_many_files(
     n, base_path, base_mountpoint, alice_user_fs, event_bus
 ):
@@ -587,9 +580,6 @@ async def test_mountpoint_iterdir_with_many_files(
 
 @pytest.mark.trio
 @pytest.mark.mountpoint
-@pytest.mark.skipif(
-    sys.platform == "darwin", reason="Inconsistent on Catalina. TODO: bring back with Monterey CI"
-)
 async def test_cancel_mount_workspace(base_mountpoint, alice_user_fs, event_bus):
     """
     This function tests the race conditions between the mounting of a workspace
@@ -611,7 +601,7 @@ async def test_cancel_mount_workspace(base_mountpoint, alice_user_fs, event_bus)
         for timeout in count(0, 0.002):
             print(f"timeout: {timeout}")
 
-            with trio.fail_after(5):
+            async with real_clock_timeout():
 
                 with trio.move_on_after(timeout) as cancel_scope:
                     await mountpoint_manager.mount_workspace(wid)

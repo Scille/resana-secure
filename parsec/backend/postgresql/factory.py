@@ -1,8 +1,9 @@
 # Parsec Cloud (https://parsec.cloud) Copyright (c) BSLv1.1 (eventually AGPLv3) 2016-2021 Scille SAS
 
 import triopg
-from async_generator import asynccontextmanager
+from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Optional
+from parsec.backend.postgresql.sequester import PGPSequesterComponent
 
 from parsec.event_bus import EventBus
 from parsec.utils import open_service_nursery
@@ -10,7 +11,6 @@ from parsec.backend.config import BackendConfig
 from parsec.backend.events import EventsComponent
 from parsec.backend.blockstore import blockstore_factory
 from parsec.backend.webhooks import WebhooksComponent
-from parsec.backend.http import HTTPComponent
 from parsec.backend.postgresql.handler import PGHandler, send_signal
 from parsec.backend.postgresql.organization import PGOrganizationComponent
 from parsec.backend.postgresql.ping import PGPingComponent
@@ -40,23 +40,22 @@ async def components_factory(
             await send_signal(conn, event, **kwargs)
 
     webhooks = WebhooksComponent(config)
-    http = HTTPComponent(config)
-    organization = PGOrganizationComponent(dbh, webhooks, config)
-    user = PGUserComponent(dbh, event_bus)
-    invite = PGInviteComponent(dbh, event_bus, config)
+    organization = PGOrganizationComponent(dbh=dbh, webhooks=webhooks, config=config)
+    user = PGUserComponent(dbh=dbh, event_bus=event_bus)
+    invite = PGInviteComponent(dbh=dbh, event_bus=event_bus, config=config)
     message = PGMessageComponent(dbh)
     realm = PGRealmComponent(dbh)
     vlob = PGVlobComponent(dbh)
     ping = PGPingComponent(dbh)
-    blockstore = blockstore_factory(config.blockstore_config, postgresql_dbh=dbh)
-    block = PGBlockComponent(dbh, blockstore, vlob)
+    blockstore = blockstore_factory(config=config.blockstore_config, postgresql_dbh=dbh)
+    block = PGBlockComponent(dbh=dbh, blockstore_component=blockstore)
     pki = PGPkiEnrollmentComponent(dbh)
-    events = EventsComponent(realm, send_event=_send_event)
+    sequester = PGPSequesterComponent(dbh)
+    events = EventsComponent(realm_component=realm, send_event=_send_event)
 
     components = {
         "events": events,
         "webhooks": webhooks,
-        "http": http,
         "organization": organization,
         "user": user,
         "invite": invite,
@@ -67,6 +66,7 @@ async def components_factory(
         "block": block,
         "blockstore": blockstore,
         "pki": pki,
+        "sequester": sequester,
     }
     for component in components.values():
         method = getattr(component, "register_components", None)

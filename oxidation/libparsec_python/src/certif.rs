@@ -1,21 +1,21 @@
 // Parsec Cloud (https://parsec.cloud) Copyright (c) BSLv1.1 (eventually AGPLv3) 2016-2021 Scille SAS
 
-use parsec_api_types::{CertificateSignerOwned, CertificateSignerRef, UserProfile};
+use libparsec::types::{CertificateSignerOwned, CertificateSignerRef, UserProfile};
 use pyo3::import_exception;
 use pyo3::prelude::*;
 use pyo3::pyclass::CompareOp;
 use pyo3::types::{PyBytes, PyDict, PyType};
 
+use crate::api_crypto::{PublicKey, SigningKey, VerifyKey};
 use crate::binding_utils::{
     py_to_rs_datetime, py_to_rs_user_profile, rs_to_py_datetime, rs_to_py_user_profile,
 };
-use crate::crypto::{PublicKey, SigningKey, VerifyKey};
 use crate::ids::{DeviceID, DeviceLabel, HumanHandle, UserID};
 
 import_exception!(parsec.api.data, DataError);
 
 #[pyclass]
-pub(crate) struct UserCertificate(pub parsec_api_types::UserCertificate);
+pub(crate) struct UserCertificate(pub libparsec::types::UserCertificate);
 
 #[pymethods]
 impl UserCertificate {
@@ -32,7 +32,7 @@ impl UserCertificate {
             [profile, "profile", py_to_rs_user_profile]
         );
 
-        Ok(Self(parsec_api_types::UserCertificate {
+        Ok(Self(libparsec::types::UserCertificate {
             author: match author {
                 Some(device_id) => CertificateSignerOwned::User(device_id.0),
                 None => CertificateSignerOwned::Root,
@@ -99,15 +99,15 @@ impl UserCertificate {
     #[classmethod]
     fn verify_and_load(
         _cls: &PyType,
-        signed: Vec<u8>,
+        signed: &[u8],
         author_verify_key: &VerifyKey,
         expected_author: Option<&DeviceID>,
         expected_user: Option<&UserID>,
         expected_human_handle: Option<&HumanHandle>,
     ) -> PyResult<Self> {
         let r = Self(
-            parsec_api_types::UserCertificate::verify_and_load(
-                &signed,
+            libparsec::types::UserCertificate::verify_and_load(
+                signed,
                 &author_verify_key.0,
                 match expected_author {
                     Some(device_id) => CertificateSignerRef::User(&device_id.0),
@@ -143,10 +143,9 @@ impl UserCertificate {
     }
 
     #[classmethod]
-    fn unsecure_load(_cls: &PyType, signed: Vec<u8>) -> PyResult<Self> {
+    fn unsecure_load(_cls: &PyType, signed: &[u8]) -> PyResult<Self> {
         Ok(Self(
-            parsec_api_types::UserCertificate::unsecure_load(&signed)
-                .map_err(DataError::new_err)?,
+            libparsec::types::UserCertificate::unsecure_load(signed).map_err(DataError::new_err)?,
         ))
     }
 
@@ -190,7 +189,7 @@ impl UserCertificate {
 }
 
 #[pyclass]
-pub(crate) struct DeviceCertificate(pub parsec_api_types::DeviceCertificate);
+pub(crate) struct DeviceCertificate(pub libparsec::types::DeviceCertificate);
 
 #[pymethods]
 impl DeviceCertificate {
@@ -206,7 +205,7 @@ impl DeviceCertificate {
             [verify_key: VerifyKey, "verify_key"],
         );
 
-        Ok(Self(parsec_api_types::DeviceCertificate {
+        Ok(Self(libparsec::types::DeviceCertificate {
             author: match author {
                 Some(device_id) => CertificateSignerOwned::User(device_id.0),
                 None => CertificateSignerOwned::Root,
@@ -268,14 +267,14 @@ impl DeviceCertificate {
     #[classmethod]
     fn verify_and_load(
         _cls: &PyType,
-        signed: Vec<u8>,
+        signed: &[u8],
         author_verify_key: &VerifyKey,
         expected_author: Option<&DeviceID>,
         expected_device: Option<&DeviceID>,
     ) -> PyResult<Self> {
         let r = Self(
-            parsec_api_types::DeviceCertificate::verify_and_load(
-                &signed,
+            libparsec::types::DeviceCertificate::verify_and_load(
+                signed,
                 &author_verify_key.0,
                 match &expected_author {
                     Some(device_id) => CertificateSignerRef::User(&device_id.0),
@@ -306,9 +305,9 @@ impl DeviceCertificate {
     }
 
     #[classmethod]
-    fn unsecure_load(_cls: &PyType, signed: Vec<u8>) -> PyResult<Self> {
+    fn unsecure_load(_cls: &PyType, signed: &[u8]) -> PyResult<Self> {
         Ok(Self(
-            parsec_api_types::DeviceCertificate::unsecure_load(&signed)
+            libparsec::types::DeviceCertificate::unsecure_load(signed)
                 .map_err(DataError::new_err)?,
         ))
     }
@@ -343,7 +342,7 @@ impl DeviceCertificate {
 }
 
 #[pyclass]
-pub(crate) struct RevokedUserCertificate(pub parsec_api_types::RevokedUserCertificate);
+pub(crate) struct RevokedUserCertificate(pub libparsec::types::RevokedUserCertificate);
 
 #[pymethods]
 impl RevokedUserCertificate {
@@ -357,7 +356,7 @@ impl RevokedUserCertificate {
             [user_id: UserID, "user_id"],
         );
 
-        Ok(Self(parsec_api_types::RevokedUserCertificate {
+        Ok(Self(libparsec::types::RevokedUserCertificate {
             author: author.0,
             timestamp,
             user_id: user_id.0,
@@ -403,14 +402,14 @@ impl RevokedUserCertificate {
     #[classmethod]
     fn verify_and_load(
         _cls: &PyType,
-        signed: Vec<u8>,
+        signed: &[u8],
         author_verify_key: &VerifyKey,
         expected_author: &DeviceID,
         expected_user: Option<&UserID>,
     ) -> PyResult<Self> {
         let r = Self(
-            parsec_api_types::RevokedUserCertificate::verify_and_load(
-                &signed,
+            libparsec::types::RevokedUserCertificate::verify_and_load(
+                signed,
                 &author_verify_key.0,
                 &expected_author.0,
             )
@@ -438,9 +437,9 @@ impl RevokedUserCertificate {
     }
 
     #[classmethod]
-    fn unsecure_load(_cls: &PyType, signed: Vec<u8>) -> PyResult<Self> {
+    fn unsecure_load(_cls: &PyType, signed: &[u8]) -> PyResult<Self> {
         Ok(Self(
-            parsec_api_types::RevokedUserCertificate::unsecure_load(&signed)
+            libparsec::types::RevokedUserCertificate::unsecure_load(signed)
                 .map_err(DataError::new_err)?,
         ))
     }

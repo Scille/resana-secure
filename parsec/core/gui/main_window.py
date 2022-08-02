@@ -11,7 +11,6 @@ from PyQt5.QtWidgets import QWidget, QMainWindow, QMenu, QShortcut, QMenuBar
 
 from parsec import __version__ as PARSEC_VERSION
 from parsec.core.gui.enrollment_query_widget import EnrollmentQueryWidget
-from parsec.core.gui.snackbar_widget import SnackbarManager
 from parsec.core.types.backend_address import BackendPkiEnrollmentAddr
 from parsec.event_bus import EventBus, EventCallback
 from parsec.api.protocol import InvitationType
@@ -40,6 +39,7 @@ from parsec.core.gui.claim_device_widget import ClaimDeviceWidget
 from parsec.core.gui.license_widget import LicenseWidget
 from parsec.core.gui.about_widget import AboutWidget
 from parsec.core.gui.settings_widget import SettingsWidget
+from parsec.core.gui.snackbar_widget import SnackbarManager
 from parsec.core.gui.custom_dialogs import (
     ask_question,
     show_error,
@@ -62,7 +62,7 @@ from parsec.core.gui.central_widget import (
 logger = get_logger()
 
 
-class MainWindow(QMainWindow, Ui_MainWindow):  # type: ignore[misc]
+class MainWindow(QMainWindow, Ui_MainWindow):
     foreground_needed = pyqtSignal()
     new_instance_needed = pyqtSignal(object)
     systray_notification = pyqtSignal(str, str, int)
@@ -83,7 +83,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):  # type: ignore[misc]
         super().__init__(parent=parent)
         self.setupUi(self)
 
-        self.setMenuBar(None)
+        # TODO: is that really ok? The type checker does not agree
+        self.setMenuBar(None)  # type: ignore[arg-type]
         self.jobs_ctx = jobs_ctx
         self.quit_callback = quit_callback
         self.event_bus = event_bus
@@ -129,6 +130,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):  # type: ignore[misc]
         self.tab_center.setCornerWidget(self.add_tab_button, Qt.Corner.TopLeftCorner)
 
         self.tab_center.currentChanged.connect(self.on_current_tab_changed)
+        self.snackbar_manager = SnackbarManager(self)
         self._define_shortcuts()
         self.ensurePolished()
 
@@ -137,9 +139,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):  # type: ignore[misc]
             self._create_mac_menu_bar()
 
     def _define_shortcuts(self) -> None:
-        self.shortcut_close = QShortcut(QKeySequence(QKeySequence.Close), self)
+        self.shortcut_close = QShortcut(QKeySequence(QKeySequence.StandardKey.Close), self)
         self.shortcut_close.activated.connect(self._shortcut_proxy(self.close_current_tab))
-        self.shortcut_new_tab = QShortcut(QKeySequence(QKeySequence.AddTab), self)
+        self.shortcut_new_tab = QShortcut(QKeySequence(QKeySequence.StandardKey.AddTab), self)
         self.shortcut_new_tab.activated.connect(self._shortcut_proxy(self._on_add_instance_clicked))
         self.shortcut_settings = QShortcut(QKeySequence(_("Ctrl+K")), self)
         self.shortcut_settings.activated.connect(self._shortcut_proxy(self._show_settings))
@@ -147,19 +149,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):  # type: ignore[misc]
         self.shortcut_recovery.activated.connect(self._shortcut_proxy(self._on_manage_keys))
         self.shortcut_menu = QShortcut(QKeySequence(_("Alt+E")), self)
         self.shortcut_menu.activated.connect(self._shortcut_proxy(self._show_menu))
-        self.shortcut_help = QShortcut(QKeySequence(QKeySequence.HelpContents), self)
+        self.shortcut_help = QShortcut(QKeySequence(QKeySequence.StandardKey.HelpContents), self)
         self.shortcut_help.activated.connect(self._shortcut_proxy(self._on_show_doc_clicked))
-        self.shortcut_quit = QShortcut(QKeySequence(QKeySequence.Quit), self)
+        self.shortcut_quit = QShortcut(QKeySequence(QKeySequence.StandardKey.Quit), self)
         self.shortcut_quit.activated.connect(self._shortcut_proxy(self.close_app))
-        self.shortcut_create_org = QShortcut(QKeySequence(QKeySequence.New), self)
+        self.shortcut_create_org = QShortcut(QKeySequence(QKeySequence.StandardKey.New), self)
         self.shortcut_create_org.activated.connect(
             self._shortcut_proxy(self._on_create_org_clicked)
         )
-        self.shortcut_join_org = QShortcut(QKeySequence(QKeySequence.Open), self)
+        self.shortcut_join_org = QShortcut(QKeySequence(QKeySequence.StandardKey.Open), self)
         self.shortcut_join_org.activated.connect(self._shortcut_proxy(self._on_join_org_clicked))
-        shortcut = QShortcut(QKeySequence(QKeySequence.NextChild), self)
+        shortcut = QShortcut(QKeySequence(QKeySequence.StandardKey.NextChild), self)
         shortcut.activated.connect(self._shortcut_proxy(self._cycle_tabs(1)))
-        shortcut = QShortcut(QKeySequence(QKeySequence.PreviousChild), self)
+        shortcut = QShortcut(QKeySequence(QKeySequence.StandardKey.PreviousChild), self)
         shortcut.activated.connect(self._shortcut_proxy(self._cycle_tabs(-1)))
 
     def _shortcut_proxy(self, funct: Callable[[], None]) -> Callable[[], None]:
@@ -306,7 +308,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):  # type: ignore[misc]
         pos.setY(pos.y() + self.menu_button.size().height())
         pos = self.mapToGlobal(pos)
         menu.exec_(pos)
-        menu.setParent(None)
+        menu.setParent(None)  # type: ignore[call-overload]
 
     def _show_about(self) -> None:
         w = AboutWidget()
@@ -362,6 +364,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):  # type: ignore[misc]
         async def wrapper(instance: "MainWindow") -> None:
             return await callback()
 
+        # TODO: remove type ignore comment when using a newer mypy version
         return wrapper.__get__(self)  # type: ignore[attr-defined]
 
     def _on_create_org_clicked(
@@ -611,9 +614,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):  # type: ignore[misc]
 
     def show_top(self) -> None:
         self.activateWindow()
-        state: Qt.WindowState = (
-            self.windowState() & ~Qt.WindowState.WindowMinimized
-        ) | Qt.WindowState.WindowActive
+        state: Qt.WindowStates = (
+            self.windowState() & ~Qt.WindowStates(Qt.WindowState.WindowMinimized)
+        ) | Qt.WindowStates(Qt.WindowState.WindowActive)
         self.setWindowState(state)
         self.raise_()
         self.show()

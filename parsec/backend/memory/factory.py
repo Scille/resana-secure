@@ -3,9 +3,9 @@
 import math
 from enum import Enum
 from typing import Tuple, Dict
-
 import trio
-from async_generator import asynccontextmanager
+from contextlib import asynccontextmanager
+from parsec.backend.memory.sequester import MemorySequesterComponent
 
 from parsec.event_bus import EventBus
 from parsec.utils import open_service_nursery
@@ -22,7 +22,6 @@ from parsec.backend.memory.vlob import MemoryVlobComponent
 from parsec.backend.memory.block import MemoryBlockComponent
 from parsec.backend.memory.pki import MemoryPkiEnrollmentComponent
 from parsec.backend.webhooks import WebhooksComponent
-from parsec.backend.http import HTTPComponent
 
 
 @asynccontextmanager
@@ -40,7 +39,6 @@ async def components_factory(config: BackendConfig, event_bus: EventBus):
             event_bus.send(event, **kwargs)
 
     webhooks = WebhooksComponent(config)
-    http = HTTPComponent(config)
     organization = MemoryOrganizationComponent(_send_event, webhooks, config)
     user = MemoryUserComponent(_send_event, event_bus)
     invite = MemoryInviteComponent(_send_event, event_bus, config)
@@ -49,6 +47,7 @@ async def components_factory(config: BackendConfig, event_bus: EventBus):
     vlob = MemoryVlobComponent(_send_event)
     ping = MemoryPingComponent(_send_event)
     pki = MemoryPkiEnrollmentComponent(_send_event)
+    sequester = MemorySequesterComponent()
     block = MemoryBlockComponent()
     blockstore = blockstore_factory(config.blockstore_config)
     events = EventsComponent(realm, send_event=_send_event)
@@ -56,7 +55,6 @@ async def components_factory(config: BackendConfig, event_bus: EventBus):
     components = {
         "events": events,
         "webhooks": webhooks,
-        "http": http,
         "organization": organization,
         "user": user,
         "invite": invite,
@@ -65,6 +63,7 @@ async def components_factory(config: BackendConfig, event_bus: EventBus):
         "vlob": vlob,
         "ping": ping,
         "pki": pki,
+        "sequester": sequester,
         "block": block,
         "blockstore": blockstore,
     }

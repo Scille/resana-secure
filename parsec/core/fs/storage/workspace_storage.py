@@ -2,13 +2,24 @@
 
 from pathlib import Path
 from collections import defaultdict
-from typing import cast, Dict, Tuple, Set, Optional, Union, AsyncIterator, NoReturn, Pattern
-
+from typing import (
+    TYPE_CHECKING,
+    cast,
+    Dict,
+    Tuple,
+    Set,
+    Optional,
+    Union,
+    AsyncIterator,
+    NoReturn,
+    Pattern,
+    List,
+)
 import trio
 from trio import lowlevel
 from pendulum import DateTime
 from structlog import get_logger
-from async_generator import asynccontextmanager
+from contextlib import asynccontextmanager
 
 from parsec.core.types import (
     EntryID,
@@ -22,7 +33,6 @@ from parsec.core.types import (
 )
 from parsec.core.config import DEFAULT_WORKSPACE_STORAGE_CACHE_SIZE
 from parsec.core.fs.exceptions import FSError, FSLocalMissError, FSInvalidFileDescriptor
-
 from parsec.core.fs.storage.local_database import LocalDatabase
 from parsec.core.fs.storage.manifest_storage import ManifestStorage
 from parsec.core.fs.storage.chunk_storage import ChunkStorage, BlockStorage
@@ -122,6 +132,12 @@ class BaseWorkspaceStorage:
         raise NotImplementedError
 
     async def mark_prevent_sync_pattern_fully_applied(self, pattern: Pattern[str]) -> None:
+        raise NotImplementedError
+
+    async def get_local_chunk_ids(self, chunk_id: List[ChunkID]) -> List[ChunkID]:
+        raise NotImplementedError
+
+    async def get_local_block_ids(self, chunk_id: List[ChunkID]) -> List[ChunkID]:
         raise NotImplementedError
 
     # Locking helpers
@@ -421,11 +437,27 @@ class WorkspaceStorage(BaseWorkspaceStorage):
         await self.manifest_storage.mark_prevent_sync_pattern_fully_applied(pattern)
         await self._load_prevent_sync_pattern()
 
+    async def get_local_chunk_ids(self, chunk_id: List[ChunkID]) -> List[ChunkID]:
+        return await self.chunk_storage.get_local_chunk_ids(chunk_id)
+
+    async def get_local_block_ids(self, chunk_id: List[ChunkID]) -> List[ChunkID]:
+        return await self.block_storage.get_local_chunk_ids(chunk_id)
+
     # Vacuum
 
     async def run_vacuum(self) -> None:
         # Only the data storage needs to get vacuuumed
         await self.data_localdb.run_vacuum()
+
+
+_PyWorkspaceStorage = WorkspaceStorage
+if not TYPE_CHECKING:
+    try:
+        from libparsec.types import WorkspaceStorage as _RsWorkspaceStorage
+    except:
+        pass
+    else:
+        WorkspaceStorage = _RsWorkspaceStorage
 
 
 class WorkspaceStorageTimestamped(BaseWorkspaceStorage):

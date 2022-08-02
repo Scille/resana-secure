@@ -2,12 +2,13 @@
 
 use std::collections::HashMap;
 
+use pyo3::exceptions::PyValueError;
 use pyo3::import_exception;
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 use pyo3::types::{PyBytes, PyType};
 
-use parsec_api_protocol::authenticated_cmds::{
+use libparsec::protocol::authenticated_cmds::{
     vlob_create, vlob_list_versions, vlob_maintenance_get_reencryption_batch,
     vlob_maintenance_save_reencryption_batch, vlob_poll_changes, vlob_read, vlob_update,
 };
@@ -131,7 +132,9 @@ impl VlobCreateRep {
 
     #[classmethod]
     fn load(_cls: &PyType, buf: Vec<u8>) -> PyResult<Self> {
-        Ok(Self(vlob_create::Rep::load(&buf)))
+        vlob_create::Rep::load(&buf)
+            .map(Self)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }
 
@@ -145,7 +148,7 @@ impl VlobReadReq {
     fn new(
         encryption_revision: u64,
         vlob_id: VlobID,
-        version: Option<u64>,
+        version: Option<u32>,
         timestamp: Option<&PyAny>,
     ) -> PyResult<Self> {
         let vlob_id = vlob_id.0;
@@ -180,7 +183,7 @@ impl VlobReadReq {
     }
 
     #[getter]
-    fn version(&self) -> PyResult<Option<u64>> {
+    fn version(&self) -> PyResult<Option<u32>> {
         Ok(self.0.version)
     }
 
@@ -203,7 +206,7 @@ impl VlobReadRep {
     #[pyo3(name = "Ok")]
     fn ok(
         _cls: &PyType,
-        version: u64,
+        version: u32,
         blob: Vec<u8>,
         author: DeviceID,
         timestamp: &PyAny,
@@ -211,9 +214,15 @@ impl VlobReadRep {
     ) -> PyResult<Self> {
         let author = author.0;
         let timestamp = py_to_rs_datetime(timestamp)?;
-        let author_last_role_granted_on = author_last_role_granted_on
+        let author_last_role_granted_on = match author_last_role_granted_on
             .map(py_to_rs_datetime)
-            .transpose()?;
+            .transpose()
+        {
+            Ok(author_last_role_granted_on) => {
+                libparsec::types::Maybe::Present(author_last_role_granted_on)
+            }
+            _ => libparsec::types::Maybe::Absent,
+        };
         Ok(Self(vlob_read::Rep::Ok {
             version,
             blob,
@@ -266,7 +275,9 @@ impl VlobReadRep {
 
     #[classmethod]
     fn load(_cls: &PyType, buf: Vec<u8>) -> PyResult<Self> {
-        Ok(Self(vlob_read::Rep::load(&buf)))
+        vlob_read::Rep::load(&buf)
+            .map(Self)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }
 
@@ -281,7 +292,7 @@ impl VlobUpdateReq {
         encryption_revision: u64,
         vlob_id: VlobID,
         timestamp: &PyAny,
-        version: u64,
+        version: u32,
         blob: Vec<u8>,
     ) -> PyResult<Self> {
         let vlob_id = vlob_id.0;
@@ -322,7 +333,7 @@ impl VlobUpdateReq {
     }
 
     #[getter]
-    fn version(&self) -> PyResult<u64> {
+    fn version(&self) -> PyResult<u32> {
         Ok(self.0.version)
     }
 
@@ -387,7 +398,9 @@ impl VlobUpdateRep {
 
     #[classmethod]
     fn load(_cls: &PyType, buf: Vec<u8>) -> PyResult<Self> {
-        Ok(Self(vlob_update::Rep::load(&buf)))
+        vlob_update::Rep::load(&buf)
+            .map(Self)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }
 
@@ -475,7 +488,9 @@ impl VlobPollChangesRep {
 
     #[classmethod]
     fn load(_cls: &PyType, buf: Vec<u8>) -> PyResult<Self> {
-        Ok(Self(vlob_poll_changes::Rep::load(&buf)))
+        vlob_poll_changes::Rep::load(&buf)
+            .map(Self)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }
 
@@ -557,7 +572,9 @@ impl VlobListVersionsRep {
 
     #[classmethod]
     fn load(_cls: &PyType, buf: Vec<u8>) -> PyResult<Self> {
-        Ok(Self(vlob_list_versions::Rep::load(&buf)))
+        vlob_list_versions::Rep::load(&buf)
+            .map(Self)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }
 
@@ -676,22 +693,22 @@ impl VlobMaintenanceGetReencryptionBatchRep {
 
     #[classmethod]
     fn load(_cls: &PyType, buf: Vec<u8>) -> PyResult<Self> {
-        Ok(Self(vlob_maintenance_get_reencryption_batch::Rep::load(
-            &buf,
-        )))
+        vlob_maintenance_get_reencryption_batch::Rep::load(&buf)
+            .map(Self)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }
 
 #[pyclass]
 #[derive(PartialEq, Clone)]
-pub(crate) struct ReencryptionBatchEntry(pub parsec_api_protocol::ReencryptionBatchEntry);
+pub(crate) struct ReencryptionBatchEntry(pub libparsec::types::ReencryptionBatchEntry);
 
 #[pymethods]
 impl ReencryptionBatchEntry {
     #[new]
     fn new(vlob_id: VlobID, version: u64, blob: Vec<u8>) -> PyResult<Self> {
         let vlob_id = vlob_id.0;
-        Ok(Self(parsec_api_protocol::ReencryptionBatchEntry {
+        Ok(Self(libparsec::types::ReencryptionBatchEntry {
             vlob_id,
             version,
             blob,
@@ -845,8 +862,8 @@ impl VlobMaintenanceSaveReencryptionBatchRep {
 
     #[classmethod]
     fn load(_cls: &PyType, buf: Vec<u8>) -> PyResult<Self> {
-        Ok(Self(vlob_maintenance_save_reencryption_batch::Rep::load(
-            &buf,
-        )))
+        vlob_maintenance_save_reencryption_batch::Rep::load(&buf)
+            .map(Self)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }

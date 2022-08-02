@@ -1,11 +1,12 @@
 // Parsec Cloud (https://parsec.cloud) Copyright (c) BSLv1.1 (eventually AGPLv3) 2016-2021 Scille SAS
 
+use pyo3::exceptions::PyValueError;
 use pyo3::import_exception;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyType};
 use std::num::NonZeroU64;
 
-use parsec_api_protocol::authenticated_cmds::{
+use libparsec::protocol::authenticated_cmds::{
     device_create, human_find, user_create, user_get, user_revoke,
 };
 
@@ -44,7 +45,7 @@ impl UserGetReq {
 
 #[pyclass]
 #[derive(PartialEq, Clone)]
-pub(crate) struct Trustchain(pub parsec_api_protocol::Trustchain);
+pub(crate) struct Trustchain(pub user_get::Trustchain);
 
 #[pymethods]
 impl Trustchain {
@@ -54,7 +55,7 @@ impl Trustchain {
         users: Vec<Vec<u8>>,
         revoked_users: Vec<Vec<u8>>,
     ) -> PyResult<Self> {
-        Ok(Self(parsec_api_protocol::Trustchain {
+        Ok(Self(user_get::Trustchain {
             devices,
             users,
             revoked_users,
@@ -109,7 +110,9 @@ impl UserGetRep {
 
     #[classmethod]
     fn load(_cls: &PyType, buf: Vec<u8>) -> PyResult<Self> {
-        Ok(Self(user_get::Rep::load(&buf)))
+        user_get::Rep::load(&buf)
+            .map(Self)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }
 
@@ -221,7 +224,9 @@ impl UserCreateRep {
 
     #[classmethod]
     fn load(_cls: &PyType, buf: Vec<u8>) -> PyResult<Self> {
-        Ok(Self(user_create::Rep::load(&buf)))
+        user_create::Rep::load(&buf)
+            .map(Self)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }
 
@@ -298,7 +303,9 @@ impl UserRevokeRep {
 
     #[classmethod]
     fn load(_cls: &PyType, buf: Vec<u8>) -> PyResult<Self> {
-        Ok(Self(user_revoke::Rep::load(&buf)))
+        user_revoke::Rep::load(&buf)
+            .map(Self)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }
 
@@ -387,7 +394,9 @@ impl DeviceCreateRep {
 
     #[classmethod]
     fn load(_cls: &PyType, buf: Vec<u8>) -> PyResult<Self> {
-        Ok(Self(device_create::Rep::load(&buf)))
+        device_create::Rep::load(&buf)
+            .map(Self)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }
 
@@ -455,7 +464,7 @@ impl HumanFindReq {
 
 #[pyclass]
 #[derive(PartialEq, Clone)]
-pub(crate) struct HumanFindResultItem(pub parsec_api_protocol::HumanFindResultItem);
+pub(crate) struct HumanFindResultItem(pub human_find::HumanFindResultItem);
 
 #[pymethods]
 impl HumanFindResultItem {
@@ -463,7 +472,7 @@ impl HumanFindResultItem {
     fn new(user_id: UserID, human_handle: Option<HumanHandle>, revoked: bool) -> PyResult<Self> {
         let user_id = user_id.0;
         let human_handle = human_handle.map(|hh| hh.0);
-        Ok(Self(parsec_api_protocol::HumanFindResultItem {
+        Ok(Self(human_find::HumanFindResultItem {
             user_id,
             human_handle,
             revoked,
@@ -535,6 +544,8 @@ impl HumanFindRep {
 
     #[classmethod]
     fn load(_cls: &PyType, buf: Vec<u8>) -> PyResult<Self> {
-        Ok(Self(human_find::Rep::load(&buf)))
+        human_find::Rep::load(&buf)
+            .map(Self)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }

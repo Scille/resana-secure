@@ -1,10 +1,11 @@
 // Parsec Cloud (https://parsec.cloud) Copyright (c) BSLv1.1 (eventually AGPLv3) 2016-2021 Scille SAS
 
+use pyo3::exceptions::PyValueError;
 use pyo3::import_exception;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyType};
 
-use parsec_api_protocol::authenticated_cmds::message_get;
+use libparsec::protocol::authenticated_cmds::message_get;
 
 use crate::binding_utils::py_to_rs_datetime;
 use crate::ids::DeviceID;
@@ -41,7 +42,7 @@ impl MessageGetReq {
 
 #[pyclass]
 #[derive(PartialEq, Eq, Clone)]
-pub(crate) struct Message(pub parsec_api_protocol::Message);
+pub(crate) struct Message(pub message_get::Message);
 
 #[pymethods]
 impl Message {
@@ -49,7 +50,7 @@ impl Message {
     fn new(count: u64, sender: DeviceID, timestamp: &PyAny, body: Vec<u8>) -> PyResult<Self> {
         let sender = sender.0;
         let timestamp = py_to_rs_datetime(timestamp)?;
-        Ok(Self(parsec_api_protocol::Message {
+        Ok(Self(message_get::Message {
             count,
             sender,
             timestamp,
@@ -88,6 +89,8 @@ impl MessageGetRep {
 
     #[classmethod]
     fn load(_cls: &PyType, buf: Vec<u8>) -> PyResult<Self> {
-        Ok(Self(message_get::Rep::load(&buf)))
+        message_get::Rep::load(&buf)
+            .map(Self)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }

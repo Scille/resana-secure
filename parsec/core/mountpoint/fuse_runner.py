@@ -4,15 +4,13 @@ import os
 import sys
 import trio
 import errno
-import ctypes
 import signal
 import threading
-import importlib_resources
+import importlib.resources
 from pathlib import PurePath
 from fuse import FUSE
 from structlog import get_logger
-from contextlib import contextmanager
-from async_generator import asynccontextmanager
+from contextlib import asynccontextmanager
 from itertools import count
 
 from parsec.event_bus import EventBus
@@ -31,21 +29,49 @@ __all__ = ("fuse_mountpoint_runner",)
 logger = get_logger()
 
 
-@contextmanager
-def _reset_signals(signals=None):
-    """A context that save the current signal handlers restore them when leaving.
+def _sig_ign(sig, stack):
+    """A signal handler behaving like signal.SIG_IGN"""
+    pass
 
-    By default, it does so for SIGINT, SIGTERM, SIGHUP and SIGPIPE.
+
+def _sig_dfl(sig, stack):
+    """A signal handler behaving like signal.SIG_DFL"""
+    # Restore the DLF handler
+    signal.signal(sig, signal.SIG_DFL)
+    # Raise either SIGHUP or SIGTERM, which terminates the process
+    signal.raise_signal(sig)
+
+
+def _patch_signals():
+    """Prevent libfuse2 to mess with the default signal handlers in python.
+
+    The fusepy runner (FUSE) relies on the `fuse_main_real` function from libfuse2.
+    This function is a high-level helper on top of the libfuse API that is intended
+    for simple application. As such, it sets some signal handlers to exit cleanly
+    after a SIGINT, a SIGTERM or a SIGHUP. It also switches the SIGPIPE signal to
+    IGN. These handlers are meant to be restored at the end of the fuse session.
+
+    This is, however, not compatible with our multi-instance multi-threaded application.
+    In order to prevent libfuse to do anything with those 4 signals, we're setting custom
+    handlers to let libfuse know that we're already handling those. Since python already
+    has a custom SIGINT handler, only the other 3 signals should be patched.
+
+    This function is idempotent.
+
+    Note: python won't let us patched the signals outside of the main thread.
+    In practice, this should never be the case. One counter example are the tests
+    using the `mountpoint_service` fixture, which starts by calling `_patch_signals`
+    directly before delegating to subthreads.
     """
-    if signals is None:
-        signals = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP, signal.SIGPIPE)
-    saved = {sig: ctypes.pythonapi.PyOS_getsig(sig) for sig in signals}
-    try:
-        yield
-    finally:
-        for sig, handler in saved.items():
-            if ctypes.pythonapi.PyOS_getsig(sig) != handler:
-                ctypes.pythonapi.PyOS_setsig(sig, handler)
+    # The default value for SIGPIPE in python is IGN
+    if signal.getsignal(signal.SIGPIPE) == signal.SIG_IGN:
+        signal.signal(signal.SIGPIPE, _sig_ign)
+    # The default value for SIGHUP in python is DFL
+    if signal.getsignal(signal.SIGHUP) == signal.SIG_DFL:
+        signal.signal(signal.SIGHUP, _sig_dfl)
+    # The default value for SIGTERM in python is DFL
+    if signal.getsignal(signal.SIGTERM) == signal.SIG_DFL:
+        signal.signal(signal.SIGTERM, _sig_dfl)
 
 
 async def _bootstrap_mountpoint(base_mountpoint_path: PurePath, workspace_fs) -> PurePath:
@@ -135,7 +161,7 @@ async def fuse_mountpoint_runner(
             encoding = sys.getfilesystemencoding()
 
             def _run_fuse_thread():
-                with importlib_resources.files(resources_module).joinpath(
+                with importlib.resources.files(resources_module).joinpath(
                     "parsec.icns"
                 ) as parsec_icns_path:
 
@@ -195,17 +221,12 @@ async def fuse_mountpoint_runner(
                     finally:
                         fuse_thread_stopped.set()
 
-            # The fusepy runner (FUSE) relies on the `fuse_main_real` function from libfuse
-            # This function is high-level helper on top of the libfuse API that is intended
-            # for simple application. As such, it sets some signal handlers to exit cleanly
-            # after a SIGTINT, a SIGTERM or a SIGHUP. This is, however, not compatible with
-            # our multi-instance multi-threaded application. A simple workaround here is to
-            # restore the signals to their previous state once the fuse instance is started.
-            with _reset_signals():
-                nursery.start_soon(
-                    lambda: trio.to_thread.run_sync(_run_fuse_thread, cancellable=True)
-                )
-                await _wait_for_fuse_ready(mountpoint_path, fuse_thread_started, initial_st_dev)
+            # We're about to call the `fuse_main_real` function from libfuse, so let's make sure
+            # the signals are correctly patched before that (`_path_signals` is idempotent)
+            _patch_signals()
+
+            nursery.start_soon(lambda: trio.to_thread.run_sync(_run_fuse_thread, cancellable=True))
+            await _wait_for_fuse_ready(mountpoint_path, fuse_thread_started, initial_st_dev)
 
             # Indicate the mountpoint is now started
             yield mountpoint_path
@@ -257,7 +278,7 @@ async def _stop_fuse_thread(
         # 120 seconds before a timeout occurs. The solution used is to call this function (macOS
         # equivalent to fusermount) in a subprocess to unmount.
         process_args = ["diskutil", "unmount", "force", str(mountpoint_path)]
-        process = await trio.open_process(process_args)
+        process = await trio.lowlevel.open_process(process_args)
 
         # Perform 300 attempts of 10 ms, i.e a 3 second timeout
         # A while loop wouldn't be ideal here, especially since this code is protected against cancellation
@@ -272,7 +293,7 @@ async def _stop_fuse_thread(
             # an unrelated mountpoint that tooks our path, but it's a really
             # unlikely event.
             if process.poll() is not None:
-                process = await trio.open_process(process_args)
+                process = await trio.lowlevel.open_process(process_args)
         else:
             logger.error("Fuse thread stop timeout", mountpoint=mountpoint_path)
 

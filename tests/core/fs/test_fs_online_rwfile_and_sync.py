@@ -4,9 +4,10 @@ import pytest
 from hypothesis import strategies as st
 from hypothesis_trio.stateful import initialize, rule
 
+from parsec import IS_OXIDIZED
 from parsec.api.data import EntryName
 
-from tests.oracles import FileOracle
+from tests.common import FileOracle
 
 
 BLOCK_SIZE = 16
@@ -14,13 +15,14 @@ PLAYGROUND_SIZE = BLOCK_SIZE * 10
 
 
 @pytest.mark.slow
+@pytest.mark.skipif(IS_OXIDIZED, reason="No persistent_mockup")
 def test_fs_online_rwfile_and_sync(user_fs_online_state_machine, alice):
     class FSOnlineRwFileAndSync(user_fs_online_state_machine):
         @initialize()
         async def init(self):
             await self.reset_all()
-            self.device = alice
             await self.start_backend()
+            self.device = self.correct_addr(alice)
             await self.restart_user_fs(self.device)
             self.wid = await self.user_fs.workspace_create(EntryName("w"))
             workspace = self.user_fs.get_workspace(self.wid)

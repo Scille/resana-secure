@@ -12,8 +12,7 @@ from parsec.core.gui.create_org_widget import CreateOrgUserInfoWidget
 from parsec.core.gui.authentication_choice_widget import AuthenticationChoiceWidget
 from parsec.core.gui.lang import translate
 
-from tests.fixtures import local_device_to_backend_user
-from tests.common import customize_fixtures, freeze_time
+from tests.common import customize_fixtures, freeze_time, local_device_to_backend_user
 
 
 @pytest.fixture
@@ -80,7 +79,7 @@ async def _do_creation_process(aqtbot, co_w):
 
 @pytest.mark.gui
 @pytest.mark.trio
-@customize_fixtures(backend_spontaneous_organization_boostrap=True)
+@customize_fixtures(backend_spontaneous_organization_bootstrap=True)
 async def test_create_organization(
     monkeypatch, gui, aqtbot, running_backend, catch_create_org_widget, autoclose_dialog
 ):
@@ -125,7 +124,7 @@ async def test_create_organization(
 
 @pytest.mark.gui
 @pytest.mark.trio
-@customize_fixtures(backend_spontaneous_organization_boostrap=True)
+@customize_fixtures(backend_spontaneous_organization_bootstrap=True)
 async def test_create_organization_offline(
     gui, aqtbot, running_backend, catch_create_org_widget, autoclose_dialog
 ):
@@ -167,7 +166,7 @@ async def test_create_organization_offline(
 
 @pytest.mark.gui
 @pytest.mark.trio
-@customize_fixtures(backend_spontaneous_organization_boostrap=True)
+@customize_fixtures(backend_spontaneous_organization_bootstrap=True)
 async def test_create_organization_same_name(
     gui,
     aqtbot,
@@ -222,7 +221,7 @@ async def test_create_organization_same_name(
 @pytest.mark.skip("No previous button in new process")
 @pytest.mark.gui
 @pytest.mark.trio
-@customize_fixtures(backend_spontaneous_organization_boostrap=True)
+@customize_fixtures(backend_spontaneous_organization_bootstrap=True)
 async def test_create_organization_previous_clicked(
     gui, aqtbot, running_backend, catch_create_org_widget, autoclose_dialog
 ):
@@ -289,7 +288,7 @@ async def test_create_organization_previous_clicked(
 
 @pytest.mark.gui
 @pytest.mark.trio
-@customize_fixtures(backend_spontaneous_organization_boostrap=True)
+@customize_fixtures(backend_spontaneous_organization_bootstrap=True)
 async def test_create_organization_bootstrap_only(
     aqtbot,
     running_backend,
@@ -359,7 +358,7 @@ async def test_create_organization_bootstrap_only(
 
 @pytest.mark.gui
 @pytest.mark.trio
-@customize_fixtures(backend_spontaneous_organization_boostrap=True)
+@customize_fixtures(backend_spontaneous_organization_bootstrap=True)
 @customize_fixtures(fake_preferred_org_creation_backend_addr=True)
 async def test_create_organization_bootstrap_only_custom_server(
     aqtbot,
@@ -430,7 +429,7 @@ async def test_create_organization_bootstrap_only_custom_server(
 
 @pytest.mark.gui
 @pytest.mark.trio
-@customize_fixtures(backend_spontaneous_organization_boostrap=True)
+@customize_fixtures(backend_spontaneous_organization_bootstrap=True)
 async def test_create_organization_already_bootstrapped(
     aqtbot,
     running_backend,
@@ -493,7 +492,7 @@ async def test_create_organization_already_bootstrapped(
 
 @pytest.mark.gui
 @pytest.mark.trio
-@customize_fixtures(backend_spontaneous_organization_boostrap=True)
+@customize_fixtures(backend_spontaneous_organization_bootstrap=True)
 @customize_fixtures(fake_preferred_org_creation_backend_addr=True)
 async def test_create_organization_custom_backend(
     gui, aqtbot, running_backend, catch_create_org_widget, autoclose_dialog, unused_tcp_port
@@ -592,7 +591,7 @@ async def test_create_organization_custom_backend(
 
 @pytest.mark.gui
 @pytest.mark.trio
-@customize_fixtures(backend_spontaneous_organization_boostrap=True)
+@customize_fixtures(backend_spontaneous_organization_bootstrap=True)
 async def test_create_organization_wrong_timestamp(
     gui, aqtbot, running_backend, catch_create_org_widget, autoclose_dialog, monkeypatch
 ):
@@ -634,7 +633,7 @@ async def test_create_organization_wrong_timestamp(
 
 @pytest.mark.gui
 @pytest.mark.trio
-async def test_create_organization_with_boostrap_token(
+async def test_create_organization_with_bootstrap_token(
     gui, aqtbot, running_backend, catch_create_org_widget, autoclose_dialog
 ):
     # Firt create the organization
