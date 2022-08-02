@@ -3,15 +3,17 @@ import pytest
 import trio
 from functools import partial
 from collections import namedtuple
+from hypercorn.config import Config as HyperConfig
+from hypercorn.trio.run import worker_serve
 
 from parsec.crypto import PrivateKey, SigningKey
 from parsec.api.data import UserCertificateContent, DeviceCertificateContent, UserProfile
 from parsec.api.protocol import OrganizationID, HumanHandle, DeviceID, DeviceName, DeviceLabel
 from parsec.core.types import BackendOrganizationBootstrapAddr, BackendAddr
 from parsec.core.invite import bootstrap_organization
-from parsec.core.backend_connection import apiv1_backend_anonymous_cmds_factory
 from parsec.core.local_device import save_device_with_password_in_config
 from parsec.backend import backend_app_factory
+from parsec.backend.asgi import app_factory as backend_asgi_app_factory
 from parsec.backend.user import User as BackendUser, Device as BackendDevice
 from parsec.backend.config import BackendConfig, MockedBlockStoreConfig
 
@@ -103,17 +105,20 @@ async def running_backend(_backend_addr_register):
         email_config=None,
         backend_addr=None,
         forward_proto_enforce_https=None,
-        ssl_context=False,
         organization_spontaneous_bootstrap=True,
         organization_bootstrap_webhook_url=None,
     )
     async with backend_app_factory(config) as backend:
         async with trio.open_service_nursery() as nursery:
             host = "127.0.0.1"
-            listeners = await nursery.start(
-                partial(trio.serve_tcp, backend.handle_client, port=0, host=host)
+            asgi_app = backend_asgi_app_factory(backend)
+            hyper_config = HyperConfig.from_mapping(
+                {
+                    "bind": ["127.0.0.1:0"],
+                }
             )
-            _, port = listeners[0].socket.getsockname()
+            binds = await nursery.start(partial(worker_serve, app=asgi_app, config=hyper_config))
+            port = int(binds[0].rsplit(":", 1)[1])
             backend_addr = BackendAddr(hostname=host, port=port, use_ssl=False)
             _backend_addr_register.register(backend_addr)
             yield backend
