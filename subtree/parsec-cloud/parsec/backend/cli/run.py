@@ -1,14 +1,15 @@
 # Parsec Cloud (https://parsec.cloud) Copyright (c) BSLv1.1 (eventually AGPLv3) 2016-2021 Scille SAS
 
-import ssl
 import trio
 import click
 from structlog import get_logger
-from typing import Optional, Tuple, List
-from itertools import count
-from collections import defaultdict
+from typing import Optional, Tuple
+from functools import partial
 import tempfile
 from pathlib import Path
+from hypercorn.config import Config as HyperConfig
+from hypercorn.trio import serve
+import logging
 
 from parsec.utils import trio_run
 from parsec.cli_utils import (
@@ -17,20 +18,15 @@ from parsec.cli_utils import (
     sentry_config_options,
     debug_config_options,
 )
+from parsec.backend.cli.utils import db_backend_options, blockstore_backend_options
 from parsec.backend import backend_app_factory, BackendApp
+from parsec.backend.asgi import app_factory
 from parsec.backend.config import (
     BackendConfig,
     EmailConfig,
     BaseBlockStoreConfig,
     SmtpEmailConfig,
     MockedEmailConfig,
-    MockedBlockStoreConfig,
-    PostgreSQLBlockStoreConfig,
-    S3BlockStoreConfig,
-    SWIFTBlockStoreConfig,
-    RAID0BlockStoreConfig,
-    RAID1BlockStoreConfig,
-    RAID5BlockStoreConfig,
 )
 from parsec.core.types import BackendAddr
 
@@ -41,146 +37,9 @@ DEFAULT_BACKEND_PORT = 6777
 DEFAULT_EMAIL_SENDER = "no-reply@parsec.com"
 
 
-def _split_with_escaping(txt: str) -> List[str]:
-    """
-    Simple colon (i.e. `:`) escaping with backslash
-    Rules (using slash instead of backslash to avoid weird encoding error):
-    `<bs>:` -> `:`
-    `<bs><bs>` -> `<bs>`
-    `<bs>whatever` -> `<bs>whatever`
-    """
-    parts = []
-    current_part = ""
-    escaping = False
-    for c in txt:
-        if escaping:
-            if c not in ("\\", ":"):
-                current_part += "\\"
-            current_part += c
-        elif c == "\\":
-            escaping = True
-            continue
-        elif c == ":":
-            parts.append(current_part)
-            current_part = ""
-        else:
-            current_part += c
-        escaping = False
-    if escaping:
-        current_part += "\\"
-    parts.append(current_part)
-    return parts
-
-
-def _parse_blockstore_param(value: str) -> BaseBlockStoreConfig:
-    if value.upper() == "MOCKED":
-        return MockedBlockStoreConfig()
-    elif value.upper() == "POSTGRESQL":
-        return PostgreSQLBlockStoreConfig()
-    else:
-        parts = _split_with_escaping(value)
-        if parts[0].upper() == "S3":
-            try:
-                endpoint_url, region, bucket, key, secret = parts[1:]
-            except ValueError:
-                raise click.BadParameter(
-                    "Invalid S3 config, must be `s3:[<endpoint_url>]:<region>:<bucket>:<key>:<secret>`"
-                )
-            # Provide https by default to avoid anoying escaping for most cases
-            if (
-                endpoint_url
-                and not endpoint_url.startswith("http://")
-                and not endpoint_url.startswith("https://")
-            ):
-                endpoint_url = f"https://{endpoint_url}"
-            return S3BlockStoreConfig(
-                s3_endpoint_url=endpoint_url or None,
-                s3_region=region,
-                s3_bucket=bucket,
-                s3_key=key,
-                s3_secret=secret,
-            )
-
-        elif parts[0].upper() == "SWIFT":
-            try:
-                auth_url, tenant, container, user, password = parts[1:]
-            except ValueError:
-                raise click.BadParameter(
-                    "Invalid SWIFT config, must be `swift:<auth_url>:<tenant>:<container>:<user>:<password>`"
-                )
-            # Provide https by default to avoid anoying escaping for most cases
-            if (
-                auth_url
-                and not auth_url.startswith("http://")
-                and not auth_url.startswith("https://")
-            ):
-                auth_url = f"https://{auth_url}"
-            return SWIFTBlockStoreConfig(
-                swift_authurl=auth_url,
-                swift_tenant=tenant,
-                swift_container=container,
-                swift_user=user,
-                swift_password=password,
-            )
-        else:
-            raise click.BadParameter(f"Invalid blockstore type `{parts[0]}`")
-
-
-def _parse_blockstore_params(raw_params: str) -> BaseBlockStoreConfig:
-    raid_configs = defaultdict(list)
-    for raw_param in raw_params:
-        raid_mode: Optional[str]
-        raid_node: Optional[int]
-        raw_param_parts = raw_param.split(":", 2)
-        if raw_param_parts[0].upper() in ("RAID0", "RAID1", "RAID5") and len(raw_param_parts) == 3:
-            raid_mode, raw_raid_node, node_param = raw_param_parts
-            try:
-                raid_node = int(raw_raid_node)
-            except ValueError:
-                raise click.BadParameter(f"Invalid node index `{raid_node}` (must be integer)")
-        else:
-            raid_mode = raid_node = None
-            node_param = raw_param
-        raid_configs[raid_mode].append((raid_node, node_param))
-
-    if len(raid_configs) != 1:
-        config_types = [k if k else v[0][1] for k, v in raid_configs.items()]
-        raise click.BadParameter(
-            f"Multiple blockstore config with different types: {'/'.join(config_types)}"
-        )
-
-    raid_mode, raid_params = list(raid_configs.items())[0]
-    if not raid_mode:
-        if len(raid_params) == 1:
-            return _parse_blockstore_param(raid_params[0][1])
-        else:
-            raise click.BadParameter("Multiple blockstore configs only available for RAID mode")
-
-    blockstores = []
-    for x in count(0):
-        if x == len(raid_params):
-            break
-
-        x_node_params = [node_param for raid_node, node_param in raid_params if raid_node == x]
-        if len(x_node_params) == 0:
-            raise click.BadParameter(f"Missing node index `{x}` in RAID config")
-        elif len(x_node_params) > 1:
-            raise click.BadParameter(f"Multiple configuration for node index `{x}` in RAID config")
-        blockstores.append(_parse_blockstore_param(x_node_params[0]))
-
-    if raid_mode.upper() == "RAID0":
-        return RAID0BlockStoreConfig(blockstores=blockstores)
-    elif raid_mode.upper() == "RAID1":
-        return RAID1BlockStoreConfig(blockstores=blockstores)
-    elif raid_mode.upper() == "RAID5":
-        return RAID5BlockStoreConfig(blockstores=blockstores)
-    else:
-        raise click.BadParameter(f"Invalid multi blockstore mode `{raid_mode}`")
-
-
 def _parse_forward_proto_enforce_https_check_param(
     raw_param: Optional[str],
-) -> Optional[Tuple[bytes, bytes]]:
+) -> Optional[Tuple[str, str]]:
     if raw_param is None:
         return None
     try:
@@ -188,7 +47,7 @@ def _parse_forward_proto_enforce_https_check_param(
     except ValueError:
         raise click.BadParameter(f"Invalid format, should be `<header-name>:<header-value>`")
     # HTTP header key is case-insensitive unlike the header value
-    return (key.lower().encode("utf8"), value.encode("utf8"))
+    return (key.lower(), value)
 
 
 class DevOption(click.Option):
@@ -246,35 +105,7 @@ For instance:
     envvar="PARSEC_PORT",
     help="Port to listen on",
 )
-@click.option(
-    "--db",
-    required=True,
-    envvar="PARSEC_DB",
-    metavar="URL",
-    help="""Database configuration.
-Allowed values:
-
-\b
--`MOCKED`: Mocked in memory
--`postgresql://<...>`: Use PostgreSQL database
-
-\b
-""",
-)
-@click.option(
-    "--db-min-connections",
-    default=5,
-    show_default=True,
-    envvar="PARSEC_DB_MIN_CONNECTIONS",
-    help="Minimal number of connections to the database if using PostgreSQL",
-)
-@click.option(
-    "--db-max-connections",
-    default=7,
-    show_default=True,
-    envvar="PARSEC_DB_MAX_CONNECTIONS",
-    help="Maximum number of connections to the database if using PostgreSQL",
-)
+@db_backend_options
 @click.option(
     "--maximum-database-connection-attempts",
     default=10,
@@ -290,37 +121,7 @@ Allowed values:
     envvar="PARSEC_PAUSE_BEFORE_RETRY_DATABASE_CONNECTION",
     help="Number of seconds before a new attempt at connecting to the database",
 )
-@click.option(
-    "--blockstore",
-    "-b",
-    required=True,
-    multiple=True,
-    callback=lambda ctx, param, value: _parse_blockstore_params(value),
-    envvar="PARSEC_BLOCKSTORE",
-    metavar="CONFIG",
-    help="""Blockstore configuration.
-Allowed values:
-
-\b
--`MOCKED`: Mocked in memory
--`POSTGRESQL`: Use the database specified in the `--db` param
--`s3:[<endpoint_url>]:<region>:<bucket>:<key>:<secret>`: Use S3 storage
--`swift:<auth_url>:<tenant>:<container>:<user>:<password>`: Use SWIFT storage
-
-Note endpoint_url/auth_url are considered as https by default (e.g.
-`s3:foo.com:[...]` -> https://foo.com).
-Escaping must be used to provide a custom scheme (e.g. `s3:http\\://foo.com:[...]`).
-
-On top of that, multiple blockstore configurations can be provided to form a
-RAID0/1/5 cluster.
-
-Each configuration must be provided with the form
-`<raid_type>:<node>:<config>` with `<raid_type>` RAID0/RAID1/RAID5, `<node>` a
-integer and `<config>` the MOCKED/POSTGRESQL/S3/SWIFT config.
-
-\b
-""",
-)
+@blockstore_backend_options
 @click.option(
     "--administration-token",
     required=True,
@@ -496,7 +297,7 @@ def run_cmd(
     email_use_ssl: bool,
     email_use_tls: bool,
     email_sender: str,
-    forward_proto_enforce_https: Optional[Tuple[bytes, bytes]],
+    forward_proto_enforce_https: Optional[Tuple[str, str]],
     ssl_keyfile: Optional[Path],
     ssl_certfile: Optional[Path],
     log_level: str,
@@ -510,16 +311,6 @@ def run_cmd(
     # Start a local backend
 
     with cli_exception_handler(debug):
-        ssl_context: Optional[ssl.SSLContext]
-        if ssl_certfile or ssl_keyfile:
-            ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-            if ssl_certfile:
-                ssl_context.load_cert_chain(ssl_certfile, ssl_keyfile)
-            else:
-                ssl_context.load_default_certs()
-        else:
-            ssl_context = None
-
         email_config: EmailConfig
         if email_host == "MOCKED":
             tmpdir = tempfile.mkdtemp(prefix="tmp-email-folder-")
@@ -547,7 +338,6 @@ def run_cmd(
             db_max_connections=db_max_connections,
             blockstore_config=blockstore,
             email_config=email_config,
-            ssl_context=True if ssl_context else False,
             forward_proto_enforce_https=forward_proto_enforce_https,
             backend_addr=backend_addr,
             debug=debug,
@@ -571,7 +361,16 @@ def run_cmd(
                 maximum_database_connection_attempts, pause_before_retry_database_connection
             )
             trio_run(
-                _run_backend, host, port, ssl_context, retry_policy, app_config, use_asyncio=True
+                partial(
+                    _run_backend,
+                    host=host,
+                    port=port,
+                    ssl_certfile=ssl_certfile,
+                    ssl_keyfile=ssl_keyfile,
+                    retry_policy=retry_policy,
+                    app_config=app_config,
+                ),
+                use_asyncio=True,
             )
         except KeyboardInterrupt:
             click.echo("bye ;-)")
@@ -599,7 +398,8 @@ class RetryPolicy:
 async def _run_backend(
     host: str,
     port: int,
-    ssl_context: Optional[ssl.SSLContext],
+    ssl_certfile: Optional[Path],
+    ssl_keyfile: Optional[Path],
     retry_policy: RetryPolicy,
     app_config: BackendConfig,
 ) -> None:
@@ -616,7 +416,13 @@ async def _run_backend(
                 retry_policy.success()
 
                 # Serve backend through TCP
-                await _serve_backend(backend, host, port, ssl_context)
+                await _serve_backend_with_asgi(
+                    backend=backend,
+                    host=host,
+                    port=port,
+                    ssl_certfile=ssl_certfile,
+                    ssl_keyfile=ssl_keyfile,
+                )
 
         except ConnectionError as exc:
             # The maximum number of attempt is reached
@@ -629,28 +435,30 @@ async def _run_backend(
             await retry_policy.pause()
 
 
-async def _serve_backend(
-    backend: BackendApp, host: str, port: int, ssl_context: Optional[ssl.SSLContext]
+async def _serve_backend_with_asgi(
+    backend: BackendApp,
+    host: str,
+    port: int,
+    ssl_certfile: Optional[Path],
+    ssl_keyfile: Optional[Path],
 ) -> None:
-    # Client handler
-    async def _serve_client(stream: trio.abc.Stream) -> None:
-        if ssl_context:
-            stream = trio.SSLStream(stream, ssl_context, server_side=True)
-
-        try:
-            await backend.handle_client(stream)
-
-        except ConnectionError:
-            # Should be handled by the reconnection logic (see `_run_and_retry_back`)
-            raise
-
-        except Exception:
-            # If we are here, something unexpected happened...
-            logger.exception("Unexpected crash")
-            await stream.aclose()
-
-    # Provide a service nursery so multi-errors errors are handled
-    async with trio.open_service_nursery() as nursery:  # type: ignore[attr-defined]
-        await trio.serve_tcp(  # type: ignore[call-arg]
-            _serve_client, port, handler_nursery=nursery, host=host
-        )
+    app = app_factory(backend)
+    # Note: Hypercorn comes with default values for incoming data size to
+    # avoid DoS abuse, so just trust them on that ;-)
+    hyper_config = HyperConfig.from_mapping(
+        {
+            "bind": [f"{host}:{port}"],
+            "accesslog": logging.getLogger("hypercorn.access"),
+            # Timestamp is added by the log processor configured in `parsec.logging`,
+            # here we configure peer address + req line + rep status + rep body size + time
+            # (e.g. "GET 88.0.12.52:54160 /foo 1.1 404 823o 12343ms")
+            "access_log_format": "%(h)s %(r)s %(s)s %(b)so %(D)sus",
+            "errorlog": logging.getLogger("hypercorn.error"),
+            "certfile": str(ssl_certfile) if ssl_certfile else None,
+            "keyfile": str(ssl_keyfile) if ssl_certfile else None,
+        }
+    )
+    await serve(app, hyper_config)
+    # `hypercorn.serve` catches KeyboardInterrupt and returns, so re-raise
+    # the keyboard interrupt to continue shutdown
+    raise KeyboardInterrupt

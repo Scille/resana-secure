@@ -1,15 +1,17 @@
 # Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2016-2021 Scille SAS
 
 import trio
-from typing import Optional
+from typing import Optional, Callable
 from functools import partial
 from pendulum import now as pendulum_now
-from async_generator import asynccontextmanager
+from contextlib import asynccontextmanager
 
+from parsec.serde import packb
 from parsec.api.protocol import (
     ping_serializer,
     organization_stats_serializer,
     organization_config_serializer,
+    organization_bootstrap_serializer,
     block_create_serializer,
     block_read_serializer,
     realm_create_serializer,
@@ -56,7 +58,7 @@ from parsec.api.protocol import (
     pki_enrollment_accept_serializer,
 )
 
-from tests.common import real_clock_fail_after
+from tests.common import real_clock_timeout
 
 
 def craft_http_request(
@@ -109,29 +111,34 @@ async def do_http_request(
 
     # In theory there is no guarantee `stream.receive_some()` outputs
     # an entire HTTP request (it typically depends on the TCP stack and
-    # the network). However given we mock the TCP stack in the tests
-    # (see `OpenTCPStreamMockWrapper` class), we have the guarantee
-    # a buffer send through `stream.send_data()` on the backend side
-    # won't be splitted into multiple `stream.receive_some()` on the
-    # client side (and vice-versa). However it's still possible for
-    # multiple `stream.send_data()` to be merged and outputed on a
-    # single `stream.receive_some()`.
-    # Of course this is totally dependant of the backend's implementation
-    # so things may change in the future ;-)
-    rep = await stream.receive_some()
+    # the network).
+    # However given we communicate only on the localhost loop, we can
+    # cross our fingers really hard and expect the http header part will come
+    # as a single trame.
+    rep = b""
+    while b"\r\n\r\n" not in rep:
+        part = await stream.receive_some()
+        if not part:
+            # Connection closed by peer
+            raise trio.BrokenResourceError
+        rep += part
     status, rep_headers = parse_http_response(rep)
-    rep_body = rep.split(b"\r\n\r\n", 1)[1]
+    rep_content = rep.split(b"\r\n\r\n", 1)[1]
     content_size = int(rep_headers.get("content-length", "0"))
     if content_size:
-        while len(rep_body) < content_size:
-            rep_body += await stream.receive_some()
+        while len(rep_content) < content_size:
+            rep_content += await stream.receive_some()
         # No need to check for another request beeing put after the
         # body in the buffer given we don't use keep alive
-        assert len(rep_body) == content_size
+        assert len(rep_content) == content_size
     else:
-        assert rep_body == b""
+        # In case the current request is a connection upgrade to websocket, the
+        # server is allowed to start sending websocket messages right away that
+        # may end up as part of the TCP trame that contained the response
+        if b"Connection: Upgrade" not in rep:
+            assert rep_content == b""
 
-    return status, rep_headers, rep_body
+    return status, rep_headers, rep_content
 
 
 class CmdSock:
@@ -141,13 +148,16 @@ class CmdSock:
         self.parse_args = parse_args
         self.check_rep_by_default = check_rep_by_default
 
-    async def _do_send(self, sock, args, kwargs):
+    async def _do_send(self, ws, req_post_processing, args, kwargs):
         req = {"cmd": self.cmd, **self.parse_args(self, *args, **kwargs)}
-        raw_req = self.serializer.req_dumps(req)
-        await sock.send(raw_req)
+        if req_post_processing:
+            raw_req = packb(req_post_processing(self.serializer.req_dump(req)))
+        else:
+            raw_req = self.serializer.req_dumps(req)
+        await ws.send(raw_req)
 
-    async def _do_recv(self, sock, check_rep):
-        raw_rep = await sock.recv()
+    async def _do_recv(self, ws, check_rep):
+        raw_rep = await ws.receive()
         rep = self.serializer.rep_loads(raw_rep)
 
         if check_rep:
@@ -155,10 +165,10 @@ class CmdSock:
 
         return rep
 
-    async def __call__(self, sock, *args, **kwargs):
+    async def __call__(self, ws, *args, req_post_processing: Callable = None, **kwargs):
         check_rep = kwargs.pop("check_rep", self.check_rep_by_default)
-        await self._do_send(sock, args, kwargs)
-        return await self._do_recv(sock, check_rep)
+        await self._do_send(ws, req_post_processing, args, kwargs)
+        return await self._do_recv(ws, check_rep)
 
     class AsyncCallRepBox:
         def __init__(self, do_recv):
@@ -177,15 +187,15 @@ class CmdSock:
             self._rep = await self._do_recv()
 
     @asynccontextmanager
-    async def async_call(self, sock, *args, **kwargs):
+    async def async_call(self, sock, *args, req_post_processing: Callable = None, **kwargs):
         check_rep = kwargs.pop("check_rep", self.check_rep_by_default)
-        await self._do_send(sock, args, kwargs)
+        await self._do_send(sock, req_post_processing, args, kwargs)
 
         box = self.AsyncCallRepBox(do_recv=partial(self._do_recv, sock, check_rep))
         yield box
 
         if not box.rep_done:
-            async with real_clock_fail_after(1):
+            async with real_clock_timeout():
                 await box.do_recv()
 
 
@@ -210,6 +220,22 @@ organization_config = CmdSock(
 
 organization_stats = CmdSock(
     "organization_stats", organization_stats_serializer, check_rep_by_default=True
+)
+
+
+organization_bootstrap = CmdSock(
+    "organization_bootstrap",
+    organization_bootstrap_serializer,
+    parse_args=lambda self, bootstrap_token, root_verify_key, user_certificate, device_certificate, redacted_user_certificate, redacted_device_certificate, sequester_authority_certificate=None: {
+        "bootstrap_token": bootstrap_token,
+        "root_verify_key": root_verify_key,
+        "user_certificate": user_certificate,
+        "device_certificate": device_certificate,
+        "redacted_user_certificate": redacted_user_certificate,
+        "redacted_device_certificate": redacted_device_certificate,
+        "sequester_authority_certificate": sequester_authority_certificate,
+    },
+    check_rep_by_default=True,
 )
 
 
@@ -289,12 +315,13 @@ realm_finish_reencryption_maintenance = CmdSock(
 vlob_create = CmdSock(
     "vlob_create",
     vlob_create_serializer,
-    parse_args=lambda self, realm_id, vlob_id, blob, timestamp=None, encryption_revision=1: {
+    parse_args=lambda self, realm_id, vlob_id, blob, timestamp=None, encryption_revision=1, sequester_blob=None: {
         "realm_id": realm_id,
         "vlob_id": vlob_id,
         "blob": blob,
         "timestamp": timestamp or pendulum_now(),
         "encryption_revision": encryption_revision,
+        "sequester_blob": sequester_blob,
     },
     check_rep_by_default=True,
 )
@@ -311,12 +338,13 @@ vlob_read = CmdSock(
 vlob_update = CmdSock(
     "vlob_update",
     vlob_update_serializer,
-    parse_args=lambda self, vlob_id, version, blob, timestamp=None, encryption_revision=1: {
+    parse_args=lambda self, vlob_id, version, blob, timestamp=None, encryption_revision=1, sequester_blob=None: {
         "vlob_id": vlob_id,
         "version": version,
         "blob": blob,
         "encryption_revision": encryption_revision,
         "timestamp": timestamp or pendulum_now(),
+        "sequester_blob": sequester_blob,
     },
     check_rep_by_default=True,
 )

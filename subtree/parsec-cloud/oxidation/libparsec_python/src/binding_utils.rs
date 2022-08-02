@@ -31,38 +31,38 @@ pub fn hash_generic(value_to_hash: &str, py: Python) -> PyResult<isize> {
     Ok(hash)
 }
 
-pub fn py_to_rs_datetime(timestamp: &PyAny) -> PyResult<parsec_api_types::DateTime> {
+pub fn py_to_rs_datetime(timestamp: &PyAny) -> PyResult<libparsec::types::DateTime> {
     let ts_any =
         Python::with_gil(|_py| -> PyResult<&PyAny> { timestamp.getattr("timestamp")?.call0() })?;
     let ts = ts_any.extract::<f64>()?;
-    Ok(parsec_api_types::DateTime::from_f64_with_us_precision(ts))
+    Ok(libparsec::types::DateTime::from_f64_with_us_precision(ts))
 }
 
-pub fn rs_to_py_datetime(py: Python, datetime: parsec_api_types::DateTime) -> PyResult<&PyAny> {
+pub fn rs_to_py_datetime(py: Python, datetime: libparsec::types::DateTime) -> PyResult<&PyAny> {
     let pendulum = PyModule::import(py, "pendulum")?;
     let args = PyTuple::new(py, vec![datetime.get_f64_with_us_precision()]);
     pendulum.call_method1("from_timestamp", args)
 }
 
-pub fn rs_to_py_realm_role(role: &parsec_api_types::RealmRole) -> PyResult<PyObject> {
+pub fn rs_to_py_realm_role(role: &libparsec::types::RealmRole) -> PyResult<PyObject> {
     Python::with_gil(|py| -> PyResult<PyObject> {
         let cls = py.import("parsec.api.protocol")?.getattr("RealmRole")?;
         let role_name = match role {
-            parsec_api_types::RealmRole::Owner => "OWNER",
-            parsec_api_types::RealmRole::Manager => "MANAGER",
-            parsec_api_types::RealmRole::Contributor => "CONTRIBUTOR",
-            parsec_api_types::RealmRole::Reader => "READER",
+            libparsec::types::RealmRole::Owner => "OWNER",
+            libparsec::types::RealmRole::Manager => "MANAGER",
+            libparsec::types::RealmRole::Contributor => "CONTRIBUTOR",
+            libparsec::types::RealmRole::Reader => "READER",
         };
         let obj = cls.getattr(role_name)?;
         Ok(obj.into_py(py))
     })
 }
 
-pub fn py_to_rs_realm_role(role: &PyAny) -> PyResult<Option<parsec_api_types::RealmRole>> {
+pub fn py_to_rs_realm_role(role: &PyAny) -> PyResult<Option<libparsec::types::RealmRole>> {
     if role.is_none() {
         return Ok(None);
     }
-    use parsec_api_types::RealmRole::*;
+    use libparsec::types::RealmRole::*;
     Ok(Some(match role.getattr("name")?.extract::<&str>()? {
         "OWNER" => Owner,
         "MANAGER" => Manager,
@@ -72,8 +72,8 @@ pub fn py_to_rs_realm_role(role: &PyAny) -> PyResult<Option<parsec_api_types::Re
     }))
 }
 
-pub fn py_to_rs_user_profile(profile: &PyAny) -> PyResult<parsec_api_types::UserProfile> {
-    use parsec_api_types::UserProfile::*;
+pub fn py_to_rs_user_profile(profile: &PyAny) -> PyResult<libparsec::types::UserProfile> {
+    use libparsec::types::UserProfile::*;
     Ok(match profile.getattr("name")?.extract::<&str>()? {
         "ADMIN" => Admin,
         "STANDARD" => Standard,
@@ -82,23 +82,22 @@ pub fn py_to_rs_user_profile(profile: &PyAny) -> PyResult<parsec_api_types::User
     })
 }
 
-pub fn rs_to_py_user_profile(profile: &parsec_api_types::UserProfile) -> PyResult<PyObject> {
+pub fn rs_to_py_user_profile(profile: &libparsec::types::UserProfile) -> PyResult<PyObject> {
+    use libparsec::types::UserProfile::*;
     Python::with_gil(|py| -> PyResult<PyObject> {
-        let cls = py.import("parsec.api.protocol")?.getattr("UserProfile")?;
+        let cls = py.import("parsec.api.data")?.getattr("UserProfile")?;
         let profile_name = match profile {
-            parsec_api_types::UserProfile::Admin => "ADMIN",
-            parsec_api_types::UserProfile::Standard => "STANDARD",
-            parsec_api_types::UserProfile::Outsider => "OUTSIDER",
+            Admin => "ADMIN",
+            Standard => "STANDARD",
+            Outsider => "OUTSIDER",
         };
         let obj = cls.getattr(profile_name)?;
         Ok(obj.into_py(py))
     })
 }
 
-pub fn py_to_rs_invitation_status(
-    status: &PyAny,
-) -> PyResult<parsec_api_protocol::InvitationStatus> {
-    use parsec_api_protocol::InvitationStatus::*;
+pub fn py_to_rs_invitation_status(status: &PyAny) -> PyResult<libparsec::types::InvitationStatus> {
+    use libparsec::types::InvitationStatus::*;
     Ok(match status.getattr("name")?.extract::<&str>()? {
         "IDLE" => Idle,
         "READY" => Ready,
@@ -121,10 +120,19 @@ pub fn py_to_rs_regex(regex: &PyAny) -> PyResult<Regex> {
     let regex = regex
         .getattr("pattern")
         .unwrap_or(regex)
-        .extract::<String>()?
+        .extract::<&str>()?
         .replace("\\Z", "\\z")
         .replace("\\ ", "\x20");
     Regex::new(&regex).map_err(|e| PyValueError::new_err(e.to_string()))
+}
+
+pub fn rs_to_py_regex<'py>(py: Python<'py>, regex: &Regex) -> PyResult<&'py PyAny> {
+    let re = py.import("re")?;
+    let args = PyTuple::new(
+        py,
+        vec![regex.as_str().replace("\\z", "\\Z").replace('\x20', "\\ ")],
+    );
+    re.call_method1("compile", args)
 }
 
 macro_rules! parse_kwargs_optional {

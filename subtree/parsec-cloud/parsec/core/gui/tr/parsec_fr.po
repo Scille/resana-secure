@@ -7,16 +7,16 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2022-05-12 06:21+0200\n"
+"POT-Creation-Date: 2022-07-25 08:31+0200\n"
 "PO-Revision-Date: 2020-10-15 10:31+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
 "Language-Team: fr <LL@li.org>\n"
-"Plural-Forms: nplurals=2; plural=(n > 1)\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.9.1\n"
+"Generated-By: Babel 2.10.3\n"
 
 msgid "TEXT_PARSEC_VERSION_version"
 msgstr "PARSEC version {version}"
@@ -56,8 +56,8 @@ msgstr ""
 msgid "ACTION_UPDATE_SUBSCRIPTION"
 msgstr "Changer d'abonnement"
 
-msgid "ACTION_COPY_BACKEND_ADDR"
-msgstr "Copier l'adresse du serveur"
+msgid "ACTION_DEVICE_MENU_THIS_ORGANIZATION"
+msgstr "Cette organisation"
 
 msgid "ACTION_DEVICE_MENU_CHANGE_AUTHENTICATION"
 msgstr "Changer l'authentification"
@@ -80,9 +80,6 @@ msgstr ""
 
 msgid "TEXT_SAAS_UPDATE_SUBSCRIPTION_URL"
 msgstr "https://parsec.cloud/comment-changer-dabonnement-parsec/"
-
-msgid "TEXT_BACKEND_ADDR_COPIED_TO_CLIPBOARD"
-msgstr "L'adresse du serveur a été copiée dans le presse-papier."
 
 msgid "TEXT_NOTIF_INFO_WORKSPACE_READ_ONLY"
 msgstr "Cet espace de travail est en lecture seule."
@@ -218,13 +215,21 @@ msgid "TEXT_CLAIM_DEVICE_INVITATION_NOT_FOUND"
 msgstr "L'invitation n'a pas été trouvée."
 
 msgid "TEXT_INVITATION_BACKEND_NOT_AVAILABLE"
-msgstr "La connexion au serveur a été perdue. Veuillez vérifier votre connexion et redémarrer le processus."
+msgstr ""
+"La connexion au serveur a été perdue. Veuillez vérifier votre connexion "
+"et redémarrer le processus."
 
 msgid "TEXT_CLAIM_DEVICE_UNKNOWN_ERROR"
 msgstr "Erreur interne. Veuillez redémarrer le processus."
 
 msgid "TEXT_CLAIM_DEVICE_TITLE"
 msgstr "Enregistrer un appareil"
+
+msgid "TEXT_CLAIM_USER_FINALIZE_INSTRUCTIONS-name_email_device"
+msgstr ""
+"L'utilisateur <b>{name}</b> (<b>{email}</b>) ainsi que votre appareil "
+"<b>{device}</b> ont été créés. Pour commencer à utiliser Parsec, il vous "
+"faut à présent choisir un mot de passe."
 
 msgid "TEXT_CLAIM_USER_INVALID_CODE_CLICKED"
 msgstr ""
@@ -258,9 +263,6 @@ msgid "TEXT_CLAIM_USER_WAIT_PEER_TRUST_ERROR"
 msgstr ""
 "Erreur pendant l'attente de confirmation du code SAS. Veuillez redémarrer"
 " le processus."
-
-msgid "TEXT_CLAIM_USER_INVALID_HUMAN_HANDLE"
-msgstr "L'email est invalide."
 
 msgid "TEXT_CLAIM_USER_CLAIM_ERROR"
 msgstr ""
@@ -301,31 +303,28 @@ msgstr "Erreur interne. Veuillez redémarrer le processus."
 msgid "TEXT_CLAIM_USER_TITLE"
 msgstr "Enregistrer un utilisateur"
 
+msgid "ACTION_CREATE_ORG"
+msgstr "Créer l'organisation"
+
 msgid "TEXT_BOOTSTRAP_ORGANIZATION_INSTRUCTIONS_organization"
 msgstr ""
 "Veuillez fournir les informations suivantes pour démarrer l'organisation "
 "<b>{organization}</b>."
 
-msgid "TEXT_ORG_WIZARD_INVALID_ORGANIZATION_ID"
-msgstr "Le nom d'organisation n'est pas valide."
-
 msgid "TEXT_ORG_WIZARD_INVALID_BACKEND_ADDR"
 msgstr "L'adresse du serveur n'est pas valide."
 
-msgid "TEXT_ORG_WIZARD_INVALID_HUMAN_HANDLE"
-msgstr "L'adresse email n'est pas valide."
-
-msgid "TEXT_ORG_WIZARD_INVALID_DEVICE_LABEL"
-msgstr "Le nom de d'appareil n'est pas valide."
-
-msgid "ACTION_CREATE_ORG"
-msgstr "Créer l'organisation"
+msgid "ACTION_CREATE_DEVICE"
+msgstr "Créer l'appareil"
 
 msgid "TEXT_ORG_WIZARD_ORGANIZATION_ALREADY_EXISTS"
 msgstr "Une organisation du même nom existe déjà."
 
 msgid "TEXT_ORG_WIZARD_INVALID_EMAIL"
 msgstr "L'email n'est pas valide."
+
+msgid "TEXT_ORG_WIZARD_INVALID_ORGANIZATION_ID"
+msgstr "Le nom d'organisation n'est pas valide."
 
 msgid "TEXT_ORG_WIZARD_OFFLINE"
 msgstr "Le serveur est hors-ligne ou vous n'avez pas de connexion internet."
@@ -431,9 +430,6 @@ msgstr "Impossible d'importer cette clef d'appareil."
 msgid "TEXT_RECOVERY_IMPORT_SUCCESS"
 msgstr "L'appareil a été récupéré avec succès"
 
-msgid "ACTION_CREATE_DEVICE"
-msgstr "Créer l'appareil"
-
 msgid "TEXT_DEVICE_RECOVERY_IMPORT_WIZARD_TITLE"
 msgstr "Récupérer un appareil"
 
@@ -468,11 +464,11 @@ msgstr "Écraser la requête"
 msgid "ACTION_NO"
 msgstr "Non"
 
-msgid "TEXT_ENROLLMENT_SUBMIT_FAILED"
-msgstr "Impossible de faire une demande d'enrôlement"
-
 msgid "TEXT_ENROLLMENT_SUBMIT_FAILED_EMAIL_USED"
 msgstr "L'adresse email du certificat est déja attributée à un utilisateur actif"
+
+msgid "TEXT_ENROLLMENT_SUBMIT_FAILED"
+msgstr "Impossible de faire une demande d'enrôlement"
 
 msgid "TEXT_ENROLLMENT_ERROR_LOADING_CERTIFICATE"
 msgstr "Impossible de charger le certificate"
@@ -636,6 +632,12 @@ msgid "TEXT_FILE_DROP_WORKSPACE_IS_READ_ONLY"
 msgstr ""
 "Impossible d'importer des fichiers car vous n'avez pas accès à cet espace"
 " de travail en écriture."
+
+msgid "TEXT_FILE_FOLDER_INFO_WITH_SELECTED_count-selected"
+msgstr "{count} éléments au total, {selected} sélectionnés"
+
+msgid "TEXT_FILE_FOLDER_INFO_NO_SELECTED_count"
+msgstr "{count} éléments au total"
 
 msgid "TEXT_FILE_LINK_COPIED_TO_CLIPBOARD"
 msgstr "Le lien vers le fichier a été copié dans le presse-papier."
@@ -921,9 +923,6 @@ msgstr "Suite à une annulation de l'invité, il faut redémarrer le precessus"
 
 msgid "TEXT_GREET_USER_PEER_RESET"
 msgstr "Suite à une annulation de l'invité, il faut redémarrer le processus."
-
-msgid "TEXT_GREET_USER_INVALID_HUMAN_HANDLE"
-msgstr "L'email n'est pas valide."
 
 msgid "TEXT_GREET_USER_CREATE_USER_ERROR"
 msgstr ""
@@ -2071,17 +2070,57 @@ msgstr "Êtes-vous sûr de vouloir fermer PARSEC ?"
 msgid "ACTION_PARSEC_QUIT_CONFIRM"
 msgstr "Quitter"
 
-msgid "TEXT_ORGANIZATION_SIZE_organizationsize"
-msgstr "<b>{organizationsize}</b> utilisés"
-
-msgid "TEXT_ORGANIZATION_SIZE_TOOLTIP_datasize-metadatasize"
-msgstr ""
-"Données : <b>{datasize}</b>\n"
-"<br />\n"
-"Méta-données : <b>{metadatasize}</b>"
-
 msgid "TEXT_PARSEC_NEW_VERSION_AVAILABLE_version"
 msgstr "La version <b>{version}</b> de PARSEC est disponible !"
+
+msgid "TEXT_ORG_INFO_DATA_SIZE-size"
+msgstr "Taille des données : {size}"
+
+msgid "TEXT_ORG_INFO_METADATA_SIZE-size"
+msgstr "Taille des métadonnées : {size}"
+
+msgid "TEXT_ORG_INFO_DATA_TOTAL_SIZE-size"
+msgstr "Taille totale : {size}"
+
+msgid "TEXT_ORG_INFO_ACTIVE_USERS_COUNT-count"
+msgstr "{count} utilisateur(s) actif(s)"
+
+msgid "TEXT_ORG_INFO_REVOKED_USERS_COUNT-count"
+msgstr "{count} utilisateur(s) révoqué(s)"
+
+msgid "TEXT_ORG_INFO_ADMIN_COUNT-count"
+msgstr "{count} administrateur(s)"
+
+msgid "TEXT_ORG_INFO_STANDARD_COUNT-count"
+msgstr "{count} utilisateur(s) standard(s)"
+
+msgid "TEXT_ORG_INFO_OUTSIDER_COUNT-count"
+msgstr "{count} utilisateur(s) externe(s)"
+
+msgid "TEXT_ORG_INFO_OUTSIDER_ALLOWED"
+msgstr "Les utilisateurs externes sont autorisés"
+
+msgid "TEXT_ORG_INFO_OUTSIDER_NOT_ALLOWED"
+msgstr "Les utilisateurs externes ne sont pas autorisés"
+
+msgid "TEXT_ORG_INFO_USER_LIMIT_UNLIMITED"
+msgstr "Aucune limite du nombre d'utilisateurs"
+
+msgid "TEXT_ORG_INFO_USER_LIMIT-limit"
+msgstr "<b>{limit}</b> utilisateurs maximum"
+
+msgid "TEXT_ORG_INFO_SEQUESTRATION_TOOLTIP"
+msgstr ""
+"Dans une organisation où le séquestre est activé, les données sont "
+"toujours <br />chiffrées de bout en bout, mais le créateur de "
+"l'organisation peut y avoir accès.<br />Celà peut servir à recouvrer des "
+"données ou pour des raisons légales."
+
+msgid "TEXT_ORG_INFO_SEQUESTRATION_ACTIVATED"
+msgstr "Le <u>séquestre</u> est activé"
+
+msgid "TEXT_BACKEND_ADDR_COPIED_TO_CLIPBOARD"
+msgstr "L'adresse du serveur a été copiée dans le presse-papier."
 
 msgid "TEXT_PASSWORD_CHECK_MATCH"
 msgstr "Le mot de passe et la confirmation sont les mêmes."
@@ -2452,18 +2491,18 @@ msgstr "Rechiffrer l'espace de travail"
 msgid "ACTION_WORKSPACE_REENCRYPTION_CONFIRM"
 msgstr "Rechiffrer"
 
-msgid "TEXT_WORKPACE_REENCRYPT_OFFLINE_ERROR"
+msgid "TEXT_WORKSPACE_REENCRYPT_OFFLINE_ERROR"
 msgstr "Échec lors du rechiffrement, impossible de joindre le serveur."
 
-msgid "TEXT_WORKPACE_REENCRYPT_ACCESS_ERROR"
+msgid "TEXT_WORKSPACE_REENCRYPT_ACCESS_ERROR"
 msgstr ""
 "Échec lors du rechiffrement, vous n'avez pas la permission de rechiffrer "
 "cet espace de travail."
 
-msgid "TEXT_WORKPACE_REENCRYPT_NOT_FOUND_ERROR"
+msgid "TEXT_WORKSPACE_REENCRYPT_NOT_FOUND_ERROR"
 msgstr "Échec lors du rechiffrement, l'espace de travail n'a pas été trouvé."
 
-msgid "TEXT_WORKPACE_REENCRYPT_FS_ERROR"
+msgid "TEXT_WORKSPACE_REENCRYPT_FS_ERROR"
 msgstr "Échec lors du rechiffrement, l'espace de travail est déjà en maintenance."
 
 msgid "TEXT_WORKSPACE_REENCRYPT_UNKOWN_ERROR"
@@ -2532,11 +2571,6 @@ msgstr "Parfait ! Veuillez maintenant fournir le code suivant à la personne :"
 
 msgid "TEXT_CLAIM_USER_CODE_EXCHANGE_WAIT"
 msgstr "En attente de l'autre personne"
-
-msgid "TEXT_CLAIM_USER_FINALIZE_INSTRUCTIONS"
-msgstr ""
-"L'utilisateur a été créé avec succès ! Pour commencer à utiliser PARSEC, "
-"vous devez maintenant choisir un mot de passe."
 
 msgid "TEXT_CLAIM_USER_RETRIEVING_INFO"
 msgstr "Récupération des informations depuis le serveur..."
@@ -2901,6 +2935,21 @@ msgstr "Votre application est à jour."
 msgid "LABEL_NOTIFICATIONS"
 msgstr ""
 
+msgid "ACTION_COPY_BACKEND_ADDR"
+msgstr "Copier l'adresse du serveur"
+
+msgid "TEXT_ORG_INFO_CONFIG_TITLE"
+msgstr "Configuration de l'organisation"
+
+msgid "TEXT_ORG_INFO_SIZE_TITLE"
+msgstr "Taille de l'organisation"
+
+msgid "TEXT_ORG_INFO_USERS_TITLE"
+msgstr "Utilisateurs dans l'organisations"
+
+msgid "TEXT_ORG_INFO_SERVER_ADDR_TITLE"
+msgstr "Adresse du serveur"
+
 msgid "TEXT_PASSWORD_WARNING"
 msgstr ""
 "Votre mot de passe est extrêmement important. Veuillez choisir un mot de "
@@ -2951,9 +3000,6 @@ msgstr "Interface"
 msgid "TEXT_SETTINGS_CHECK_SHOW_CONFINED_FILES"
 msgstr "Afficher les fichiers exclus de la synchronisation"
 
-msgid "TEXT_SETTINGS_CHECK_USE_WORKSPACES_COLORS"
-msgstr "Utiliser des couleurs pour les espaces de travail"
-
 msgid "ACTION_SAVE"
 msgstr "Sauvegarder"
 
@@ -2986,9 +3032,6 @@ msgstr "Accueillir l'utilisateur"
 
 msgid "TEXT_USERS_FILTER_USERS_PLACEHOLDER"
 msgstr "Filtrer les utilisateurs"
-
-msgid "ACTION_FILTER_LIST_USERS"
-msgstr "Rechercher utilisateurs"
 
 msgid "ACTION_USER_INVITE_USER"
 msgstr "Inviter un utilisateur"

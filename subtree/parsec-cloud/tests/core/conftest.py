@@ -1,7 +1,7 @@
 # Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2016-2021 Scille SAS
 
 import pytest
-from async_generator import asynccontextmanager
+from contextlib import asynccontextmanager
 
 from parsec.core.backend_connection import (
     backend_authenticated_cmds_factory,
@@ -45,22 +45,6 @@ async def alice2_remote_devices_manager(remote_devices_manager_factory, alice2):
 async def bob_remote_devices_manager(remote_devices_manager_factory, bob):
     async with remote_devices_manager_factory(bob) as rdm:
         yield rdm
-
-
-@pytest.fixture
-def backend_addr_factory(running_backend, tcp_stream_spy):
-    # Creating new addr for backend make it easy be selective on what to
-    # turn offline
-    counter = 0
-
-    def _backend_addr_factory():
-        nonlocal counter
-        addr = f"tcp://backend-addr-{counter}.localhost:9999"
-        tcp_stream_spy.push_hook(addr, running_backend.connection_factory)
-        counter += 1
-        return addr
-
-    return _backend_addr_factory
 
 
 @pytest.fixture

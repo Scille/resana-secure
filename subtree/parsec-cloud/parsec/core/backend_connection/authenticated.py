@@ -2,7 +2,7 @@
 
 import trio
 from enum import Enum
-from async_generator import asynccontextmanager
+from contextlib import asynccontextmanager
 from typing import Optional, List, AsyncGenerator, Callable, TypeVar
 from structlog import get_logger
 from functools import partial
@@ -190,7 +190,10 @@ class BackendAuthenticatedConn:
         # On top of that, we pre-populate the cache with a "good enough" default
         # value so organization config is guaranteed to be always available \o/
         self._organization_config = OrganizationConfig(
-            user_profile_outsider_allowed=False, active_users_limit=None
+            user_profile_outsider_allowed=False,
+            active_users_limit=None,
+            sequester_authority=None,
+            sequester_services=None,
         )
         self.event_bus = event_bus
         self.max_cooldown = max_cooldown
@@ -280,8 +283,8 @@ class BackendAuthenticatedConn:
                 # (e.g. 0, 1, 2, 4, 8, 15, 15, 15 etc. if max cooldown is 15s)
                 if self._backend_connection_failures < 1:
                     # A cooldown time of 0 second is useful for the specific case of a
-                    # revokation when the event listener is the only running transport.
-                    # This way, we don't have to wait 1 second before the revokation is
+                    # revocation when the event listener is the only running transport.
+                    # This way, we don't have to wait 1 second before the revocation is
                     # detected.
                     cooldown_time = 0
                 else:
@@ -325,9 +328,15 @@ class BackendAuthenticatedConn:
                     )
 
             else:
+                # `organization_config` also provide sequester configuration, however
+                # we just ignore it (the remote_loader will lazily load the config
+                # the first time it tries a manifest upload with the wrong config)
                 self._organization_config = OrganizationConfig(
                     user_profile_outsider_allowed=rep["user_profile_outsider_allowed"],
                     active_users_limit=rep["active_users_limit"],
+                    # Sequester introduced in APIv2.8/3.2
+                    sequester_authority=rep.get("sequester_authority_certificate"),
+                    sequester_services=rep.get("sequester_services_certificates"),
                 )
 
             rep = await cmds.events_subscribe(transport)
@@ -378,7 +387,7 @@ class BackendAuthenticatedConn:
         if not ignore_status:
             if self.status_exc:
                 # Re-raising an already raised exception is bad practice
-                # as its internal state gets mutated everytime is raised.
+                # as its internal state gets mutated every time is raised.
                 # Note that this copy preserves the __cause__ attribute.
                 raise copy_exception(self.status_exc)
 

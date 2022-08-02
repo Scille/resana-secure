@@ -1,5 +1,6 @@
 # Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2016-2021 Scille SAS
 
+import sys
 import pytest
 import threading
 import trio
@@ -24,6 +25,12 @@ def mountpoint_service_factory(tmpdir, local_device_factory, user_fs_factory, re
     Run a trio loop with fs and mountpoint manager in a separate thread to
     allow blocking operations on the mountpoint in the test
     """
+
+    # Signals have to be patched in the main thread when using fuse
+    if sys.platform != "win32":
+        from parsec.core.mountpoint.fuse_runner import _patch_signals
+
+        _patch_signals()
 
     async def _run_mountpoint(
         base_mountpoint, bootstrap_cb, *, task_status=trio.TASK_STATUS_IGNORED

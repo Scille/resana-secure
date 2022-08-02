@@ -74,9 +74,7 @@ class BaseTypedReqSchema(BaseReqSchema):
     def make_obj(  # type: ignore[misc]
         self, data: Dict[str, Any]
     ) -> "BaseReq":
-        return self.TYPE(  # type: ignore[call-arg]
-            **data
-        )
+        return self.TYPE(**data)  # type: ignore[call-arg]
 
 
 class BaseRepSchema(BaseSchema):
@@ -94,9 +92,7 @@ class BaseTypedRepSchema(BaseRepSchema):
         self, data: Dict[str, Any]
     ) -> "BaseRep":
         data.pop("status")
-        return self.TYPE(  # type: ignore[call-arg]
-            **data
-        )
+        return self.TYPE(**data)  # type: ignore[call-arg]
 
 
 class ErrorRepSchema(BaseRepSchema):
@@ -182,10 +178,10 @@ class CmdSerializer:
             fallback_type_schema = ErrorRepSchema
             type_schemas = {
                 "ok": self.rep_noerror_schema,
-                "require_greater_timestamp": RequireGreaterTimestampRepSchema,
-                "bad_timestamp": TimestampOutOfBallparkRepSchema,
+                "require_greater_timestamp": RequireGreaterTimestampRepSchema(),
+                "bad_timestamp": TimestampOutOfBallparkRepSchema(),
+                **{k: v() for k, v in extra_error_schemas.items()},
             }
-            type_schemas.update(extra_error_schemas)
 
             def get_obj_type(self, obj: Dict[str, object]) -> str:
                 try:

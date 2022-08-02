@@ -22,7 +22,7 @@ from parsec.core.fs.exceptions import (
     FSFileNotFoundError,
 )
 from parsec.core.gui.trio_jobs import JobResultError, QtToTrioJob
-from parsec.core.gui import desktop
+from parsec.core.gui import desktop, validators
 from parsec.core.gui.file_items import FileType, TYPE_DATA_INDEX
 from parsec.core.gui.custom_dialogs import (
     ask_question,
@@ -32,7 +32,6 @@ from parsec.core.gui.custom_dialogs import (
     GreyedDialog,
     QDialogInProcess,
 )
-from parsec.core.gui.custom_widgets import CenteredSpinnerWidget
 from parsec.core.gui.file_history_widget import FileHistoryWidget
 from parsec.core.gui.loading_widget import LoadingWidget
 from parsec.core.gui.lang import translate as _
@@ -47,6 +46,7 @@ logger = get_logger()
 # Type alias for files to import
 # Files are copied from a trio path to an FS path.
 ImportFiles = List[Tuple[trio.Path, FsPath]]
+ImportErrors = List[Tuple[trio.Path, OSError]]
 
 
 class CancelException(Exception):
@@ -262,10 +262,8 @@ class FilesWidget(QWidget, Ui_FilesWidget):
         super().__init__(*args, **kwargs)
         self.setupUi(self)
 
-        # Create spinner and stack it on the table_files widget
-        self.spinner = CenteredSpinnerWidget(parent=self.table_files)
-        self.table_files_layout.addWidget(self.spinner, 0, 0)
         self.spinner.hide()
+        self.label_elements.hide()
 
         self.core = core
         self.jobs_ctx = jobs_ctx
@@ -307,6 +305,7 @@ class FilesWidget(QWidget, Ui_FilesWidget):
         self.table_files.cut_clicked.connect(self.on_cut_clicked)
         self.table_files.file_path_clicked.connect(self.on_get_file_path_clicked)
         self.table_files.open_current_dir_clicked.connect(self.on_open_current_dir_clicked)
+        self.table_files.itemSelectionChanged.connect(self._on_selection_changed)
 
         self.rename_success.connect(self._on_rename_success)
         self.rename_error.connect(self._on_rename_error)
@@ -338,6 +337,7 @@ class FilesWidget(QWidget, Ui_FilesWidget):
     def set_workspace_fs(
         self, wk_fs, current_directory=FsPath("/"), default_selection=None, clipboard=None
     ):
+        self.table_files.clear()
         self.current_directory = current_directory
         self.workspace_fs = wk_fs
         self.load(current_directory)
@@ -367,6 +367,24 @@ class FilesWidget(QWidget, Ui_FilesWidget):
                     source_workspace=self.clipboard.source_workspace.get_workspace_name().str,
                 )
         self.reset(default_selection)
+
+    def _on_selection_changed(self):
+        selected_count = len(self.table_files.selected_files())
+        file_count = max(self.table_files.rowCount() - 1, 0)
+        if not file_count:
+            self.label_elements.hide()
+            return
+        self.label_elements.show()
+        if selected_count:
+            self.label_elements.setText(
+                _("TEXT_FILE_FOLDER_INFO_WITH_SELECTED_count-selected").format(
+                    count=file_count, selected=selected_count
+                )
+            )
+        else:
+            self.label_elements.setText(
+                _("TEXT_FILE_FOLDER_INFO_NO_SELECTED_count").format(count=file_count)
+            )
 
     def reset(self, default_selection=None):
         workspace_name = self.workspace_fs.get_workspace_name()
@@ -502,13 +520,19 @@ class FilesWidget(QWidget, Ui_FilesWidget):
     def rename_files(self):
         files = self.table_files.selected_files()
         if len(files) == 1:
+            selection_end = files[0].name.find(".")
+            # If no "." or starts with a ".", we want to select the whole file name
+            if selection_end in [-1, 0]:
+                selection_end = len(files[0].name)
             new_name = get_text_input(
                 self,
                 _("TEXT_FILE_RENAME_TITLE"),
                 _("TEXT_FILE_RENAME_INSTRUCTIONS"),
                 placeholder=_("TEXT_FILE_RENAME_PLACEHOLDER"),
                 default_text=files[0].name,
+                validator=validators.FileNameValidator(),
                 button_text=_("ACTION_FILE_RENAME"),
+                selection=(0, selection_end),
             )
             if not new_name:
                 return
@@ -531,6 +555,7 @@ class FilesWidget(QWidget, Ui_FilesWidget):
                 _("TEXT_FILE_RENAME_MULTIPLE_TITLE_count").format(count=len(files)),
                 _("TEXT_FILE_RENAME_MULTIPLE_INSTRUCTIONS_count").format(count=len(files)),
                 placeholder=_("TEXT_FILE_RENAME_MULTIPLE_PLACEHOLDER"),
+                validator=validators.FileNameValidator(),
                 button_text=_("ACTION_FILE_RENAME_MULTIPLE"),
             )
             if not new_name:
@@ -647,6 +672,8 @@ class FilesWidget(QWidget, Ui_FilesWidget):
 
     def load(self, directory, default_selection=None):
         self.spinner.show()
+        self.label_elements.hide()
+        self.table_files.setEnabled(False)
         self.current_directory = directory
         self.current_directory_id = None
         self.jobs_ctx.submit_job(
@@ -700,7 +727,20 @@ class FilesWidget(QWidget, Ui_FilesWidget):
         files = []
         try:
             # Get the list of files to import with the corresponding size
-            files, total_size = await self._get_files_from_sources(sources, dest)
+            files, total_size, errors = await self._get_files_from_sources(sources, dest)
+
+            # Nothing to do
+            if not files and not errors:
+                return
+
+            # Log errors
+            for source, exc in errors:
+                logger.exception(f"Could not load {source}", exc_info=exc)
+
+            # No file to import, raise the first error
+            if not files and errors:
+                (_source, exc), *_more_errors = errors
+                raise exc
 
             # Make the job cancellable
             with trio.CancelScope() as cancel_scope:
@@ -756,34 +796,52 @@ class FilesWidget(QWidget, Ui_FilesWidget):
 
     # Import async helpers
 
-    async def _get_files(self, source: trio.Path, dest: FsPath) -> Tuple[ImportFiles, int]:
-        # Source is a file
-        if await source.is_file():
-            stat = await source.stat()
-            return [(source, dest / source.name)], stat.st_size
-        # Source is a directory
-        files = []
-        total_size = 0
-        # Loop over children and aggregate
-        for child in await source.iterdir():
-            child_files, child_size = await self._get_files(child, dest / source.name)
-            files.extend(child_files)
-            total_size += child_size
-        return files, total_size
+    async def _get_files(
+        self, source: trio.Path, dest: FsPath
+    ) -> Tuple[ImportFiles, int, ImportErrors]:
+        try:
+            # Source is a file
+            if await source.is_file():
+                stat = await source.stat()
+                return [(source, dest / source.name)], stat.st_size, []
+
+            # Neither a file or a directory, simply ignore
+            if not await source.is_dir():
+                return [], 0, []
+
+            # Source is a directory
+            files = []
+            errors = []
+            total_size = 0
+            # Loop over children and aggregate
+            for child in await source.iterdir():
+                child_files, child_size, child_errors = await self._get_files(
+                    child, dest / source.name
+                )
+                files.extend(child_files)
+                errors.extend(child_errors)
+                total_size += child_size
+            return files, total_size, errors
+
+        # Source is not available (e.g `PermissionDenied`)
+        except OSError as exc:
+            return [], 0, [(source, exc)]
 
     async def _get_files_from_sources(
         self, sources: Iterable[str], dest: FsPath
-    ) -> Tuple[ImportFiles, int]:
+    ) -> Tuple[ImportFiles, int, ImportErrors]:
         files = []
+        errors = []
         total_size = 0
         # Loop over sources and make sure to work with trio paths
         for source in sources:
             source = trio.Path(source)
             # Aggregate the results
-            source_files, source_size = await self._get_files(source, dest)
+            source_files, source_size, source_errors = await self._get_files(source, dest)
             files.extend(source_files)
+            errors.extend(source_errors)
             total_size += source_size
-        return files, total_size
+        return files, total_size, errors
 
     async def _import_all(
         self, files: ImportFiles, loading_dialog: LoadingWidget
@@ -828,6 +886,16 @@ class FilesWidget(QWidget, Ui_FilesWidget):
 
         # Open the file to import
         async with await trio.open_file(source, "rb") as f:
+
+            # Getting the file name without extension (anything after the first dot is considered to be the extension)
+            name_we, *suffixes = dest.name.str.split(".")
+            # Count starts at 2 (1 would be the file without a number)
+            count = 2
+            while await self.workspace_fs.exists(dest):
+                # Create the new file name by adding the count ("myfile.txt" becomes "myfile (2).txt")
+                new_file_name = EntryName(".".join([f"{name_we} ({count})", *suffixes]))
+                dest = dest.parent / new_file_name
+                count += 1
 
             # Open the file to create
             async with await self.workspace_fs.open_file(dest, "wb") as dest_file:
@@ -886,6 +954,7 @@ class FilesWidget(QWidget, Ui_FilesWidget):
             _("TEXT_FILE_CREATE_FOLDER_INSTRUCTIONS"),
             placeholder=_("TEXT_FILE_CREATE_FOLDER_PLACEHOLDER"),
             button_text=_("ACTION_FILE_CREATE_FOLDER"),
+            validator=validators.FileNameValidator(),
         )
         if not folder_name:
             return
@@ -940,7 +1009,6 @@ class FilesWidget(QWidget, Ui_FilesWidget):
             old_selection = [x.name for x in self.table_files.selected_files()]
 
         self.table_files.clear()
-        self.spinner.hide()
         old_sort = self.table_files.horizontalHeader().sortIndicatorSection()
         old_order = self.table_files.horizontalHeader().sortIndicatorOrder()
         self.table_files.setSortingEnabled(False)
@@ -983,11 +1051,28 @@ class FilesWidget(QWidget, Ui_FilesWidget):
         if default_selection and not file_found:
             show_error(self, _("TEXT_FILE_GOTO_LINK_NOT_FOUND"))
         workspace_name = self.workspace_fs.get_workspace_name()
+        self.spinner.hide()
+        self.table_files.setEnabled(True)
+        selected_count = len(self.table_files.selected_files())
+        if selected_count:
+            self.label_elements.setText(
+                _("TEXT_FILE_FOLDER_INFO_WITH_SELECTED_count-selected").format(
+                    count=len(files_stats), selected=selected_count
+                )
+            )
+        else:
+            self.label_elements.setText(
+                _("TEXT_FILE_FOLDER_INFO_NO_SELECTED_count").format(count=len(files_stats))
+            )
+        self.label_elements.show()
         self.folder_changed.emit(workspace_name, str(self.current_directory))
 
     def _on_folder_stat_error(self, job):
         self.table_files.clear()
         self.spinner.hide()
+        self.table_files.setEnabled(True)
+        self.label_elements.show()
+        self.label_elements.setText(_("TEXT_FILE_FOLDER_INFO_NO_SELECTED_count").format(count=0))
         if isinstance(job.exc, FSFileNotFoundError):
             show_error(self, _("TEXT_FILE_FOLDER_NOT_FOUND"))
             self.table_files.add_parent_workspace()
