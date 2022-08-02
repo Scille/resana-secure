@@ -7,10 +7,10 @@
 
 To update the Parsec subtree to a new version:
 
-.. code-block:: shell
-
-    git subtree pull --squash --prefix='subtree/parsec-cloud' -- 'git@github.com:Scille/parsec-cloud.git' $VERSION
-    git subtree pull --squash --prefix='subtree/parsec-extensions' -- 'git@github.com:vxgmichel/parsec-extensions.git' $VERSION
+```shell
+git subtree pull --squash --prefix='subtree/parsec-cloud' -- 'git@github.com:Scille/parsec-cloud.git' $VERSION
+git subtree pull --squash --prefix='subtree/parsec-extensions' -- 'git@github.com:vxgmichel/parsec-extensions.git' $VERSION
+```
 
 ## Release
 
@@ -22,18 +22,19 @@ On the master branch:
 2) Modify version in pyproject.toml
 3) Create the release commit
 
-.. code-block:: shell
-    git commit -a -m "Bump version $VERSION"
-    git push
+```shell
+git commit -a -m "Bump version $VERSION"
+git push
+```
 
 Then wait for a green CI ;-)
 
 ### 2 - Create a tag and push it
 
-.. code-block:: shell
-
-    git tag $VERSION -a -s -m "Release version $VERSION"
-    git push origin $VERSION
+```shell
+git tag $VERSION -a -s -m "Release version $VERSION"
+git push origin $VERSION
+```
 
 ### 3 - Generate the installer
 
@@ -41,16 +42,16 @@ Then wait for a green CI ;-)
 2) Extract the artifact output in `packaging/windows/build`
 3) Run `make_installer.py`
 
-.. code-block:: shell
-
-    pushd packaging/windows
-    # Ensure we are building from scratch !
-    rm -rf build
-    # <Extract the CI artifact>
-    # Sign the executable, generate the installer and sign it
-    set PATH=C:\Program Files (x86)\NSIS;%PATH%
-    set PATH=C:\Program Files (x86)\Windows Kits\10\bin\10.0.18362.0\x64;%PATH%
-    python make_installer.py --sign-mode exe
+```shell
+pushd packaging/windows
+# Ensure we are building from scratch !
+rm -rf build
+# <Extract the CI artifact>
+# Sign the executable, generate the installer and sign it
+set PATH=C:\Program Files (x86)\NSIS;%PATH%
+set PATH=C:\Program Files (x86)\Windows Kits\10\bin\10.0.18362.0\x64;%PATH%
+python make_installer.py --sign-mode exe
+```
 
 ### 3 - Create the release on Github
 
