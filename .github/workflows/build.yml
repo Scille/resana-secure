@@ -43,9 +43,8 @@ jobs:
           set -eux
           poetry install
       - name: 'Run tests'
-        run: |
-          set -eux
-          poetry run py.test tests
+        run: poetry run py.test tests
+        timeout-minutes: 10
 
 
 #################################################################################
@@ -82,10 +81,8 @@ jobs:
           set -eux
           poetry install
       - name: 'Run tests'
-        shell: bash
-        run: |
-          set -eux
-          poetry run py.test tests
+        run: poetry run py.test tests
+        timeout-minutes: 10
 
 
 #################################################################################
