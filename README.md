@@ -16,21 +16,17 @@ To update the Parsec subtree to a new version:
 
 ### 1 - Generate a new release
 
+On the master branch:
+
+1) Modify version in renasa_secure/_version.py
+2) Modify version in pyproject.toml
+3) Create the release commit
+
 .. code-block:: shell
+    git commit -a -m "Bump version $VERSION"
+    git push
 
-    # 1) Modify version in renasa_secure/_version.py
-    # 2) Modify version in pyproject.toml
-    # 3) git commit -a -m "Bump version $VERSION"
-
-    pushd packaging/win32
-    # Ensure we are building from scratch !
-    rm -rf build
-    # Note the release will use the Python version used to run the script
-    "C:\Users\gbleu\AppData\Local\Programs\Python\Python39\python.exe" freeze_program.py ../..
-    # Sign the executable, generate the installer and sign it
-    set PATH=C:\Program Files (x86)\NSIS;%PATH%
-    set PATH=C:\Program Files (x86)\Windows Kits\10\bin\10.0.18362.0\x64;%PATH%
-    python make_installer.py --sign-mode exe
+Then wait for a green CI ;-)
 
 ### 2 - Create a tag and push it
 
@@ -38,6 +34,23 @@ To update the Parsec subtree to a new version:
 
     git tag $VERSION -a -s -m "Release version $VERSION"
     git push origin $VERSION
+
+### 3 - Generate the installer
+
+1) Download the artifact from the tag's CI run.
+2) Extract the artifact output in `packaging/windows/build`
+3) Run `make_installer.py`
+
+.. code-block:: shell
+
+    pushd packaging/windows
+    # Ensure we are building from scratch !
+    rm -rf build
+    # <Extract the CI artifact>
+    # Sign the executable, generate the installer and sign it
+    set PATH=C:\Program Files (x86)\NSIS;%PATH%
+    set PATH=C:\Program Files (x86)\Windows Kits\10\bin\10.0.18362.0\x64;%PATH%
+    python make_installer.py --sign-mode exe
 
 ### 3 - Create the release on Github
 
