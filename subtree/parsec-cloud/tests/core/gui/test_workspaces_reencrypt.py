@@ -35,7 +35,7 @@ async def display_reencryption_button(aqtbot, monkeypatch, workspace_widget):
         assert isinstance(wk_button, WorkspaceButton)
         assert wk_button.name == EntryName("w1")
 
-    await aqtbot.wait_until(_workspace_displayed, timeout=2000)
+    await aqtbot.wait_until(_workspace_displayed)
     wk_button = workspace_widget.layout_workspaces.itemAt(0).widget()
 
     def _reencrypt_button_displayed():
@@ -95,26 +95,26 @@ async def test_workspace_reencryption_display(
         assert isinstance(wk_button, WorkspaceButton)
         assert wk_button.name == EntryName("w1")
 
-    await aqtbot.wait_until(partial(_workspace_displayed, w_w), timeout=2000)
+    await aqtbot.wait_until(partial(_workspace_displayed, w_w))
     wk_button = w_w.layout_workspaces.itemAt(0).widget()
 
     def _reencrypt_button_not_displayed():
         assert wk_button.button_reencrypt.isHidden()
         assert not wk_button.button_reencrypt.isVisible()
 
-    await aqtbot.wait_until(_reencrypt_button_not_displayed, timeout=2000)
+    await aqtbot.wait_until(_reencrypt_button_not_displayed)
 
     await revoke_user_workspace_right(shared_workspace, alice_user_fs, bob_user_fs, bob.user_id)
 
     w_w = await logged_gui.test_switch_to_workspaces_widget()
 
-    await aqtbot.wait_until(partial(_workspace_displayed, w_w), timeout=2000)
+    await aqtbot.wait_until(partial(_workspace_displayed, w_w))
     wk_button = w_w.layout_workspaces.itemAt(0).widget()
 
     def _reencrypt_button_displayed():
         assert wk_button.button_reencrypt.isVisible()
 
-    await aqtbot.wait_until(_reencrypt_button_displayed, timeout=2000)
+    await aqtbot.wait_until(_reencrypt_button_displayed)
 
 
 @pytest.mark.gui
@@ -167,7 +167,7 @@ async def test_workspace_reencryption_offline_backend(
         def _assert_error():
             assert len(autoclose_dialog.dialogs) == 1
             assert autoclose_dialog.dialogs == [
-                ("Error", translate("TEXT_WORKPACE_REENCRYPT_OFFLINE_ERROR"))
+                ("Error", translate("TEXT_WORKSPACE_REENCRYPT_OFFLINE_ERROR"))
             ]
             assert wk_button.button_reencrypt.isVisible()
 
@@ -198,7 +198,7 @@ async def test_workspace_reencryption_fs_error(
     def _assert_error():
         assert len(autoclose_dialog.dialogs) == 1
         assert autoclose_dialog.dialogs == [
-            ("Error", translate("TEXT_WORKPACE_REENCRYPT_FS_ERROR"))
+            ("Error", translate("TEXT_WORKSPACE_REENCRYPT_FS_ERROR"))
         ]
         assert wk_button.button_reencrypt.isVisible()
 
@@ -242,7 +242,7 @@ async def test_workspace_reencryption_access_error(
         assert len(autoclose_dialog.dialogs) == 2
         assert (
             "Error",
-            translate("TEXT_WORKPACE_REENCRYPT_ACCESS_ERROR"),
+            translate("TEXT_WORKSPACE_REENCRYPT_ACCESS_ERROR"),
         ) in autoclose_dialog.dialogs
         assert wk_button.button_reencrypt.isVisible()
 
@@ -278,7 +278,7 @@ async def test_workspace_reencryption_not_found_error(
     def _assert_error():
         assert len(autoclose_dialog.dialogs) == 1
         assert autoclose_dialog.dialogs == [
-            ("Error", translate("TEXT_WORKPACE_REENCRYPT_NOT_FOUND_ERROR"))
+            ("Error", translate("TEXT_WORKSPACE_REENCRYPT_NOT_FOUND_ERROR"))
         ]
         assert wk_button.button_reencrypt.isVisible()
 
@@ -304,10 +304,10 @@ async def test_workspace_reencryption_do_one_batch_error(
 ):
 
     expected_errors = {
-        FSBackendOfflineError: translate("TEXT_WORKPACE_REENCRYPT_OFFLINE_ERROR"),
-        FSError: translate("TEXT_WORKPACE_REENCRYPT_FS_ERROR"),
-        FSWorkspaceNoAccess: translate("TEXT_WORKPACE_REENCRYPT_ACCESS_ERROR"),
-        FSWorkspaceNotFoundError: translate("TEXT_WORKPACE_REENCRYPT_NOT_FOUND_ERROR"),
+        FSBackendOfflineError: translate("TEXT_WORKSPACE_REENCRYPT_OFFLINE_ERROR"),
+        FSError: translate("TEXT_WORKSPACE_REENCRYPT_FS_ERROR"),
+        FSWorkspaceNoAccess: translate("TEXT_WORKSPACE_REENCRYPT_ACCESS_ERROR"),
+        FSWorkspaceNotFoundError: translate("TEXT_WORKSPACE_REENCRYPT_NOT_FOUND_ERROR"),
         Exception: translate("TEXT_WORKSPACE_REENCRYPT_UNKOWN_ERROR"),
     }
 
@@ -341,8 +341,11 @@ async def test_workspace_reencryption_do_one_batch_error(
         )
 
 
+# This test has been detected as flaky.
+# Using re-runs is a valid temporary solutions but the problem should be investigated in the future.
 @pytest.mark.gui
 @pytest.mark.trio
+@pytest.mark.flaky(reruns=3)
 async def test_workspace_reencryption_continue(
     aqtbot,
     running_backend,

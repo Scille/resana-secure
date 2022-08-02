@@ -7,16 +7,16 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2022-05-12 06:21+0200\n"
+"POT-Creation-Date: 2022-07-25 08:31+0200\n"
 "PO-Revision-Date: 2020-10-15 10:30+0200\n"
 "Last-Translator: \n"
 "Language: en\n"
 "Language-Team: en <LL@li.org>\n"
-"Plural-Forms: nplurals=2; plural=(n != 1)\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.9.1\n"
+"Generated-By: Babel 2.10.3\n"
 
 msgid "TEXT_PARSEC_VERSION_version"
 msgstr "PARSEC version {version}"
@@ -56,8 +56,8 @@ msgstr ""
 msgid "ACTION_UPDATE_SUBSCRIPTION"
 msgstr "Update subscription"
 
-msgid "ACTION_COPY_BACKEND_ADDR"
-msgstr "Copy server address"
+msgid "ACTION_DEVICE_MENU_THIS_ORGANIZATION"
+msgstr "This organization"
 
 msgid "ACTION_DEVICE_MENU_CHANGE_AUTHENTICATION"
 msgstr "Change authentication"
@@ -80,9 +80,6 @@ msgstr ""
 
 msgid "TEXT_SAAS_UPDATE_SUBSCRIPTION_URL"
 msgstr "https://parsec.cloud/comment-changer-dabonnement-parsec/"
-
-msgid "TEXT_BACKEND_ADDR_COPIED_TO_CLIPBOARD"
-msgstr "Server address has been copied to the clipboard."
 
 msgid "TEXT_NOTIF_INFO_WORKSPACE_READ_ONLY"
 msgstr "This workspace is read-only"
@@ -212,13 +209,21 @@ msgid "TEXT_CLAIM_DEVICE_INVITATION_NOT_FOUND"
 msgstr "No invitation found."
 
 msgid "TEXT_INVITATION_BACKEND_NOT_AVAILABLE"
-msgstr "The connection to the server has been lost. Please check your internet connection and restart the process."
+msgstr ""
+"The connection to the server has been lost. Please check your internet "
+"connection and restart the process."
 
 msgid "TEXT_CLAIM_DEVICE_UNKNOWN_ERROR"
 msgstr "Error while registering the new device."
 
 msgid "TEXT_CLAIM_DEVICE_TITLE"
 msgstr "Register a device"
+
+msgid "TEXT_CLAIM_USER_FINALIZE_INSTRUCTIONS-name_email_device"
+msgstr ""
+"The user <b>{name}</b> (<b>{email}</b>) along with your device "
+"<b>{device}</b> were successfully created. To start using Parsec, you "
+"will now have to choose a password."
 
 msgid "TEXT_CLAIM_USER_INVALID_CODE_CLICKED"
 msgstr ""
@@ -246,9 +251,6 @@ msgid "TEXT_CLAIM_USER_WAIT_PEER_TRUST_ERROR"
 msgstr ""
 "Error while waiting for peer SAS code acknowledgement. Please restart the"
 " process."
-
-msgid "TEXT_CLAIM_USER_INVALID_HUMAN_HANDLE"
-msgstr "The email is invalid."
 
 msgid "TEXT_CLAIM_USER_CLAIM_ERROR"
 msgstr "Error while validating invite information. Please restart the process."
@@ -287,31 +289,28 @@ msgstr "Unexpected error. Please restart the process."
 msgid "TEXT_CLAIM_USER_TITLE"
 msgstr "Register a user"
 
+msgid "ACTION_CREATE_ORG"
+msgstr "Create the organization"
+
 msgid "TEXT_BOOTSTRAP_ORGANIZATION_INSTRUCTIONS_organization"
 msgstr ""
 "Please fill out the following information to bootstrap the organization "
 "<b>{organization}</b>."
 
-msgid "TEXT_ORG_WIZARD_INVALID_ORGANIZATION_ID"
-msgstr "The organization name is invalid."
-
 msgid "TEXT_ORG_WIZARD_INVALID_BACKEND_ADDR"
 msgstr "The server address is invalid."
 
-msgid "TEXT_ORG_WIZARD_INVALID_HUMAN_HANDLE"
-msgstr "The email address is invalid."
-
-msgid "TEXT_ORG_WIZARD_INVALID_DEVICE_LABEL"
-msgstr "The device name is invalid."
-
-msgid "ACTION_CREATE_ORG"
-msgstr "Create the organization"
+msgid "ACTION_CREATE_DEVICE"
+msgstr "Create the device"
 
 msgid "TEXT_ORG_WIZARD_ORGANIZATION_ALREADY_EXISTS"
 msgstr "This organization name is already used."
 
 msgid "TEXT_ORG_WIZARD_INVALID_EMAIL"
 msgstr "The email is invalid."
+
+msgid "TEXT_ORG_WIZARD_INVALID_ORGANIZATION_ID"
+msgstr "The organization name is invalid."
 
 msgid "TEXT_ORG_WIZARD_OFFLINE"
 msgstr "The server is offline or you have no access to the internet."
@@ -411,9 +410,6 @@ msgstr "Cannot import device key"
 msgid "TEXT_RECOVERY_IMPORT_SUCCESS"
 msgstr "The device has been successfully recovered"
 
-msgid "ACTION_CREATE_DEVICE"
-msgstr "Create the device"
-
 msgid "TEXT_DEVICE_RECOVERY_IMPORT_WIZARD_TITLE"
 msgstr "Recover a device"
 
@@ -448,11 +444,11 @@ msgstr "Remake the request"
 msgid "ACTION_NO"
 msgstr "No"
 
-msgid "TEXT_ENROLLMENT_SUBMIT_FAILED"
-msgstr "Could not make the request."
-
 msgid "TEXT_ENROLLMENT_SUBMIT_FAILED_EMAIL_USED"
 msgstr "The certificate email address is already used by an active user"
+
+msgid "TEXT_ENROLLMENT_SUBMIT_FAILED"
+msgstr "Could not make the request."
 
 msgid "TEXT_ENROLLMENT_ERROR_LOADING_CERTIFICATE"
 msgstr "Error loading certificate."
@@ -610,6 +606,12 @@ msgstr "Workspaces list"
 
 msgid "TEXT_FILE_DROP_WORKSPACE_IS_READ_ONLY"
 msgstr "Cannot import files because you don't have write access to this workspace."
+
+msgid "TEXT_FILE_FOLDER_INFO_WITH_SELECTED_count-selected"
+msgstr "{count} elements in total, {selected} selected"
+
+msgid "TEXT_FILE_FOLDER_INFO_NO_SELECTED_count"
+msgstr "{count} elements in total"
 
 msgid "TEXT_FILE_LINK_COPIED_TO_CLIPBOARD"
 msgstr "A link to the file has been copied to your clipboard."
@@ -885,9 +887,6 @@ msgstr ""
 
 msgid "TEXT_GREET_USER_PEER_RESET"
 msgstr "The invitee has reset the process. We will restart from the beginning."
-
-msgid "TEXT_GREET_USER_INVALID_HUMAN_HANDLE"
-msgstr "The email is invalid."
 
 msgid "TEXT_GREET_USER_CREATE_USER_ERROR"
 msgstr "An error occurred while creating the user. Please restart the process."
@@ -2015,17 +2014,56 @@ msgstr "Are you sure you want to close PARSEC?"
 msgid "ACTION_PARSEC_QUIT_CONFIRM"
 msgstr "Quit"
 
-msgid "TEXT_ORGANIZATION_SIZE_organizationsize"
-msgstr "<b>{organizationsize}</b> used"
-
-msgid "TEXT_ORGANIZATION_SIZE_TOOLTIP_datasize-metadatasize"
-msgstr ""
-"Data: <b>{datasize}</b>\n"
-"<br />\n"
-"Meta-data: <b>{metadatasize}</b>"
-
 msgid "TEXT_PARSEC_NEW_VERSION_AVAILABLE_version"
 msgstr "The version <b>{version}</b> of PARSEC is available!"
+
+msgid "TEXT_ORG_INFO_DATA_SIZE-size"
+msgstr "Data size: <b>{size}</b>"
+
+msgid "TEXT_ORG_INFO_METADATA_SIZE-size"
+msgstr "Metadata size: <b>{size}</b>"
+
+msgid "TEXT_ORG_INFO_DATA_TOTAL_SIZE-size"
+msgstr "Total size: <b>{size}</b>"
+
+msgid "TEXT_ORG_INFO_ACTIVE_USERS_COUNT-count"
+msgstr "{count} active user(s)"
+
+msgid "TEXT_ORG_INFO_REVOKED_USERS_COUNT-count"
+msgstr "{count} revoked user(s)"
+
+msgid "TEXT_ORG_INFO_ADMIN_COUNT-count"
+msgstr "{count} administrator(s)"
+
+msgid "TEXT_ORG_INFO_STANDARD_COUNT-count"
+msgstr "{count} standard user(s)"
+
+msgid "TEXT_ORG_INFO_OUTSIDER_COUNT-count"
+msgstr "{count} outsider(s)"
+
+msgid "TEXT_ORG_INFO_OUTSIDER_ALLOWED"
+msgstr "Outsider profile is <b>allowed</b>"
+
+msgid "TEXT_ORG_INFO_OUTSIDER_NOT_ALLOWED"
+msgstr "Outsider profile is <b>not allowed</b>"
+
+msgid "TEXT_ORG_INFO_USER_LIMIT_UNLIMITED"
+msgstr "No limit to the number of users"
+
+msgid "TEXT_ORG_INFO_USER_LIMIT-limit"
+msgstr "Limited to {limit} active users"
+
+msgid "TEXT_ORG_INFO_SEQUESTRATION_TOOLTIP"
+msgstr ""
+"In a sequestered organization, data is still encrypted end-to-end, <br "
+"/>but the organization creator can gain access to it.<br />This is "
+"typically done for data recovery or legal requirements."
+
+msgid "TEXT_ORG_INFO_SEQUESTRATION_ACTIVATED"
+msgstr "<u>Sequestration</u> is activated"
+
+msgid "TEXT_BACKEND_ADDR_COPIED_TO_CLIPBOARD"
+msgstr "Server address has been copied to the clipboard."
 
 msgid "TEXT_PASSWORD_CHECK_MATCH"
 msgstr "The password and the confirmation match."
@@ -2380,18 +2418,18 @@ msgstr "Reencrypt the workspace"
 msgid "ACTION_WORKSPACE_REENCRYPTION_CONFIRM"
 msgstr "Reencrypt"
 
-msgid "TEXT_WORKPACE_REENCRYPT_OFFLINE_ERROR"
+msgid "TEXT_WORKSPACE_REENCRYPT_OFFLINE_ERROR"
 msgstr "Reencryption failure, can not reach the server."
 
-msgid "TEXT_WORKPACE_REENCRYPT_ACCESS_ERROR"
+msgid "TEXT_WORKSPACE_REENCRYPT_ACCESS_ERROR"
 msgstr ""
 "Reencryption failure, you don't have permission to reencrypt the "
 "workspace."
 
-msgid "TEXT_WORKPACE_REENCRYPT_NOT_FOUND_ERROR"
+msgid "TEXT_WORKSPACE_REENCRYPT_NOT_FOUND_ERROR"
 msgstr "Reencryption failure, workspace not found."
 
-msgid "TEXT_WORKPACE_REENCRYPT_FS_ERROR"
+msgid "TEXT_WORKSPACE_REENCRYPT_FS_ERROR"
 msgstr "Reencryption failure, workspace already in maintenance."
 
 msgid "TEXT_WORKSPACE_REENCRYPT_UNKOWN_ERROR"
@@ -2462,11 +2500,6 @@ msgstr "Perfect! Now please provide the following code to the person:"
 
 msgid "TEXT_CLAIM_USER_CODE_EXCHANGE_WAIT"
 msgstr "We're waiting for the other person to enter the code..."
-
-msgid "TEXT_CLAIM_USER_FINALIZE_INSTRUCTIONS"
-msgstr ""
-"The user was successfully created. To start using Parsec, you will now "
-"have to choose a password."
 
 msgid "TEXT_CLAIM_USER_RETRIEVING_INFO"
 msgstr "Retrieving information from the server..."
@@ -2822,6 +2855,21 @@ msgstr "Your PARSEC is up-to-date!"
 msgid "LABEL_NOTIFICATIONS"
 msgstr ""
 
+msgid "ACTION_COPY_BACKEND_ADDR"
+msgstr "Copy server address"
+
+msgid "TEXT_ORG_INFO_CONFIG_TITLE"
+msgstr "Organization's configuration"
+
+msgid "TEXT_ORG_INFO_SIZE_TITLE"
+msgstr "Organization's size"
+
+msgid "TEXT_ORG_INFO_USERS_TITLE"
+msgstr "Organization's users"
+
+msgid "TEXT_ORG_INFO_SERVER_ADDR_TITLE"
+msgstr "Server address"
+
 msgid "TEXT_PASSWORD_WARNING"
 msgstr ""
 "Your password is extremely important. Be sure to chose a secure password "
@@ -2871,9 +2919,6 @@ msgstr "Interface"
 msgid "TEXT_SETTINGS_CHECK_SHOW_CONFINED_FILES"
 msgstr "Display files that will not be synced"
 
-msgid "TEXT_SETTINGS_CHECK_USE_WORKSPACES_COLORS"
-msgstr "Use colors for workspaces"
-
 msgid "ACTION_SAVE"
 msgstr "Save"
 
@@ -2906,9 +2951,6 @@ msgstr "Greet the user"
 
 msgid "TEXT_USERS_FILTER_USERS_PLACEHOLDER"
 msgstr "Filter users"
-
-msgid "ACTION_FILTER_LIST_USERS"
-msgstr "Search users"
 
 msgid "ACTION_USER_INVITE_USER"
 msgstr "Invite a new user"

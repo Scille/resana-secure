@@ -6,14 +6,13 @@
 Parsec
 ======
 
+.. image:: https://github.com/Scille/parsec-cloud/actions/workflows/quality-assurance.yml/badge.svg
+   :target: https://github.com/Scille/parsec-cloud/actions/workflows/quality-assurance.yml
+   :alt: Quality Assurance
 
 .. image:: https://img.shields.io/azure-devops/tests/Scille/parsec/1/master.svg
     :target: https://dev.azure.com/Scille/parsec/_build?definitionId=1&_a=summary
     :alt: Azure DevOps tests
-
-.. image:: https://codecov.io/gh/Scille/parsec-cloud/branch/master/graph/badge.svg
-    :target: https://codecov.io/gh/Scille/parsec-cloud
-    :alt: Code coverage
 
 .. image:: https://pyup.io/repos/github/Scille/parsec-cloud/shield.svg
     :target: https://pyup.io/repos/github/Scille/parsec-cloud/

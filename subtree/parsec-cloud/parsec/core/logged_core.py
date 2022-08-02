@@ -4,11 +4,11 @@ import re
 import attr
 import fnmatch
 from pathlib import Path
-import importlib_resources
+import importlib.resources
 from typing import Optional, Tuple, List, Pattern
 from structlog import get_logger
 from functools import partial
-from async_generator import asynccontextmanager
+from contextlib import asynccontextmanager
 
 from parsec.event_bus import EventBus
 from parsec.api.protocol import (
@@ -18,7 +18,7 @@ from parsec.api.protocol import (
     InvitationDeletedReason,
     InvitationEmailSentStatus,
 )
-from parsec.api.data import RevokedUserCertificateContent
+from parsec.api.data import RevokedUserCertificateContent, EntryName
 from parsec.core.pki import accepter_list_submitted_from_backend
 from parsec.core.types import LocalDevice, UserInfo, DeviceInfo, BackendInvitationAddr
 from parsec.core import resources as core_resources
@@ -98,7 +98,7 @@ def get_prevent_sync_pattern(prevent_sync_pattern_path: Optional[Path] = None) -
         pattern = _get_prevent_sync_pattern(prevent_sync_pattern_path)
     # Default to the pattern from the ignore file in the core resources
     if pattern is None:
-        with importlib_resources.files(core_resources).joinpath("default_pattern.ignore") as path:
+        with importlib.resources.files(core_resources).joinpath("default_pattern.ignore") as path:
             pattern = _get_prevent_sync_pattern(path)
     # As a last resort use the failsafe
     if pattern is None:
@@ -130,7 +130,7 @@ class LoggedCore:
     def backend_status_exc(self) -> Optional[Exception]:
         return self._backend_conn.status_exc
 
-    def find_workspace_from_name(self, workspace_name: str):
+    def find_workspace_from_name(self, workspace_name: EntryName):
         for workspace in self.user_fs.get_user_manifest().workspaces:
             if workspace_name == workspace.name:
                 return workspace

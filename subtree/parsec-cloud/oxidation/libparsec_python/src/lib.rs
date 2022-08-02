@@ -7,14 +7,17 @@
 use pyo3::prelude::{pymodule, wrap_pyfunction, PyModule, PyResult, Python};
 
 mod addrs;
+mod api_crypto;
 mod binding_utils;
 mod certif;
-mod crypto;
+mod file_operations;
 mod ids;
 mod invite;
+mod local_device;
 mod local_manifest;
 mod manifest;
 mod protocol;
+mod storage;
 mod time;
 mod trustchain;
 
@@ -23,12 +26,12 @@ mod trustchain;
 /// import the module.
 #[pymodule]
 fn _libparsec(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_class::<crypto::HashDigest>()?;
-    m.add_class::<crypto::SigningKey>()?;
-    m.add_class::<crypto::VerifyKey>()?;
-    m.add_class::<crypto::SecretKey>()?;
-    m.add_class::<crypto::PrivateKey>()?;
-    m.add_class::<crypto::PublicKey>()?;
+    m.add_class::<api_crypto::HashDigest>()?;
+    m.add_class::<api_crypto::SigningKey>()?;
+    m.add_class::<api_crypto::VerifyKey>()?;
+    m.add_class::<api_crypto::SecretKey>()?;
+    m.add_class::<api_crypto::PrivateKey>()?;
+    m.add_class::<api_crypto::PublicKey>()?;
     m.add_class::<addrs::BackendAddr>()?;
     m.add_class::<addrs::BackendOrganizationAddr>()?;
     m.add_class::<addrs::BackendActionAddr>()?;
@@ -180,5 +183,14 @@ fn _libparsec(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<certif::DeviceCertificate>()?;
     m.add_class::<trustchain::TrustchainContext>()?;
     m.add_function(wrap_pyfunction!(time::freeze_time, m)?)?;
+    // LocalDevice
+    m.add_class::<local_device::LocalDevice>()?;
+    // Storage
+    m.add_class::<storage::WorkspaceStorage>()?;
+    // File operations
+    m.add_function(wrap_pyfunction!(file_operations::prepare_read, m)?)?;
+    m.add_function(wrap_pyfunction!(file_operations::prepare_write, m)?)?;
+    m.add_function(wrap_pyfunction!(file_operations::prepare_resize, m)?)?;
+    m.add_function(wrap_pyfunction!(file_operations::prepare_reshape, m)?)?;
     Ok(())
 }

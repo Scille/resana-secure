@@ -2,10 +2,9 @@
 
 import attr
 import trio
-from urllib.error import URLError
 from pendulum import DateTime
 from structlog import get_logger
-from async_generator import asynccontextmanager
+from contextlib import asynccontextmanager
 
 from parsec import service_nursery
 from parsec.monitoring import TaskMonitoringInstrument
@@ -16,7 +15,6 @@ __all__ = [
     "trio_run",
     "open_service_nursery",
     "split_multi_error",
-    "URLError",
 ]
 
 logger = get_logger()
@@ -231,13 +229,13 @@ async def open_service_nursery():
     patched with extra MultiError capabilities.
     """
     try:
-        async with service_nursery.open_service_nursery() as nursery:
+        async with service_nursery.open_service_nursery_with_multierror() as nursery:
             yield nursery
     except trio.MultiError as exc:
         # Re-raise a Cancelled() if the exception contains a Cancelled()
         await check_cancellation(exc)
         # Collapse the MultiError into a single exception
-        logger.exception("A MultiError has been detected")
+        logger.warning("A MultiError has been detected")
         raise collapse_multi_error(exc)
 
 

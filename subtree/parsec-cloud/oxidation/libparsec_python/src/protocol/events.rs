@@ -5,7 +5,7 @@ use pyo3::import_exception;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyType};
 
-use parsec_api_protocol::authenticated_cmds::{events_listen, events_subscribe};
+use libparsec::protocol::authenticated_cmds::{events_listen, events_subscribe};
 
 use crate::binding_utils::{py_to_rs_invitation_status, py_to_rs_realm_role};
 use crate::ids::{RealmID, VlobID};
@@ -51,7 +51,7 @@ impl EventsListenRep {
     #[pyo3(name = "OkPinged")]
     fn ok_pinged(_cls: &PyType, ping: String) -> PyResult<Self> {
         Ok(Self(events_listen::Rep::Ok(
-            parsec_api_protocol::APIEvent::Pinged { ping },
+            events_listen::APIEvent::Pinged { ping },
         )))
     }
 
@@ -59,7 +59,7 @@ impl EventsListenRep {
     #[pyo3(name = "OkMessageReceived")]
     fn ok_message_received(_cls: &PyType, index: u64) -> PyResult<Self> {
         Ok(Self(events_listen::Rep::Ok(
-            parsec_api_protocol::APIEvent::MessageReceived { index },
+            events_listen::APIEvent::MessageReceived { index },
         )))
     }
 
@@ -73,7 +73,7 @@ impl EventsListenRep {
         let token = token.0;
         let invitation_status = py_to_rs_invitation_status(invitation_status)?;
         Ok(Self(events_listen::Rep::Ok(
-            parsec_api_protocol::APIEvent::InviteStatusChanged {
+            events_listen::APIEvent::InviteStatusChanged {
                 token,
                 invitation_status,
             },
@@ -89,7 +89,7 @@ impl EventsListenRep {
     ) -> PyResult<Self> {
         let realm_id = realm_id.0;
         Ok(Self(events_listen::Rep::Ok(
-            parsec_api_protocol::APIEvent::RealmMaintenanceFinished {
+            events_listen::APIEvent::RealmMaintenanceFinished {
                 realm_id,
                 encryption_revision,
             },
@@ -105,7 +105,7 @@ impl EventsListenRep {
     ) -> PyResult<Self> {
         let realm_id = realm_id.0;
         Ok(Self(events_listen::Rep::Ok(
-            parsec_api_protocol::APIEvent::RealmMaintenanceStarted {
+            events_listen::APIEvent::RealmMaintenanceStarted {
                 realm_id,
                 encryption_revision,
             },
@@ -124,7 +124,7 @@ impl EventsListenRep {
         let realm_id = realm_id.0;
         let src_id = src_id.0;
         Ok(Self(events_listen::Rep::Ok(
-            parsec_api_protocol::APIEvent::RealmVlobsUpdated {
+            events_listen::APIEvent::RealmVlobsUpdated {
                 realm_id,
                 checkpoint,
                 src_id,
@@ -134,13 +134,13 @@ impl EventsListenRep {
     }
 
     #[classmethod]
-    #[pyo3(name = "OkRealmRolesUdpated")]
+    #[pyo3(name = "OkRealmRolesUpdated")]
     fn ok_realm_roles_updated(_cls: &PyType, realm_id: RealmID, role: &PyAny) -> PyResult<Self> {
         let realm_id = realm_id.0;
         let role =
             py_to_rs_realm_role(role)?.ok_or_else(|| PyValueError::new_err("role is missing"))?;
         Ok(Self(events_listen::Rep::Ok(
-            parsec_api_protocol::APIEvent::RealmRolesUpdated { realm_id, role },
+            events_listen::APIEvent::RealmRolesUpdated { realm_id, role },
         )))
     }
 
@@ -165,7 +165,9 @@ impl EventsListenRep {
 
     #[classmethod]
     fn load(_cls: &PyType, buf: Vec<u8>) -> PyResult<Self> {
-        Ok(Self(events_listen::Rep::load(&buf)))
+        events_listen::Rep::load(&buf)
+            .map(Self)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }
 
@@ -213,6 +215,8 @@ impl EventsSubscribeRep {
 
     #[classmethod]
     fn load(_cls: &PyType, buf: Vec<u8>) -> PyResult<Self> {
-        Ok(Self(events_subscribe::Rep::load(&buf)))
+        events_subscribe::Rep::load(&buf)
+            .map(Self)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }

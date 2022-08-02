@@ -1,8 +1,9 @@
 # Parsec Cloud (https://parsec.cloud) Copyright (c) BSLv1.1 (eventually AGPLv3) 2016-2021 Scille SAS
 
 from typing import Dict, List, Optional
-import pendulum
+from pendulum import now as pendulum_now, DateTime
 import attr
+from parsec.backend.user import UserAlreadyRevokedError
 
 from parsec.utils import timestamps_in_the_ballpark
 from parsec.api.data import DataError, RealmRoleCertificateContent, UserProfile
@@ -77,7 +78,7 @@ class RealmRoleRequireGreaterTimestampError(RealmError):
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class RealmStatus:
     maintenance_type: Optional[MaintenanceType]
-    maintenance_started_on: Optional[pendulum.DateTime]
+    maintenance_started_on: Optional[DateTime]
     maintenance_started_by: Optional[DeviceID]
     encryption_revision: int
 
@@ -113,7 +114,7 @@ class RealmGrantedRole:
     user_id: UserID
     role: Optional[RealmRole]
     granted_by: Optional[DeviceID]
-    granted_on: pendulum.DateTime
+    granted_on: DateTime
 
 
 class BaseRealmComponent:
@@ -135,7 +136,7 @@ class BaseRealmComponent:
                 "reason": f"Invalid certification data ({exc}).",
             }
 
-        now = pendulum.now()
+        now = pendulum_now()
         if not timestamps_in_the_ballpark(data.timestamp, now):
             return realm_create_serializer.timestamp_out_of_ballpark_rep_dump(
                 backend_timestamp=now, client_timestamp=data.timestamp
@@ -284,7 +285,7 @@ class BaseRealmComponent:
                 "reason": f"Invalid certification data ({exc}).",
             }
 
-        now = pendulum.now()
+        now = pendulum_now()
         if not timestamps_in_the_ballpark(data.timestamp, now):
             return realm_update_roles_serializer.timestamp_out_of_ballpark_rep_dump(
                 backend_timestamp=now, client_timestamp=data.timestamp
@@ -308,6 +309,9 @@ class BaseRealmComponent:
             await self.update_roles(
                 client_ctx.organization_id, granted_role, msg["recipient_message"]
             )
+
+        except UserAlreadyRevokedError:
+            return realm_update_roles_serializer.rep_dump({"status": "user_revoked"})
 
         except RealmRoleAlreadyGranted:
             return realm_update_roles_serializer.rep_dump({"status": "already_granted"})
@@ -340,7 +344,7 @@ class BaseRealmComponent:
     async def api_realm_start_reencryption_maintenance(self, client_ctx, msg):
         msg = realm_start_reencryption_maintenance_serializer.req_load(msg)
 
-        now = pendulum.now()
+        now = pendulum_now()
         if not timestamps_in_the_ballpark(msg["timestamp"], now):
             return realm_start_reencryption_maintenance_serializer.timestamp_out_of_ballpark_rep_dump(
                 backend_timestamp=now, client_timestamp=msg["timestamp"]
@@ -492,7 +496,7 @@ class BaseRealmComponent:
         realm_id: RealmID,
         encryption_revision: int,
         per_participant_message: Dict[UserID, bytes],
-        timestamp: pendulum.DateTime,
+        timestamp: DateTime,
     ) -> None:
         """
         Raises:
@@ -525,3 +529,11 @@ class BaseRealmComponent:
         Raises: Nothing !
         """
         raise NotImplementedError()
+
+    async def dump_realms_granted_roles(
+        self, organization_id: OrganizationID
+    ) -> List[RealmGrantedRole]:
+        """
+        Raises: Nothing !
+        """
+        raise NotImplementedError

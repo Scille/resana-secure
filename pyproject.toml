@@ -5,7 +5,7 @@ description = ""
 authors = ["Scille SAS"]
 
 [tool.poetry.dependencies]
-python = ">=3.9,<3.11"
+python = "~3.9.0"
 quart = "~=0.14"
 quart-trio = "~=0.7"
 quart-cors = "~=0.4"

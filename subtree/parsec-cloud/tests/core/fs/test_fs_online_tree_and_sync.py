@@ -5,6 +5,8 @@ import pytest
 from string import ascii_lowercase
 from hypothesis import strategies as st
 from hypothesis_trio.stateful import Bundle, initialize, rule
+
+from parsec import IS_OXIDIZED
 from parsec.api.data import EntryName
 
 
@@ -18,6 +20,7 @@ st_entry_name = st.text(alphabet=ascii_lowercase, min_size=1, max_size=3)
 
 @pytest.mark.slow
 @pytest.mark.skipif(sys.platform == "win32", reason="Windows path style not compatible with oracle")
+@pytest.mark.skipif(IS_OXIDIZED, reason="No persistent_mockup")
 def test_fs_online_tree_and_sync(user_fs_online_state_machine, oracle_fs_with_sync_factory, alice):
     class FSOnlineTreeAndSync(user_fs_online_state_machine):
         Files = Bundle("file")
@@ -30,11 +33,12 @@ def test_fs_online_tree_and_sync(user_fs_online_state_machine, oracle_fs_with_sy
         @initialize(target=Folders)
         async def init(self):
             await self.reset_all()
+            await self.start_backend()
+
             self.oracle_fs = oracle_fs_with_sync_factory()
             self.oracle_fs.create_workspace("/w")
-            self.device = alice
+            self.device = self.backend_controller.server.correct_addr(alice)
 
-            await self.start_backend()
             await self.restart_user_fs(self.device)
             self.wid = await self.user_fs.workspace_create(EntryName("w"))
             workspace = self.user_fs.get_workspace(self.wid)

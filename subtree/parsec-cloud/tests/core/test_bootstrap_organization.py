@@ -1,28 +1,25 @@
 # Parsec Cloud (https://parsec.cloud) Copyright (c) AGPLv3 2016-2021 Scille SAS
 
+import oscrypto
 import pytest
-from unittest.mock import AsyncMock
+from quart import Response
 
-from parsec.backend.http import HTTPResponse
+from parsec.serde import packb
 from parsec.api.data import UserProfile, EntryName
 from parsec.api.protocol import OrganizationID, DeviceLabel, HumanHandle
 from parsec.core.types import BackendOrganizationBootstrapAddr
 from parsec.core.invite import bootstrap_organization, InviteNotFoundError, InviteAlreadyUsedError
 from parsec.core.fs.storage.user_storage import user_storage_non_speculative_init
+from parsec.sequester_crypto import SequesterVerifyKeyDer, sequester_authority_sign
 
 
 @pytest.mark.trio
 @pytest.mark.parametrize("with_labels", [False, True])
 @pytest.mark.parametrize("backend_version", ["2.5", "2.6", "latest"])
 async def test_good(
-    running_backend,
-    backend,
-    user_fs_factory,
-    with_labels,
-    data_base_dir,
-    backend_version,
-    monkeypatch,
+    running_backend, backend, user_fs_factory, with_labels, data_base_dir, backend_version
 ):
+
     org_id = OrganizationID("NewOrg")
     org_token = "123456"
     await backend.organization.create(org_id, org_token)
@@ -39,24 +36,26 @@ async def test_good(
         device_label = None
 
     if backend_version == "2.5":
-        _handle_request = AsyncMock(return_value=HTTPResponse.build_msgpack(404, {}))
-        monkeypatch.setattr("parsec.backend.http.HTTPComponent.handle_request", _handle_request)
+
+        def _mock_anonymous_api(*args, **kwargs):
+            return Response(response=packb({}), status=404, content_type="application/msgpack")
+
+        running_backend.asgi_app.view_functions["anonymous_api.anonymous_api"] = _mock_anonymous_api
 
     if backend_version == "2.6":
-        _handle_request = AsyncMock(
-            return_value=HTTPResponse.build_msgpack(200, {"status": "unknown_command"})
-        )
-        monkeypatch.setattr("parsec.backend.http.HTTPComponent.handle_request", _handle_request)
 
-    if backend_version == "latest":
-        _handle_request = None
+        def _mock_anonymous_api(*args, **kwargs):
+            return Response(
+                response=packb({"status": "unknown_command"}),
+                status=200,
+                content_type="application/msgpack",
+            )
+
+        running_backend.asgi_app.view_functions["anonymous_api.anonymous_api"] = _mock_anonymous_api
 
     new_device = await bootstrap_organization(
         organization_addr, human_handle=human_handle, device_label=device_label
     )
-
-    if _handle_request is not None:
-        _handle_request.assert_awaited_once()
 
     assert new_device is not None
     assert new_device.organization_id == org_id
@@ -65,7 +64,7 @@ async def test_good(
     assert new_device.profile == UserProfile.ADMIN
 
     # This function should always be called as part of bootstrap organization
-    # (yeah, we should improve the erognomics...)
+    # (yeah, we should improve the ergonomics...)
     await user_storage_non_speculative_init(data_base_dir=data_base_dir, device=new_device)
 
     # Test the behavior of this new device
@@ -101,6 +100,36 @@ async def test_good(
         assert backend_device.device_certificate != backend_device.redacted_device_certificate
     else:
         assert backend_device.device_certificate == backend_device.redacted_device_certificate
+
+
+@pytest.mark.trio
+async def test_bootstrap_sequester_verify_key(running_backend, backend):
+    org_id = OrganizationID("NewOrg")
+    org_token = "123456"
+    await backend.organization.create(org_id, org_token)
+
+    organization_addr = BackendOrganizationBootstrapAddr.build(
+        running_backend.addr, org_id, org_token
+    )
+    human_handle = HumanHandle(email="zack@example.com", label="Zack")
+    device_label = DeviceLabel("PC1")
+
+    verify_key, signing_key = oscrypto.asymmetric.generate_pair("rsa", bit_size=1024)
+    ref_data = b"SomeData"
+    ref_data_sign = sequester_authority_sign(signing_key, ref_data)
+    der_verify_key = SequesterVerifyKeyDer(verify_key)
+
+    await bootstrap_organization(
+        organization_addr,
+        human_handle=human_handle,
+        device_label=device_label,
+        sequester_authority_verify_key=der_verify_key,
+    )
+
+    organization = await backend.organization.get(org_id)
+    assert organization.sequester_authority
+    assert organization.sequester_authority.verify_key_der
+    organization.sequester_authority.verify_key_der.verify(ref_data_sign)
 
 
 @pytest.mark.trio

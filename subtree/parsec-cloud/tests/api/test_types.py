@@ -97,6 +97,7 @@ def test_human_handle_compare():
         ("a@x", "A"),  # Smallest size
         (f"{'a' * 64}@{'x' * 185}.com", "x" * 254),  # Max sizes
         (f"{'飞' * 21}@{'飞' * 62}.com", f"{'飞' * 84}xx"),  # Unicode & max size
+        ("john.doe@example.com", "J.D."),
     ),
 )
 def test_valid_human_handle(email, label):
@@ -114,6 +115,7 @@ def test_valid_human_handle(email, label):
         ("", "Alice"),  # Empty email
         ("", "Alice <alice@example.com>"),  # Empty email and misleading label
         ("Alice <alice@example.com>", ""),  # Empty label and misleading label
+        ("Alice <@example.com>", "Alice"),  # Missing local part in email
     ),
 )
 def test_invalid_human_handle(email, label):

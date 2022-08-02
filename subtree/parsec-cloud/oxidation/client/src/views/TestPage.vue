@@ -45,19 +45,26 @@ import {
 } from '@ionic/vue';
 import { ref } from 'vue';
 import { libparsec } from '../plugins/libparsec';
+import { Buffer } from 'buffer';
 
 const status = ref('uninitialized');
-const key = ref('1UT2bs6chdW4AnXbkSS18EuwOAgWIr7ROcHnicUhdAA=');
-const message = ref('Ym9ueW91ciE=');
+const key = ref(Uint8Array.from([213, 68, 246, 110, 206, 156, 133, 213, 184, 2, 117, 219, 145, 36,
+  181, 240, 75, 176, 56, 8, 22, 34, 190, 209, 57, 193, 231, 137, 197, 33, 116, 0]));
+const message = ref('bonyour!');
+const configDir = ref('/home/<user>/.config/parsec');
 
 async function onSubmit(): Promise<any> {
   console.log('onSubmit !');
   // Avoid concurrency modification
   const keyValue = key.value;
   const messageValue = message.value;
-  let encrypted = '';
+  let encrypted = Uint8Array.from([]);
+  const configDirValue = configDir.value;
 
   try {
+    const version = await libparsec.version();
+    console.log(version);
+
     console.log('calling encrypt...');
     encrypted = await libparsec.encrypt(keyValue, messageValue);
 
@@ -67,8 +74,13 @@ async function onSubmit(): Promise<any> {
     if (decrypted !== messageValue) {
       throw `Decrypted data differs from original data !\nDecrypted: ${decrypted}\nEncrypted: ${encrypted}`;
     }
+
+    console.log('calling list_availables_devices...');
+    const devices = await libparsec.listAvailableDevices(configDirValue);
+    console.log(devices);
   } catch (error) {
-    const errmsg = `Error: ${error}`;
+    console.log(error);
+    const errmsg = `Error: ${error.value}`;
     status.value = errmsg;
     console.log(errmsg);
     const errtoast = await toastController.create({
@@ -79,7 +91,7 @@ async function onSubmit(): Promise<any> {
     return;
   }
 
-  const okmsg = `Encrypted message: ${encrypted}`;
+  const okmsg = `Encrypted message: ${Buffer.from(encrypted).toString('base64')}`;
   status.value = okmsg;
   const oktoast = await toastController.create({
     message: 'All good ;-)',

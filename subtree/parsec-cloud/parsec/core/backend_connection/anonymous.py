@@ -4,7 +4,6 @@ from uuid import UUID
 from structlog import get_logger
 
 from parsec.crypto import VerifyKey
-from parsec.utils import URLError
 from parsec.api.protocol import (
     OrganizationID,
     ProtocolError,
@@ -47,7 +46,7 @@ async def _anonymous_cmd(
     url = addr.to_http_domain_url(f"/anonymous/{organization_id}")
     try:
         raw_rep = await http_request(url=url, method="POST", data=raw_req)
-    except URLError as exc:
+    except OSError as exc:
         logger.debug("Request failed (backend not available)", cmd=req["cmd"], exc_info=exc)
         raise BackendNotAvailable(exc) from exc
 
@@ -108,6 +107,7 @@ async def organization_bootstrap(
     device_certificate: bytes,
     redacted_user_certificate: bytes,
     redacted_device_certificate: bytes,
+    sequester_authority_certificate: bytes,
 ) -> dict:
     return await _anonymous_cmd(
         organization_bootstrap_serializer,
@@ -120,4 +120,5 @@ async def organization_bootstrap(
         device_certificate=device_certificate,
         redacted_user_certificate=redacted_user_certificate,
         redacted_device_certificate=redacted_device_certificate,
+        sequester_authority_certificate=sequester_authority_certificate,
     )

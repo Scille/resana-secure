@@ -1,10 +1,11 @@
 // Parsec Cloud (https://parsec.cloud) Copyright (c) BSLv1.1 (eventually AGPLv3) 2016-2021 Scille SAS
 
+use pyo3::exceptions::PyValueError;
 use pyo3::import_exception;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyType};
 
-use parsec_api_protocol::authenticated_cmds::{organization_config, organization_stats};
+use libparsec::protocol::authenticated_cmds::{organization_config, organization_stats};
 
 use crate::binding_utils::py_to_rs_user_profile;
 
@@ -35,14 +36,14 @@ impl OrganizationStatsReq {
 
 #[pyclass]
 #[derive(PartialEq, Eq, Clone)]
-pub(crate) struct UsersPerProfileDetailItem(pub parsec_api_protocol::UsersPerProfileDetailItem);
+pub(crate) struct UsersPerProfileDetailItem(pub organization_stats::UsersPerProfileDetailItem);
 
 #[pymethods]
 impl UsersPerProfileDetailItem {
     #[new]
     fn new(profile: &PyAny, active: u64, revoked: u64) -> PyResult<Self> {
         let profile = py_to_rs_user_profile(profile)?;
-        Ok(Self(parsec_api_protocol::UsersPerProfileDetailItem {
+        Ok(Self(organization_stats::UsersPerProfileDetailItem {
             profile,
             active,
             revoked,
@@ -110,7 +111,9 @@ impl OrganizationStatsRep {
 
     #[classmethod]
     fn load(_cls: &PyType, buf: Vec<u8>) -> PyResult<Self> {
-        Ok(Self(organization_stats::Rep::load(&buf)))
+        organization_stats::Rep::load(&buf)
+            .map(Self)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }
 
@@ -175,6 +178,8 @@ impl OrganizationConfigRep {
 
     #[classmethod]
     fn load(_cls: &PyType, buf: Vec<u8>) -> PyResult<Self> {
-        Ok(Self(organization_config::Rep::load(&buf)))
+        organization_config::Rep::load(&buf)
+            .map(Self)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 }
