@@ -66,6 +66,7 @@ de session permettant d'authentifier les autres requêtes.
 Request:
 ```
 {
+    "organization": <string>,
     "email": <string>,
     "key": <base64>
 }
@@ -88,6 +89,9 @@ Une fois obtenu, le token d'authentification est
 ```
 Authorization: Bearer <token>
 ```
+
+Il est possible de s'authentifier auprès de plusieurs organizations, chaque
+authentification retournant un token différent.
 
 
 `DELETE /auth`
