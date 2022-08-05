@@ -90,7 +90,7 @@ Une fois obtenu, le token d'authentification est
 Authorization: Bearer <token>
 ```
 
-Il est possible de s'authentifier auprès de plusieurs organizations, chaque
+Il est possible de s'authentifier auprès de plusieurs organisations, chaque
 authentification retournant un token différent.
 
 ### `DELETE /auth`
@@ -105,6 +105,45 @@ Set-Cookie: session=; Expires=Thu, 01-Jan-1970 00:00:00 GMT; Max-Age=0; Path=/
 {
 }
 ```
+
+### `POST /organization/bootstrap`
+
+Le boostrap est la phase d'enregistrement du premier utilisateur d'une organisation
+nouvellement créée.
+
+Request:
+
+```python
+{
+    "organization_url": <string>,
+    "email": <string>,
+    "key": <base64>
+}
+```
+
+Le champ `organization_url` contient une URL du type `parsec://parsec.example.com/my_org?action=bootstrap_organization&token=1234ABCD`.
+
+`key` est utilisé pour chiffrer le fichier de clé de Device résultant de l'opération de bootstrap.
+
+Response:
+
+```python
+HTTP 200
+{
+}
+```
+
+ou
+
+```python
+HTTP 400
+{
+    "error": "organization_already_boostrapped"
+}
+```
+
+- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'organisation n'existe pas sure le serveur)
 
 ## Utilisateurs & invitations
 
