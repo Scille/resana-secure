@@ -78,6 +78,7 @@ def authenticated(fn):
         except CoreNotLoggedError:
             raise APIException(401, {"error": "authentication_requested"})
 
+    wrapper.is_authenticated = True
     return wrapper
 
 

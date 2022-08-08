@@ -1,5 +1,6 @@
 import pytest
 import re
+import importlib
 from unittest.mock import ANY
 
 
@@ -187,35 +188,52 @@ def routes_samples(test_app):
         "apitoken": "7a0a3d1038bb4a22ba6d310abcc198d4",
         "email": "bob@example.com",
     }
+
     routes = []
+
+    def get_import_path(api_path):
+        try:
+            api, fn = api_path.split(".")
+            for bp_name, bp in test_app.app.blueprints.items():
+                if bp_name == api:
+                    return bp.import_name, fn
+        except:
+            return None, None
+
+    def get_endpoint_function(rule):
+        # Get the endpoint from the rule and import the function
+        mod_name, func_name = get_import_path(rule.endpoint)
+        func = None
+        if mod_name is not None:
+            try:
+                mod = importlib.import_module(mod_name)
+                func = getattr(mod, func_name, None)
+            except ImportError:
+                pass
+        return func
+
+    def is_authenticated(func):
+        # @authenticated wrapper adds a is_authenticated attribute
+        return func is not None and getattr(func, "is_authenticated", False) is True
+
     for rule in test_app.app.url_map.iter_rules():
         args = {key: default_args_values[key] for key in rule.arguments}
         _, route = rule.build(args)
-        for rule_method in rule.methods:
-            routes.append((rule_method, route))
+        func = get_endpoint_function(rule)
+        if is_authenticated(func):
+            for rule_method in rule.methods:
+                routes.append((rule_method, route))
     return routes
 
 
 @pytest.mark.trio
-async def test_authenticated_routes(test_app, routes_samples):
-    for method, route in routes_samples:
+async def test_authenticated_routes(test_app, auth_routes_samples):
+    for method, route in auth_routes_samples:
         if method == "OPTIONS":
-            continue
-        if "/claimer/" in route:
-            continue
-        if route == "/recovery/import":
             continue
         test_client = test_app.test_client()
         response = await getattr(test_client, method.lower())(route)
-        if route == "/" and method in ("GET", "HEAD"):
-            assert response.status_code == 200
-        elif route == "/auth" and method == "POST":
-            assert response.status_code == 400
-        elif route == "/auth" and method == "DELETE":
-            assert response.status_code == 200
-        else:
-            assert response.status_code == 401
-
+        assert response.status_code == 401
 
 @pytest.mark.trio
 async def test_cors_routes(test_app, client_origin, routes_samples):
