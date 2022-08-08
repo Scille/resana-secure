@@ -20,6 +20,7 @@ from .routes.invite import invite_bp
 from .routes.workspaces import workspaces_bp
 from .routes.invitations import invitations_bp
 from .routes.recovery import recovery_bp
+from .routes.organization import organization_bp
 from .ltcm import LTCM
 
 
@@ -48,6 +49,7 @@ async def app_factory(config: CoreConfig, client_allowed_origins: List[str]):
     app.register_blueprint(workspaces_bp)
     app.register_blueprint(invitations_bp)
     app.register_blueprint(recovery_bp)
+    app.register_blueprint(organization_bp)
 
     @app.route("/", methods=["GET"])
     async def landing_page():

@@ -211,6 +211,8 @@ async def test_authenticated_routes(test_app, routes_samples):
             assert response.status_code == 200
         elif route == "/auth" and method == "POST":
             assert response.status_code == 400
+        elif route == "/organization/bootstrap" and method == "POST":
+            assert response.status_code == 400
         elif route == "/auth" and method == "DELETE":
             assert response.status_code == 200
         else:
