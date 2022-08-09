@@ -2,10 +2,12 @@ from quart import Blueprint, current_app, session
 
 from ..cores_manager import (
     CoreNotLoggedError,
+    CoreOrgNotFoundError,
     CoreDeviceNotFoundError,
     CoreDeviceInvalidPasswordError,
 )
 from ..utils import check_data, APIException, get_auth_token
+from parsec.api.protocol import OrganizationID
 
 
 auth_bp = Blueprint("auth_api", __name__)
@@ -25,14 +27,24 @@ async def do_auth():
         password = data.get("key")
         if not isinstance(password, str):
             bad_fields.add("key")
+        org_id = data.get("org_id")
+        if not isinstance(org_id, str):
+            bad_fields.add("org_id")
 
     try:
-        auth_token = await current_app.cores_manager.login(email=email, password=password)
+        OrganizationID(org_id)
+    except (NameError, TypeError, ValueError):
+        raise APIException(400, {"error": "bad_organization_id"})
+
+    try:
+        auth_token = await current_app.cores_manager.login(email=email, password=password, org_id=org_id)
 
     except CoreDeviceNotFoundError:
         raise APIException(404, {"error": "bad_email"})
     except CoreDeviceInvalidPasswordError:
         raise APIException(400, {"error": "bad_key"})
+    except CoreOrgNotFoundError:
+        raise APIException(404, {"error": "unknown_organization_id"})
 
     session["logged_in"] = auth_token
     return {"token": auth_token}, 200

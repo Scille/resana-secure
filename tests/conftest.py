@@ -86,7 +86,7 @@ async def authenticated_client(test_app, local_device):
     test_client = test_app.test_client()
 
     response = await test_client.post(
-        "/auth", json={"email": local_device.email, "key": local_device.key}
+        "/auth", json={"email": local_device.email, "key": local_device.key, "org_id": str(local_device.org_id)}
     )
     assert response.status_code == 200
     # Note cookie is automatically added to test_client's cookie jar
@@ -125,7 +125,7 @@ async def running_backend(_backend_addr_register):
             nursery.cancel_scope.cancel()
 
 
-LocalDeviceTestbed = namedtuple("LocalDeviceTestbed", "device,email,key")
+LocalDeviceTestbed = namedtuple("LocalDeviceTestbed", "device,email,key,org_id")
 
 
 @pytest.fixture
@@ -144,7 +144,7 @@ async def local_device(running_backend, backend_addr, core_config_dir):
     save_device_with_password_in_config(
         config_dir=core_config_dir, device=new_device, password=password
     )
-    return LocalDeviceTestbed(device=new_device, email=human_handle.email, key=password)
+    return LocalDeviceTestbed(device=new_device, email=human_handle.email, key=password, org_id=organization_id)
 
 
 RemoteDeviceTestbed = namedtuple("RemoteDeviceTestbed", "device_id,email")

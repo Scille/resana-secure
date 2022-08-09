@@ -15,7 +15,7 @@ async def test_authentication(test_app, local_device):
 
     # Now proceed to the auth
     response = await test_client.post(
-        "/auth", json={"email": local_device.email, "key": local_device.key}
+        "/auth", json={"email": local_device.email, "key": local_device.key, "org_id": str(local_device.org_id)}
     )
     body = await response.get_json()
     assert response.status_code == 200
@@ -62,7 +62,7 @@ async def test_multi_authentication(test_app, local_device):
 
     # First auth
     response = await test_client.post(
-        "/auth", json={"email": local_device.email, "key": local_device.key}
+        "/auth", json={"email": local_device.email, "key": local_device.key, "org_id": str(local_device.org_id)}
     )
     body = await response.get_json()
     assert response.status_code == 200
@@ -70,7 +70,7 @@ async def test_multi_authentication(test_app, local_device):
 
     # Additional auth, should return the same token
     response = await test_client.post(
-        "/auth", json={"email": local_device.email, "key": local_device.key}
+        "/auth", json={"email": local_device.email, "key": local_device.key, "org_id": str(local_device.org_id)}
     )
     body = await response.get_json()
     assert response.status_code == 200
@@ -78,7 +78,7 @@ async def test_multi_authentication(test_app, local_device):
 
     # Additional auth, but with invalid key
     response = await test_client.post(
-        "/auth", json={"email": local_device.email, "key": f"{local_device.key}dummy"}
+        "/auth", json={"email": local_device.email, "key": f"{local_device.key}dummy", "org_id": str(local_device.org_id)}
     )
     body = await response.get_json()
     assert response.status_code == 400
@@ -110,7 +110,7 @@ async def test_logout_without_session_cookie(test_app, local_device):
     # This client will contain the session cookie as soon as the auth query is done
     test_client_with_cookie = test_app.test_client()
     response = await test_client_with_cookie.post(
-        "/auth", json={"email": local_device.email, "key": local_device.key}
+        "/auth", json={"email": local_device.email, "key": local_device.key, "org_id": str(local_device.org_id)}
     )
     body = await response.get_json()
     assert response.status_code == 200
@@ -135,10 +135,9 @@ async def test_logout_without_session_cookie(test_app, local_device):
 
 
 @pytest.mark.trio
-async def test_authentication_unknown_email(test_app):
+async def test_authentication_unknown_email(test_app, local_device):
     test_client = test_app.test_client()
-
-    response = await test_client.post("/auth", json={"email": "john@doe.com", "key": ""})
+    response = await test_client.post("/auth", json={"email": "john@doe.com", "key": "", "org_id": str(local_device.org_id)})
     body = await response.get_json()
     assert response.status_code == 404
     assert body == {"error": "bad_email"}
@@ -147,11 +146,28 @@ async def test_authentication_unknown_email(test_app):
 @pytest.mark.trio
 async def test_authentication_bad_key(test_app, local_device):
     test_client = test_app.test_client()
-
-    response = await test_client.post("/auth", json={"email": local_device.email, "key": ""})
+    response = await test_client.post("/auth", json={"email": local_device.email, "key": "", "org_id": str(local_device.org_id)})
     body = await response.get_json()
     assert response.status_code == 400
     assert body == {"error": "bad_key"}
+
+
+@pytest.mark.trio
+async def test_authentication_bad_org_id(test_app, local_device):
+    test_client = test_app.test_client()
+    response = await test_client.post("/auth", json={"email": local_device.email, "key": local_device.key, "org_id": ""})
+    body = await response.get_json()
+    assert response.status_code == 400
+    assert body == {"error": "bad_organization_id"}
+
+
+@pytest.mark.trio
+async def test_authentication_unknown_org_id(test_app, local_device):
+    test_client = test_app.test_client()
+    response = await test_client.post("/auth", json={"email": local_device.email, "key": local_device.key, "org_id": "WrongOrg"})
+    body = await response.get_json()
+    assert response.status_code == 404
+    assert body == {"error": "unknown_organization_id"}
 
 
 @pytest.mark.trio

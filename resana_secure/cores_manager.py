@@ -14,6 +14,8 @@ from parsec.core.local_device import (
     load_device_with_password,
     LocalDeviceError,
 )
+from parsec.api.protocol import OrganizationID
+
 
 from .ltcm import ComponentNotRegistered
 
@@ -33,10 +35,16 @@ class CoreDeviceNotFoundError(CoreManagerError):
 class CoreDeviceInvalidPasswordError(CoreManagerError):
     pass
 
+class CoreOrgNotFoundError(CoreManagerError):
+    pass
 
-def load_device_or_error(config_dir: Path, email: str, password: str) -> Optional[LocalDevice]:
-    found_email = False
+
+def load_device_or_error(config_dir: Path, email: str, password: str, org_id: OrganizationID) -> Optional[LocalDevice]:
+    found_email = found_org = False
     for available_device in list_available_devices(config_dir):
+        if str(available_device.organization_id) != str(org_id):
+            continue
+        found_org = True
         if available_device.human_handle and available_device.human_handle.email == email:
             found_email = True
             try:
@@ -48,6 +56,8 @@ def load_device_or_error(config_dir: Path, email: str, password: str) -> Optiona
                 # Maybe another device file is available for this email...
                 continue
     else:
+        if not found_org:
+            raise CoreOrgNotFoundError
         if found_email:
             raise CoreDeviceInvalidPasswordError
         else:
@@ -71,7 +81,7 @@ class CoresManager:
         self._auth_token_to_component_handle: Dict[str, int] = {}
         self._login_lock = trio.Lock()
 
-    async def login(self, email: str, password: str) -> str:
+    async def login(self, email: str, password: str, org_id: OrganizationID) -> str:
         """
         Raises:
             CoreDeviceNotFoundError
@@ -80,7 +90,7 @@ class CoresManager:
         config = current_app.config["CORE_CONFIG"]
         # First load the device from disk
         # This operation can be done concurrently and ensures the email/password couple is valid
-        device = load_device_or_error(config_dir=config.config_dir, email=email, password=password)
+        device = load_device_or_error(config_dir=config.config_dir, email=email, password=password, org_id=org_id)
 
         # The lock is needed here to avoid concurrent logins with the same email
         async with self._login_lock:
