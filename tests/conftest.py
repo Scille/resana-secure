@@ -86,7 +86,12 @@ async def authenticated_client(test_app, local_device):
     test_client = test_app.test_client()
 
     response = await test_client.post(
-        "/auth", json={"email": local_device.email, "key": local_device.key, "org_id": str(local_device.org_id)}
+        "/auth",
+        json={
+            "email": local_device.email,
+            "key": local_device.key,
+            "org_id": local_device.org_id.str,
+        },
     )
     assert response.status_code == 200
     # Note cookie is automatically added to test_client's cookie jar
@@ -144,7 +149,9 @@ async def local_device(running_backend, backend_addr, core_config_dir):
     save_device_with_password_in_config(
         config_dir=core_config_dir, device=new_device, password=password
     )
-    return LocalDeviceTestbed(device=new_device, email=human_handle.email, key=password, org_id=organization_id)
+    return LocalDeviceTestbed(
+        device=new_device, email=human_handle.email, key=password, org_id=organization_id
+    )
 
 
 RemoteDeviceTestbed = namedtuple("RemoteDeviceTestbed", "device_id,email")

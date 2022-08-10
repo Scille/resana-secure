@@ -35,17 +35,17 @@ class CoreDeviceNotFoundError(CoreManagerError):
 class CoreDeviceInvalidPasswordError(CoreManagerError):
     pass
 
-class CoreOrgNotFoundError(CoreManagerError):
-    pass
 
-
-def load_device_or_error(config_dir: Path, email: str, password: str, org_id: OrganizationID) -> Optional[LocalDevice]:
-    found_email = found_org = False
+def load_device_or_error(
+    config_dir: Path, email: str, password: str, org_id: OrganizationID
+) -> Optional[LocalDevice]:
+    found_email = False
     for available_device in list_available_devices(config_dir):
-        if str(available_device.organization_id) != str(org_id):
-            continue
-        found_org = True
-        if available_device.human_handle and available_device.human_handle.email == email:
+        if (
+            available_device.organization_id == org_id
+            and available_device.human_handle
+            and available_device.human_handle.email == email
+        ):
             found_email = True
             try:
                 return load_device_with_password(
@@ -56,8 +56,6 @@ def load_device_or_error(config_dir: Path, email: str, password: str, org_id: Or
                 # Maybe another device file is available for this email...
                 continue
     else:
-        if not found_org:
-            raise CoreOrgNotFoundError
         if found_email:
             raise CoreDeviceInvalidPasswordError
         else:
@@ -90,7 +88,9 @@ class CoresManager:
         config = current_app.config["CORE_CONFIG"]
         # First load the device from disk
         # This operation can be done concurrently and ensures the email/password couple is valid
-        device = load_device_or_error(config_dir=config.config_dir, email=email, password=password, org_id=org_id)
+        device = load_device_or_error(
+            config_dir=config.config_dir, email=email, password=password, org_id=org_id
+        )
 
         # The lock is needed here to avoid concurrent logins with the same email
         async with self._login_lock:

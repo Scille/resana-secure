@@ -2,7 +2,6 @@ from quart import Blueprint, current_app, session
 
 from ..cores_manager import (
     CoreNotLoggedError,
-    CoreOrgNotFoundError,
     CoreDeviceNotFoundError,
     CoreDeviceInvalidPasswordError,
 )
@@ -28,23 +27,20 @@ async def do_auth():
         if not isinstance(password, str):
             bad_fields.add("key")
         org_id = data.get("org_id")
-        if not isinstance(org_id, str):
+        try:
+            org_id = OrganizationID(org_id)
+        except (NameError, TypeError, ValueError):
             bad_fields.add("org_id")
 
     try:
-        OrganizationID(org_id)
-    except (NameError, TypeError, ValueError):
-        raise APIException(400, {"error": "bad_organization_id"})
-
-    try:
-        auth_token = await current_app.cores_manager.login(email=email, password=password, org_id=org_id)
+        auth_token = await current_app.cores_manager.login(
+            email=email, password=password, org_id=org_id
+        )
 
     except CoreDeviceNotFoundError:
-        raise APIException(404, {"error": "bad_email"})
+        raise APIException(404, {"error": "device_not_found"})
     except CoreDeviceInvalidPasswordError:
         raise APIException(400, {"error": "bad_key"})
-    except CoreOrgNotFoundError:
-        raise APIException(404, {"error": "unknown_organization_id"})
 
     session["logged_in"] = auth_token
     return {"token": auth_token}, 200

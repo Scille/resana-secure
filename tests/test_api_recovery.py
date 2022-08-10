@@ -34,7 +34,7 @@ async def test_recovery_ok(test_app, local_device, authenticated_client):
         json={
             "email": local_device.device.human_handle.email,
             "key": b64encode(new_device_key).decode("ascii"),
-            "org_id": str(local_device.org_id),
+            "org_id": local_device.org_id.str,
         },
     )
     assert response.status_code == 200
