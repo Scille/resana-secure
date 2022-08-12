@@ -196,7 +196,7 @@ async def test_claim_ok(test_app, local_device, authenticated_client, type):
         json={
             "email": new_device_email,
             "key": b64encode(new_device_key).decode("ascii"),
-            "org_id": local_device.org_id.str,
+            "organization": local_device.organization.str,
         },
     )
     assert response.status_code == 200

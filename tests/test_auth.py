@@ -19,7 +19,7 @@ async def test_authentication(test_app, local_device):
         json={
             "email": local_device.email,
             "key": local_device.key,
-            "org_id": local_device.org_id.str,
+            "organization": local_device.organization.str,
         },
     )
     body = await response.get_json()
@@ -71,7 +71,7 @@ async def test_multi_authentication(test_app, local_device):
         json={
             "email": local_device.email,
             "key": local_device.key,
-            "org_id": local_device.org_id.str,
+            "organization": local_device.organization.str,
         },
     )
     body = await response.get_json()
@@ -84,7 +84,7 @@ async def test_multi_authentication(test_app, local_device):
         json={
             "email": local_device.email,
             "key": local_device.key,
-            "org_id": local_device.org_id.str,
+            "organization": local_device.organization.str,
         },
     )
     body = await response.get_json()
@@ -97,7 +97,7 @@ async def test_multi_authentication(test_app, local_device):
         json={
             "email": local_device.email,
             "key": f"{local_device.key}dummy",
-            "org_id": local_device.org_id.str,
+            "organization": local_device.organization.str,
         },
     )
     body = await response.get_json()
@@ -134,7 +134,7 @@ async def test_logout_without_session_cookie(test_app, local_device):
         json={
             "email": local_device.email,
             "key": local_device.key,
-            "org_id": local_device.org_id.str,
+            "organization": local_device.organization.str,
         },
     )
     body = await response.get_json()
@@ -163,7 +163,8 @@ async def test_logout_without_session_cookie(test_app, local_device):
 async def test_authentication_unknown_email(test_app, local_device):
     test_client = test_app.test_client()
     response = await test_client.post(
-        "/auth", json={"email": "john@doe.com", "key": "", "org_id": local_device.org_id.str}
+        "/auth",
+        json={"email": "john@doe.com", "key": "", "organization": local_device.organization.str},
     )
     body = await response.get_json()
     assert response.status_code == 404
@@ -174,7 +175,12 @@ async def test_authentication_unknown_email(test_app, local_device):
 async def test_authentication_bad_key(test_app, local_device):
     test_client = test_app.test_client()
     response = await test_client.post(
-        "/auth", json={"email": local_device.email, "key": "", "org_id": local_device.org_id.str}
+        "/auth",
+        json={
+            "email": local_device.email,
+            "key": "",
+            "organization": local_device.organization.str,
+        },
     )
     body = await response.get_json()
     assert response.status_code == 400
@@ -182,21 +188,22 @@ async def test_authentication_bad_key(test_app, local_device):
 
 
 @pytest.mark.trio
-async def test_authentication_incorrect_org_id(test_app, local_device):
+async def test_authentication_incorrect_organization_id(test_app, local_device):
     test_client = test_app.test_client()
     response = await test_client.post(
-        "/auth", json={"email": local_device.email, "key": local_device.key, "org_id": ""}
+        "/auth", json={"email": local_device.email, "key": local_device.key, "organization": ""}
     )
     body = await response.get_json()
     assert response.status_code == 400
-    assert body == {"error": "bad_data", "fields": ["org_id"]}
+    assert body == {"error": "bad_data", "fields": ["organization"]}
 
 
 @pytest.mark.trio
-async def test_authentication_unknown_org_id(test_app, local_device):
+async def test_authentication_unknown_organization_id(test_app, local_device):
     test_client = test_app.test_client()
     response = await test_client.post(
-        "/auth", json={"email": local_device.email, "key": local_device.key, "org_id": "UnknownOrg"}
+        "/auth",
+        json={"email": local_device.email, "key": local_device.key, "organization": "UnknownOrg"},
     )
     body = await response.get_json()
     assert response.status_code == 404

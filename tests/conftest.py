@@ -90,7 +90,7 @@ async def authenticated_client(test_app, local_device):
         json={
             "email": local_device.email,
             "key": local_device.key,
-            "org_id": local_device.org_id.str,
+            "organization": local_device.organization.str,
         },
     )
     assert response.status_code == 200
@@ -130,7 +130,7 @@ async def running_backend(_backend_addr_register):
             nursery.cancel_scope.cancel()
 
 
-LocalDeviceTestbed = namedtuple("LocalDeviceTestbed", "device,email,key,org_id")
+LocalDeviceTestbed = namedtuple("LocalDeviceTestbed", "device,email,key,organization")
 
 
 @pytest.fixture
@@ -150,7 +150,7 @@ async def local_device(running_backend, backend_addr, core_config_dir):
         config_dir=core_config_dir, device=new_device, password=password
     )
     return LocalDeviceTestbed(
-        device=new_device, email=human_handle.email, key=password, org_id=organization_id
+        device=new_device, email=human_handle.email, key=password, organization=organization_id
     )
 
 

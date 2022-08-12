@@ -26,15 +26,15 @@ async def do_auth():
         password = data.get("key")
         if not isinstance(password, str):
             bad_fields.add("key")
-        org_id = data.get("org_id")
+        organization_id = data.get("organization")
         try:
-            org_id = OrganizationID(org_id)
+            organization_id = OrganizationID(organization_id)
         except (NameError, TypeError, ValueError):
-            bad_fields.add("org_id")
+            bad_fields.add("organization")
 
     try:
         auth_token = await current_app.cores_manager.login(
-            email=email, password=password, org_id=org_id
+            email=email, password=password, organization_id=organization_id
         )
 
     except CoreDeviceNotFoundError:
