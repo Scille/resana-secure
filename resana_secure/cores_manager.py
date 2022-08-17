@@ -14,6 +14,8 @@ from parsec.core.local_device import (
     load_device_with_password,
     LocalDeviceError,
 )
+from parsec.api.protocol import OrganizationID
+
 
 from .ltcm import ComponentNotRegistered
 
@@ -34,10 +36,16 @@ class CoreDeviceInvalidPasswordError(CoreManagerError):
     pass
 
 
-def load_device_or_error(config_dir: Path, email: str, password: str) -> Optional[LocalDevice]:
+def load_device_or_error(
+    config_dir: Path, email: str, password: str, organization_id: OrganizationID
+) -> Optional[LocalDevice]:
     found_email = False
     for available_device in list_available_devices(config_dir):
-        if available_device.human_handle and available_device.human_handle.email == email:
+        if (
+            available_device.organization_id == organization_id
+            and available_device.human_handle
+            and available_device.human_handle.email == email
+        ):
             found_email = True
             try:
                 return load_device_with_password(
@@ -71,7 +79,7 @@ class CoresManager:
         self._auth_token_to_component_handle: Dict[str, int] = {}
         self._login_lock = trio.Lock()
 
-    async def login(self, email: str, password: str) -> str:
+    async def login(self, email: str, password: str, organization_id: OrganizationID) -> str:
         """
         Raises:
             CoreDeviceNotFoundError
@@ -80,7 +88,9 @@ class CoresManager:
         config = current_app.config["CORE_CONFIG"]
         # First load the device from disk
         # This operation can be done concurrently and ensures the email/password couple is valid
-        device = load_device_or_error(config_dir=config.config_dir, email=email, password=password)
+        device = load_device_or_error(
+            config_dir=config.config_dir, email=email, password=password, organization_id=organization_id
+        )
 
         # The lock is needed here to avoid concurrent logins with the same email
         async with self._login_lock:

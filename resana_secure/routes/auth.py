@@ -6,6 +6,7 @@ from ..cores_manager import (
     CoreDeviceInvalidPasswordError,
 )
 from ..utils import check_data, APIException, get_auth_token
+from parsec.api.protocol import OrganizationID
 
 
 auth_bp = Blueprint("auth_api", __name__)
@@ -25,12 +26,19 @@ async def do_auth():
         password = data.get("key")
         if not isinstance(password, str):
             bad_fields.add("key")
+        organization_id = data.get("organization")
+        try:
+            organization_id = OrganizationID(organization_id)
+        except (NameError, TypeError, ValueError):
+            bad_fields.add("organization")
 
     try:
-        auth_token = await current_app.cores_manager.login(email=email, password=password)
+        auth_token = await current_app.cores_manager.login(
+            email=email, password=password, organization_id=organization_id
+        )
 
     except CoreDeviceNotFoundError:
-        raise APIException(404, {"error": "bad_email"})
+        raise APIException(404, {"error": "device_not_found"})
     except CoreDeviceInvalidPasswordError:
         raise APIException(400, {"error": "bad_key"})
 
