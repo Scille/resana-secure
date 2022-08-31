@@ -1,0 +1,3 @@
+[submodule "modules/parsec-cloud"]
+	path = modules/parsec-cloud
+	url = git@github.com:Scille/parsec-cloud.git
