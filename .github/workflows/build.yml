@@ -43,7 +43,7 @@ jobs:
           set -eux
           poetry install -E core
           poetry run python misc/generate_pyqt.py
-        working-directory: subtree/parsec-cloud/
+        working-directory: modules/parsec-cloud/
       - name: 'Install project'
         run: poetry install
       - name: 'Run tests'
@@ -85,7 +85,7 @@ jobs:
           set -eux
           poetry install -E core
           poetry run python misc/generate_pyqt.py
-        working-directory: subtree/parsec-cloud/
+        working-directory: modules/parsec-cloud/
       - name: 'Install project'
         run: poetry install
       - name: 'Run tests'
@@ -113,6 +113,9 @@ jobs:
         run: |
           set -eux
           python --version
+      - name: 'Patch Parsec version'
+        shell: bash
+        run: python packaging/patch_parsec_version.py
       - name: Generate PyQt stuff for parsec-cloud
         shell: bash
         run: |
@@ -122,7 +125,7 @@ jobs:
           poetry --version
           poetry install -E core
           poetry run python misc/generate_pyqt.py
-        working-directory: subtree/parsec-cloud/
+        working-directory: modules/parsec-cloud/
       - name: Freeze Parsec
         run: python freeze_program.py ../..
         working-directory: packaging/windows/

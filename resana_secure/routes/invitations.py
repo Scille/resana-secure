@@ -34,7 +34,7 @@ async def get_invitations(core):
             cooked["users"].append(
                 {
                     "token": apitoken,
-                    "created_on": invitation["created_on"].to_iso8601_string(),
+                    "created_on": invitation["created_on"].to_rfc3339(),
                     "claimer_email": invitation["claimer_email"],
                     "status": invitation["status"].value,
                 }
@@ -42,7 +42,7 @@ async def get_invitations(core):
         else:  # Device
             cooked["device"] = {
                 "token": apitoken,
-                "created_on": invitation["created_on"].to_iso8601_string(),
+                "created_on": invitation["created_on"].to_rfc3339(),
                 "status": invitation["status"].value,
             }
 

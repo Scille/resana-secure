@@ -1,15 +1,17 @@
 # Parsec - Resana Secure version
 
-## Subtree
+## Submodules
 
-- `subtree/parsec-cloud` contains a copy (using git subtree) of the main Parsec reposity.
-- `subtree/parsec-cloud/parsec/_version.py` has been modified to add the `+resana` suffix
+- `modules/parsec-cloud` contains a copy (using git submodule) of the main Parsec reposity.
 
-To update the Parsec subtree to a new version:
+To update the Parsec subtree to a new version, set the modules/parsec-cloud repository to where you want it. Submodules act as a link.
 
 ```shell
-git subtree pull --squash --prefix='subtree/parsec-cloud' -- 'git@github.com:Scille/parsec-cloud.git' $VERSION
-git subtree pull --squash --prefix='subtree/parsec-extensions' -- 'git@github.com:vxgmichel/parsec-extensions.git' $VERSION
+cd modules/parsec-cloud
+git fetch && # set to the version you want
+cd ../..
+git add modules/parsec-cloud
+# Commit and push
 ```
 
 ## Release

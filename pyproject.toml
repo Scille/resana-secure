@@ -10,7 +10,7 @@ quart = "~=0.14"
 quart-trio = "~=0.7"
 quart-cors = "~=0.4"
 hypercorn = "~=0.11"
-parsec-cloud = { path = "./subtree/parsec-cloud", extras = ["backend", "core"], develop = false }
+parsec-cloud = { path = "./modules/parsec-cloud", extras = ["backend", "core"], develop = false }
 pyinstaller = "^5.1"
 
 [tool.poetry.dev-dependencies]
