@@ -16,10 +16,10 @@ async def list_workspaces(core):
     user_manifest = core.user_fs.get_user_manifest()
     return (
         {
-            "workspaces": [
+            "workspaces": sorted([
                 {"id": entry.id.hex, "name": entry.name.str, "role": entry.role.value}
                 for entry in user_manifest.workspaces
-            ]
+            ], key=lambda elem: elem["name"])
         },
         200,
     )
