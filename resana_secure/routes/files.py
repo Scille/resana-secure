@@ -59,8 +59,8 @@ async def get_workspace_folders_tree(core, workspace_id):
             stat = {
                 "id": entry_info["id"].hex,
                 "name": name.str if name is not None else "/",
-                "created": entry_info["created"].to_iso8601_string(),
-                "updated": entry_info["updated"].to_iso8601_string(),
+                "created": entry_info["created"].to_rfc3339(),
+                "updated": entry_info["updated"].to_rfc3339(),
             }
             cooked_children = {}
             for child_name in entry_info["children"]:
@@ -276,8 +276,8 @@ async def get_workspace_folder_content(core, workspace_id, folder_id):
                     {
                         "id": child_stat["id"].hex,
                         "name": child_name.str,
-                        "created": child_stat["created"].to_iso8601_string(),
-                        "updated": child_stat["updated"].to_iso8601_string(),
+                        "created": child_stat["created"].to_rfc3339(),
+                        "updated": child_stat["updated"].to_rfc3339(),
                         "size": child_stat["size"],
                         "extension": extension,
                     }

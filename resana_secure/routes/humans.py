@@ -44,8 +44,8 @@ async def search_humans(core):
                         "label": user.human_handle.label,
                     },
                     "profile": user.profile.value,
-                    "created_on": user.created_on.to_iso8601_string(),
-                    "revoked_on": user.revoked_on.to_iso8601_string() if user.revoked_on else None,
+                    "created_on": user.created_on.to_rfc3339(),
+                    "revoked_on": user.revoked_on.to_rfc3339() if user.revoked_on else None,
                 }
                 for user in results
             ],

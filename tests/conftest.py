@@ -1,4 +1,4 @@
-import pendulum
+
 import pytest
 import trio
 from functools import partial
@@ -6,9 +6,11 @@ from collections import namedtuple
 from hypercorn.config import Config as HyperConfig
 from hypercorn.trio.run import worker_serve
 
+from parsec._parsec import DateTime
+
 from parsec.crypto import PrivateKey, SigningKey
-from parsec.api.data import UserCertificateContent, DeviceCertificateContent, UserProfile
-from parsec.api.protocol import OrganizationID, HumanHandle, DeviceID, DeviceName, DeviceLabel
+from parsec.api.data import UserCertificate, DeviceCertificate
+from parsec.api.protocol import OrganizationID, HumanHandle, DeviceID, DeviceName, DeviceLabel, UserProfile
 from parsec.core.types import BackendOrganizationBootstrapAddr, BackendAddr
 from parsec.core.invite import bootstrap_organization
 from parsec.core.local_device import save_device_with_password_in_config
@@ -160,11 +162,11 @@ RemoteDeviceTestbed = namedtuple("RemoteDeviceTestbed", "device_id,email")
 @pytest.fixture
 async def other_device(running_backend, local_device):
     organization_id = OrganizationID("CoolOrg")
-    now = pendulum.now()
+    now = DateTime.now()
     author = local_device.device.device_id
     author_key = local_device.device.signing_key
 
-    device_certificate = DeviceCertificateContent(
+    device_certificate = DeviceCertificate(
         author=author,
         timestamp=now,
         device_id=DeviceID(f"{local_device.device.user_id}@{DeviceName.new()}"),
@@ -189,12 +191,12 @@ async def other_device(running_backend, local_device):
 @pytest.fixture
 async def other_user(running_backend, local_device):
     organization_id = OrganizationID("CoolOrg")
-    now = pendulum.now()
+    now = DateTime.now()
     author = local_device.device.device_id
     author_key = local_device.device.signing_key
 
     device_id = DeviceID.new()
-    user_certificate = UserCertificateContent(
+    user_certificate = UserCertificate(
         author=author,
         timestamp=now,
         user_id=device_id.user_id,
@@ -204,7 +206,7 @@ async def other_user(running_backend, local_device):
     )
     redacted_user_certificate = user_certificate.evolve(human_handle=None)
 
-    device_certificate = DeviceCertificateContent(
+    device_certificate = DeviceCertificate(
         author=author,
         timestamp=now,
         device_id=device_id,

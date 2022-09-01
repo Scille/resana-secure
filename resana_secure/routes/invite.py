@@ -1,8 +1,8 @@
 from quart import Blueprint, current_app
 import platform
 
-from parsec.api.protocol import InvitationType, HumanHandle, DeviceLabel
-from parsec.api.data import UserProfile, SASCode
+from parsec.api.protocol import InvitationType, HumanHandle, DeviceLabel, UserProfile
+from parsec.api.data import SASCode
 from parsec.core.local_device import save_device_with_password_in_config
 from parsec.core.invite import (
     UserClaimInitialCtx,

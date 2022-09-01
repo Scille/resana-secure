@@ -101,7 +101,7 @@ def build_apitoken(
     token: UUID,
 ) -> str:
     invitation_addr = BackendInvitationAddr.build(
-        backend_addr=backend_addr,
+        backend_addr=backend_addr.get_backend_addr(),
         organization_id=organization_id,
         invitation_type=invitation_type,
         token=token,
