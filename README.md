@@ -2,7 +2,7 @@
 
 ## Submodules
 
-- `subtree/parsec-cloud` contains a copy (using git submodule) of the main Parsec reposity.
+- `modules/parsec-cloud` contains a copy (using git submodule) of the main Parsec reposity.
 
 To update the Parsec subtree to a new version, set the modules/parsec-cloud repository to where you want it. Submodules act as a link.
 
