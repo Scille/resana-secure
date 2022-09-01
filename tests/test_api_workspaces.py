@@ -39,8 +39,8 @@ async def test_create_and_list_workspaces(authenticated_client):
     assert response.status_code == 200
     assert await response.get_json() == {
         "workspaces": [
-            {"id": foo_id, "name": "foo", "role": "OWNER"},
             {"id": bar_id, "name": "bar", "role": "OWNER"},
+            {"id": foo_id, "name": "foo", "role": "OWNER"},
         ]
     }
 
