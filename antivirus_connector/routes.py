@@ -5,7 +5,7 @@ import structlog
 from quart import Blueprint, request, current_app
 
 from parsec.sequester_crypto import sequester_service_decrypt
-from parsec.api.data import BaseManifest, FileManifest
+from parsec.api.data import AnyRemoteManifest, FileManifest
 from parsec.api.protocol import OrganizationID
 
 from .utils import APIException
@@ -33,7 +33,7 @@ async def load_manifest(vlob):
             current_app.config["APP_CONFIG"].authority_private_key, vlob
         )
         # Connector does not care if data is signed or not
-        manifest = BaseManifest.unsecure_load(decrypted_vlob)
+        manifest = AnyRemoteManifest.unsecure_load(decrypted_vlob)
         if not isinstance(manifest, FileManifest):
             return None
         return manifest

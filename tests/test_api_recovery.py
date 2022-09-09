@@ -11,7 +11,7 @@ async def test_recovery_ok(test_app, local_device, authenticated_client):
     assert response.status_code == 200
     assert (
         body["file_name"]
-        == f"resana-secure-recovery-{local_device.device.organization_id}-{local_device.device.short_user_display}.psrk"
+        == f"resana-secure-recovery-{local_device.device.organization_id.str}-{local_device.device.short_user_display}.psrk"
     )
     assert "file_content" in body
     assert "passphrase" in body
@@ -51,7 +51,7 @@ async def test_recovery_invalid_passphrase(
     assert response.status_code == 200
     assert (
         body["file_name"]
-        == f"resana-secure-recovery-{local_device.device.organization_id}-{local_device.device.short_user_display}.psrk"
+        == f"resana-secure-recovery-{local_device.device.organization_id.str}-{local_device.device.short_user_display}.psrk"
     )
     assert "file_content" in body
     assert "passphrase" in body

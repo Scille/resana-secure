@@ -65,7 +65,7 @@ async def test_submit_invalid_args(antivirus_test_app):
     )
     assert response.status_code == 400
     body = await response.get_json()
-    assert body == {"error": "Invalid value for argument: Invalid data"}
+    assert body == {"error": "Invalid value for argument: Invalid OrganizationID"}
 
     data = {
         "sequester_blob": base64.urlsafe_b64encode(b"a"),
