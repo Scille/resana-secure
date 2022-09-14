@@ -38,12 +38,6 @@ jobs:
           python -m pip install --user pipx
           pipx install poetry
           poetry --version
-      - name: Generate PyQt stuff for parsec-cloud
-        run: |
-          set -eux
-          poetry install -E core
-          poetry run python misc/generate_pyqt.py
-        working-directory: modules/parsec-cloud/
       - name: 'Install project'
         run: poetry install
       - name: 'Run tests'
@@ -79,13 +73,6 @@ jobs:
         run: |
           set -eux
           choco install -y --limit-output winfsp --version=${{ env.WINFSP_VERSION }}
-      - name: Generate PyQt stuff for parsec-cloud
-        shell: bash
-        run: |
-          set -eux
-          poetry install -E core
-          poetry run python misc/generate_pyqt.py
-        working-directory: modules/parsec-cloud/
       - name: 'Install project'
         run: poetry install
       - name: 'Run tests'
@@ -113,19 +100,12 @@ jobs:
         run: |
           set -eux
           python --version
-      - name: 'Patch Parsec version'
-        shell: bash
-        run: python packaging/patch_parsec_version.py
-      - name: Generate PyQt stuff for parsec-cloud
-        shell: bash
-        run: |
-          set -eux
           python -m pip install --user pipx
           pipx install poetry
           poetry --version
-          poetry install -E core
-          poetry run python misc/generate_pyqt.py
-        working-directory: modules/parsec-cloud/
+      - name: 'Patch Parsec version'
+        shell: bash
+        run: python packaging/patch_parsec_version.py
       - name: Freeze Parsec
         run: python freeze_program.py ../..
         working-directory: packaging/windows/
