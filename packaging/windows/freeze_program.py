@@ -72,7 +72,7 @@ def main(program_source):
         )
         run(f"{ PYTHON_EXECUTABLE } -m venv {pyinstaller_venv_dir}")
     run(
-        f"{ TOOLS_VENV_DIR.absolute() / 'Scripts/python' } -m poetry install --no-dev --no-interaction",
+        f"{ TOOLS_VENV_DIR.absolute() / 'Scripts/python' } -m poetry install --no-interaction",
         cwd=program_source.absolute(),
         env={**os.environ, "VIRTUAL_ENV": str(pyinstaller_venv_dir.absolute())},
     )
