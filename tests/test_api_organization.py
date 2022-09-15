@@ -267,10 +267,10 @@ async def test_bootstrap_body_not_json(test_app, org_bootstrap_addr, kind):
 
 @pytest.mark.trio
 async def test_bootstrap_organization_with_sequester_key(
-    test_app, core_config_dir, org_bootstrap_addr
+    test_app, core_config_dir, org_bootstrap_addr, running_backend
 ):
     test_client = test_app.test_client()
-    pub_key, priv_key = crypto.generate_pair("rsa", bit_size=1024)
+    pub_key, _ = crypto.generate_pair("rsa", bit_size=1024)
     seq_verify_key = SequesterVerifyKeyDer(pub_key)
 
     response = await test_client.post(
@@ -293,6 +293,14 @@ async def test_bootstrap_organization_with_sequester_key(
         == org_bootstrap_addr.organization_id.str
     )
     assert available_devices[0].human_handle.email == "gordon.freeman@blackmesa.nm"
+
+    organization = await running_backend.organization.get(
+        org_bootstrap_addr.organization_id
+    )
+    assert organization.sequester_authority is not None
+    assert (
+        organization.sequester_authority.verify_key_der.dump() == seq_verify_key.dump()
+    )
 
 
 @pytest.mark.trio
