@@ -1,6 +1,6 @@
 import trio
 from uuid import uuid4
-from typing import AsyncIterator, Callable, Dict, Optional
+from typing import AsyncIterator, Callable, Dict, Optional, Tuple
 from functools import partial
 from quart import current_app
 from pathlib import Path
@@ -75,11 +75,13 @@ async def start_core(
 
 class CoresManager:
     def __init__(self):
-        self._email_to_auth_token: Dict[str, str] = {}
+        self._email_to_auth_token: Dict[Tuple(OrganizationID, str), str] = {}
         self._auth_token_to_component_handle: Dict[str, int] = {}
         self._login_lock = trio.Lock()
 
-    async def login(self, email: str, password: str, organization_id: OrganizationID) -> str:
+    async def login(
+        self, email: str, password: str, organization_id: OrganizationID
+    ) -> str:
         """
         Raises:
             CoreDeviceNotFoundError
@@ -89,13 +91,18 @@ class CoresManager:
         # First load the device from disk
         # This operation can be done concurrently and ensures the email/password couple is valid
         device = load_device_or_error(
-            config_dir=config.config_dir, email=email, password=password, organization_id=organization_id
+            config_dir=config.config_dir,
+            email=email,
+            password=password,
+            organization_id=organization_id,
         )
 
         # The lock is needed here to avoid concurrent logins with the same email
         async with self._login_lock:
             # Return existing auth_token if the login has already be done for this device
-            existing_auth_token = self._email_to_auth_token.get(email)
+            existing_auth_token = self._email_to_auth_token.get(
+                (organization_id, email)
+            )
             if existing_auth_token:
                 # No need to check if the related component is still available
                 # given `_on_stopped` callback (see below) makes sure to
@@ -106,14 +113,16 @@ class CoresManager:
 
             def _on_stopped():
                 self._auth_token_to_component_handle.pop(auth_token, None)
-                self._email_to_auth_token.pop(email, None)
+                self._email_to_auth_token.pop((organization_id, email), None)
 
             auth_token = uuid4().hex
             component_handle = await current_app.ltcm.register_component(
-                partial(start_core, config=config, device=device, on_stopped=_on_stopped)
+                partial(
+                    start_core, config=config, device=device, on_stopped=_on_stopped
+                )
             )
             self._auth_token_to_component_handle[auth_token] = component_handle
-            self._email_to_auth_token[email] = auth_token
+            self._email_to_auth_token[(organization_id, email)] = auth_token
 
             return auth_token
 
@@ -149,7 +158,9 @@ class CoresManager:
             raise CoreNotLoggedError
 
         try:
-            async with current_app.ltcm.acquire_component(component_handle) as component:
+            async with current_app.ltcm.acquire_component(
+                component_handle
+            ) as component:
                 yield component
 
         except ComponentNotRegistered as exc:
