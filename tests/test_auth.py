@@ -2,6 +2,9 @@ import pytest
 import re
 from unittest.mock import ANY
 
+from parsec.core.types import BackendOrganizationBootstrapAddr
+from parsec.api.protocol import OrganizationID
+
 
 @pytest.mark.trio
 async def test_authentication(test_app, local_device):
@@ -52,11 +55,15 @@ async def test_authentication(test_app, local_device):
     assert response.status_code == 200
 
     # Invalid token should be rejected
-    response = await test_client.get("/workspaces", headers={"Authorization": "Bearer dummy"})
+    response = await test_client.get(
+        "/workspaces", headers={"Authorization": "Bearer dummy"}
+    )
     assert response.status_code == 401
 
     dummy_session_cookie = "eyJsb2dnZWRfaW4iOiI1ODU5NWY1OTI1OTA0NGMyYTE1ODg4NGFlYzY5NGJkOCJ9.YDeKyQ.46LVu1VFkoZISHp-5xaXDK-sjDk"
-    test_client.set_cookie(server_name="127.0.0.1", key="session", value=dummy_session_cookie)
+    test_client.set_cookie(
+        server_name="127.0.0.1", key="session", value=dummy_session_cookie
+    )
     response = await test_client.get("/workspaces")
     assert response.status_code == 401
 
@@ -164,7 +171,11 @@ async def test_authentication_unknown_email(test_app, local_device):
     test_client = test_app.test_client()
     response = await test_client.post(
         "/auth",
-        json={"email": "john@doe.com", "key": "", "organization": local_device.organization.str},
+        json={
+            "email": "john@doe.com",
+            "key": "",
+            "organization": local_device.organization.str,
+        },
     )
     body = await response.get_json()
     assert response.status_code == 404
@@ -191,7 +202,8 @@ async def test_authentication_bad_key(test_app, local_device):
 async def test_authentication_incorrect_organization_id(test_app, local_device):
     test_client = test_app.test_client()
     response = await test_client.post(
-        "/auth", json={"email": local_device.email, "key": local_device.key, "organization": ""}
+        "/auth",
+        json={"email": local_device.email, "key": local_device.key, "organization": ""},
     )
     body = await response.get_json()
     assert response.status_code == 400
@@ -203,7 +215,11 @@ async def test_authentication_unknown_organization_id(test_app, local_device):
     test_client = test_app.test_client()
     response = await test_client.post(
         "/auth",
-        json={"email": local_device.email, "key": local_device.key, "organization": "UnknownOrg"},
+        json={
+            "email": local_device.email,
+            "key": local_device.key,
+            "organization": "UnknownOrg",
+        },
     )
     body = await response.get_json()
     assert response.status_code == 404
@@ -211,7 +227,9 @@ async def test_authentication_unknown_organization_id(test_app, local_device):
 
 
 @pytest.mark.trio
-@pytest.mark.parametrize("kind", ["missing_header", "bad_header", "bad_body", "missing_body"])
+@pytest.mark.parametrize(
+    "kind", ["missing_header", "bad_header", "bad_body", "missing_body"]
+)
 async def test_authentication_body_not_json(test_app, kind):
     test_client = test_app.test_client()
     if kind == "missing_body":
@@ -282,7 +300,8 @@ async def test_cors_routes(test_app, client_origin, routes_samples):
         if method == "OPTIONS":
             continue
         response = await test_client.options(
-            route, headers={"Origin": client_origin, "Access-Control-Request-Method": method}
+            route,
+            headers={"Origin": client_origin, "Access-Control-Request-Method": method},
         )
         assert response.status_code == 200
         assert response.headers.get("Access-Control-Allow-Origin") == client_origin
@@ -294,7 +313,57 @@ async def test_cors_routes(test_app, client_origin, routes_samples):
 
         # Test with bad origin
         response = await test_client.options(
-            route, headers={"Origin": "https://dummy.org", "Access-Control-Request-Method": method}
+            route,
+            headers={
+                "Origin": "https://dummy.org",
+                "Access-Control-Request-Method": method,
+            },
         )
         assert response.status_code == 200
         assert "Access-Control-Allow-Origin" not in response.headers
+
+
+@pytest.mark.trio
+async def test_multi_org_authentication(test_app, backend_addr, running_backend):
+    test_client = test_app.test_client()
+
+    ORG_IDS = [OrganizationID("Org1"), OrganizationID("Org2"), OrganizationID("Org3")]
+    EMAIL = "gordon.freeman@blackmesa.nm"
+    PASSWORD = "abcd"
+
+    addrs = [
+        BackendOrganizationBootstrapAddr.build(backend_addr, org_id)
+        for org_id in ORG_IDS
+    ]
+
+    # Create 3 different orgs using the same email
+    for backend_addr in addrs:
+        response = await test_client.post(
+            "/organization/bootstrap",
+            json={
+                "organization_url": backend_addr.to_url(),
+                "email": EMAIL,
+                "key": PASSWORD,
+            },
+        )
+
+    assert response.status_code == 200
+
+    tokens = []
+    # If everything goes according to plan, each auth should return
+    # a different token
+    for org_id in ORG_IDS:
+        response = await test_client.post(
+            "/auth",
+            json={
+                "email": EMAIL,
+                "key": PASSWORD,
+                "organization": org_id.str,
+            },
+        )
+        assert response.status_code == 200
+        body = await response.get_json()
+        assert body["token"] not in tokens
+        tokens.append(body["token"])
+
+    assert len(tokens) == 3
