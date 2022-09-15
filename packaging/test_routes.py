@@ -5,8 +5,7 @@ import requests
 import base64
 import concurrent.futures
 import time
-
-from parsec.core.types import BackendOrganizationBootstrapAddr
+import urllib
 
 
 logger = logging.getLogger("test-resana")
@@ -48,6 +47,7 @@ def test_workspaces(auth_token, resana_addr):
         assert r.json() == {"workspaces": []}
     except AssertionError:
         logger.exception("[KO] List workspaces")
+        logger.debug(r.json())
     else:
         logger.info("[OK] List workspaces")
 
@@ -64,6 +64,7 @@ def test_workspaces(auth_token, resana_addr):
         VARIABLES["workspace_id"] = r.json()["id"]
     except AssertionError:
         logger.exception("[KO] Adding a new workspace")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Adding a new workspace")
 
@@ -76,6 +77,7 @@ def test_workspaces(auth_token, resana_addr):
         }
     except AssertionError:
         logger.exception("[KO] List workspace to check that we have one")
+        logger.debug(r.json())
     else:
         logger.info("[OK] List workspace to check that we have one")
 
@@ -93,6 +95,7 @@ def test_workspaces(auth_token, resana_addr):
         assert r.status_code == 200
     except AssertionError:
         logger.exception("[KO] Rename the workspace")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Rename the workspace")
 
@@ -107,6 +110,7 @@ def test_workspaces(auth_token, resana_addr):
         }
     except AssertionError:
         logger.exception("[KO] Check that the workspace was renamed")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Check that the workspace was renamed")
 
@@ -121,6 +125,7 @@ def test_workspaces(auth_token, resana_addr):
         assert r.json() == {"roles": {DEFAULT_EMAIL: "OWNER"}}
     except AssertionError:
         logger.exception("[KO] Get the sharing info")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Get the sharing info")
 
@@ -135,6 +140,7 @@ def test_workspaces(auth_token, resana_addr):
         assert r.status_code == 200
     except AssertionError:
         logger.exception("[KO] Share the workspace")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Share the workspace")
 
@@ -149,6 +155,7 @@ def test_workspaces(auth_token, resana_addr):
         assert r.json() == {"roles": {DEFAULT_EMAIL: "OWNER", INVITEE_EMAIL: "MANAGER"}}
     except AssertionError:
         logger.exception("[KO] Check that the workspace has been shared")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Check that the workspace has been shared")
 
@@ -163,6 +170,7 @@ def test_workspaces(auth_token, resana_addr):
         assert r.status_code == 200
     except AssertionError:
         logger.exception("[KO] Update role")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Update role")
 
@@ -177,6 +185,7 @@ def test_workspaces(auth_token, resana_addr):
         assert r.json() == {"roles": {DEFAULT_EMAIL: "OWNER", INVITEE_EMAIL: "READER"}}
     except AssertionError:
         logger.exception("[KO] Check that role has been updated")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Check that role has been updated")
 
@@ -191,6 +200,7 @@ def test_workspaces(auth_token, resana_addr):
         assert r.status_code == 200
     except AssertionError:
         logger.exception("[KO] Unshare the workspace")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Unshare the workspace")
 
@@ -207,6 +217,7 @@ def test_workspaces(auth_token, resana_addr):
         logger.exception(
             "[KO] Make sure that the workspace is no longer shared with bob"
         )
+        logger.debug(r.json())
     else:
         logger.info("[OK] Make sure that the workspace is no longer shared with bob")
 
@@ -261,6 +272,7 @@ def test_files(auth_token, resana_addr):
         VARIABLES["workspace_id"] = r.json()["workspaces"][0]["id"]
     except AssertionError:
         logger.exception("[KO] List workspaces")
+        logger.debug(r.json())
     else:
         logger.info("[OK] List workspaces")
 
@@ -282,6 +294,7 @@ def test_files(auth_token, resana_addr):
         VARIABLES["root_folder_id"] = r.json()["id"]
     except AssertionError:
         logger.exception("[KO] List folders")
+        logger.debug(r.json())
     else:
         logger.info("[OK] List folders")
 
@@ -301,6 +314,7 @@ def test_files(auth_token, resana_addr):
         VARIABLES["sub_folder_id"] = r.json()["id"]
     except AssertionError:
         logger.exception("[KO] Create a folder")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Create a folder")
 
@@ -329,6 +343,7 @@ def test_files(auth_token, resana_addr):
         }
     except AssertionError:
         logger.exception("[KO] Check new folder created")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Check new folder created")
 
@@ -349,6 +364,7 @@ def test_files(auth_token, resana_addr):
         VARIABLES["file1_id"] = r.json()["id"]
     except AssertionError:
         logger.exception("[KO] Upload a new file")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Upload a new file")
 
@@ -374,6 +390,7 @@ def test_files(auth_token, resana_addr):
         }
     except AssertionError:
         logger.exception("[KO] Make sure the file appears")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Make sure the file appears")
 
@@ -388,6 +405,7 @@ def test_files(auth_token, resana_addr):
         assert r.status_code == 200
     except AssertionError:
         logger.exception("[KO] Rename the file")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Rename the file")
 
@@ -413,6 +431,7 @@ def test_files(auth_token, resana_addr):
         }
     except AssertionError:
         logger.exception("[KO] Make sure the file was renamed")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Make sure the file was renamed")
 
@@ -440,6 +459,7 @@ def test_files(auth_token, resana_addr):
         assert r.json() == {"files": []}
     except AssertionError:
         logger.exception("[KO] Make sure the file was deleted")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Make sure the file was deleted")
 
@@ -510,6 +530,7 @@ def test_invitations(auth_token, resana_addr):
         assert r.json() == {"device": None, "users": []}
     except AssertionError:
         logger.exception("[KO] Listing invitations")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Listing invitations")
 
@@ -526,6 +547,7 @@ def test_invitations(auth_token, resana_addr):
         VARIABLES["token"] = r.json()["token"]
     except AssertionError:
         logger.exception("[KO] Inviting user")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Inviting user")
 
@@ -546,6 +568,7 @@ def test_invitations(auth_token, resana_addr):
         }
     except AssertionError:
         logger.exception("[KO] Checking if the new invitation appears")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Checking if the new invitation appears")
 
@@ -559,6 +582,7 @@ def test_invitations(auth_token, resana_addr):
         assert r.json() == {"greeter_email": DEFAULT_EMAIL, "type": "user"}
     except AssertionError:
         logger.exception("[KO] Claimer retrieve info")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Claimer retrieve info")
 
@@ -575,6 +599,7 @@ def test_invitations(auth_token, resana_addr):
         assert greeter_ret.json() == {"greeter_sas": ANY, "type": "user"}
     except AssertionError:
         logger.exception("[KO] Greeter wait")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Greeter wait")
 
@@ -588,6 +613,7 @@ def test_invitations(auth_token, resana_addr):
         VARIABLES["greeter_sas"] = greeter_ret.json()["greeter_sas"]
     except AssertionError:
         logger.exception("[KO] Claimer wait")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Claimer wait")
 
@@ -603,6 +629,7 @@ def test_invitations(auth_token, resana_addr):
         greeter_ret.json() == {"candidate_claimer_sas": [ANY, ANY, ANY, ANY]}
     except AssertionError:
         logger.exception("[KO] Greeter wait peer trust")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Greeter wait peer trust")
 
@@ -616,6 +643,7 @@ def test_invitations(auth_token, resana_addr):
         VARIABLES["claimer_sas"] = claimer_ret.json()["claimer_sas"]
     except AssertionError:
         logger.exception("[KO] Claimer check trust")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Claimer check trust")
 
@@ -630,6 +658,7 @@ def test_invitations(auth_token, resana_addr):
         assert greeter_ret.status_code == 200
     except AssertionError:
         logger.exception("[KO] Greeter check trust")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Greeter check trust")
 
@@ -637,6 +666,7 @@ def test_invitations(auth_token, resana_addr):
         assert claimer_ret.status_code == 200
     except AssertionError:
         logger.exception("[KO] Claimer wait peer trust")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Claimer wait peer trust")
 
@@ -651,6 +681,7 @@ def test_invitations(auth_token, resana_addr):
         assert claimer_ret.status_code == 200
     except AssertionError:
         logger.exception("[KO] Claimer finalize")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Claimer finalize")
 
@@ -658,6 +689,7 @@ def test_invitations(auth_token, resana_addr):
         assert greeter_ret.status_code == 200
     except AssertionError:
         logger.exception("[KO] Greeter finalize")
+        logger.debug(r.json())
     else:
         logger.info("[OK] Greeter finalize")
 
@@ -670,6 +702,7 @@ def test_invitations(auth_token, resana_addr):
         )
     except AssertionError:
         logger.exception("[KO] List users to see new user")
+        logger.debug(r.json())
     else:
         logger.info("[OK] List users to see new user")
 
@@ -677,6 +710,7 @@ def test_invitations(auth_token, resana_addr):
 def main(
     resana_addr,
     bootstrap_addr,
+    org_id,
     skip_bootstrap=False,
     skip_humans=False,
     skip_workspaces=False,
@@ -685,17 +719,17 @@ def main(
 ):
     """Test all Resana routes.
 
-    The script needs the URL to a running Resana instance and the bootstrap
-    address from Parsec (obtain with `parsec core create_organization`).
+    The script needs the URL to a running Resana instance, a Parsec backend address (with
+    the backend configured with `spontaneous bootstrap`) and an organization id.
     """
 
     if not skip_bootstrap:
-        logger.info("Bootstraping")
+        logger.info(f"Bootstraping using `{bootstrap_addr}`")
         r = make_request(
             "POST",
             f"{resana_addr}/organization/bootstrap",
             data={
-                "organization_url": bootstrap_addr.to_url(),
+                "organization_url": bootstrap_addr,
                 "email": DEFAULT_EMAIL,
                 "key": DEFAULT_PASSWORD,
             },
@@ -708,7 +742,7 @@ def main(
         json={
             "email": DEFAULT_EMAIL,
             "key": DEFAULT_PASSWORD,
-            "organization": bootstrap_addr.organization_id.str,
+            "organization": org_id,
         },
     )
     assert r.status_code == 200
@@ -736,15 +770,21 @@ if __name__ == "__main__":
         "--resana",
         type=str,
         default="http://127.0.0.1:5775",
-        required=True,
         help="Resana addr",
     )
     parser.add_argument(
-        "-b",
-        "--bootstrap",
-        type=lambda s: BackendOrganizationBootstrapAddr.from_url(s),
+        "-p",
+        "--parsec",
+        type=str,
         required=True,
-        help="Bootstrap addr",
+        help="Parsec backend address",
+    )
+    parser.add_argument(
+        "-o",
+        "--org",
+        type=str,
+        required=True,
+        help="Organization ID",
     )
     parser.add_argument(
         "-d", "--debug", action="store_true", help="Adds extra debugging info"
@@ -784,9 +824,13 @@ if __name__ == "__main__":
 
     logging.getLogger("urllib3").setLevel(logging.WARNING)
 
+    parsed = urllib.parse.urlparse(args.parsec)
+    bootstrap_addr = f"{parsed.scheme}://{parsed.netloc}/{args.org}?{parsed.query}&action=bootstrap_organization"
+
     main(
         args.resana,
-        args.bootstrap,
+        bootstrap_addr,
+        args.org,
         skip_bootstrap=args.skip_bootstrap,
         skip_humans=args.skip_humans,
         skip_workspaces=args.skip_workspaces,
