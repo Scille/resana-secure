@@ -1,9 +1,13 @@
 import pytest
 
+import oscrypto.asymmetric as crypto
+import base64
+
 from parsec.api.protocol import OrganizationID
 from parsec.backend.organization import generate_bootstrap_token
 from parsec.core.local_device import list_available_devices
 from parsec.core.types import BackendOrganizationBootstrapAddr
+from parsec.sequester_crypto import SequesterVerifyKeyDer
 
 
 @pytest.fixture
@@ -259,3 +263,93 @@ async def test_bootstrap_body_not_json(test_app, org_bootstrap_addr, kind):
     body = await response.get_json()
     assert response.status_code == 400
     assert body == {"error": "json_body_expected"}
+
+
+@pytest.mark.trio
+async def test_bootstrap_organization_with_sequester_key(
+    test_app, core_config_dir, org_bootstrap_addr, running_backend
+):
+    test_client = test_app.test_client()
+    pub_key, _ = crypto.generate_pair("rsa", bit_size=1024)
+    seq_verify_key = SequesterVerifyKeyDer(pub_key)
+
+    response = await test_client.post(
+        "/organization/bootstrap",
+        json={
+            "organization_url": org_bootstrap_addr.to_url(),
+            "email": "gordon.freeman@blackmesa.nm",
+            "key": "abcd",
+            "sequester_verify_key": base64.b64encode(seq_verify_key.dump()).decode(),
+        },
+    )
+
+    assert response.status_code == 200
+    body = await response.get_json()
+    assert body == {}
+    available_devices = list_available_devices(core_config_dir)
+    assert len(available_devices) == 1
+    assert (
+        available_devices[0].organization_id.str
+        == org_bootstrap_addr.organization_id.str
+    )
+    assert available_devices[0].human_handle.email == "gordon.freeman@blackmesa.nm"
+
+    organization = await running_backend.organization.get(
+        org_bootstrap_addr.organization_id
+    )
+    assert organization.sequester_authority is not None
+    assert (
+        organization.sequester_authority.verify_key_der.dump() == seq_verify_key.dump()
+    )
+
+
+@pytest.mark.trio
+async def test_bootstrap_organization_invalid_sequester_key(
+    test_app, org_bootstrap_addr
+):
+    test_client = test_app.test_client()
+
+    # Not str
+    response = await test_client.post(
+        "/organization/bootstrap",
+        json={
+            "organization_url": org_bootstrap_addr.to_url(),
+            "email": "gordon.freeman@blackmesa.nm",
+            "key": "abcd",
+            "sequester_verify_key": 42,
+        },
+    )
+
+    assert response.status_code == 400
+    body = await response.get_json()
+    assert body == {"error": "bad_data", "fields": ["sequester_verify_key"]}
+
+    # Not base64
+    response = await test_client.post(
+        "/organization/bootstrap",
+        json={
+            "organization_url": org_bootstrap_addr.to_url(),
+            "email": "gordon.freeman@blackmesa.nm",
+            "key": "abcd",
+            "sequester_verify_key": "a#",
+        },
+    )
+
+    assert response.status_code == 400
+    body = await response.get_json()
+    assert body == {"error": "bad_data", "fields": ["sequester_verify_key"]}
+
+    # Not a valid key
+    response = await test_client.post(
+        "/organization/bootstrap",
+        json={
+            "organization_url": org_bootstrap_addr.to_url(),
+            "email": "gordon.freeman@blackmesa.nm",
+            "key": "abcd",
+            "sequester_verify_key": base64.b64encode(b"nihilanth").decode(),
+        },
+    )
+
+    assert response.status_code == 400
+    body = await response.get_json()
+    assert body == {"error": "bad_data", "fields": ["sequester_verify_key"]}

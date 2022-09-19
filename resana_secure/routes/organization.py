@@ -1,12 +1,15 @@
 from quart import Blueprint, current_app
 
 import platform
+import binascii
+import base64
 
 from parsec.core.invite import (
     bootstrap_organization,
     InviteNotFoundError,
     InviteAlreadyUsedError,
 )
+from parsec.sequester_crypto import SequesterVerifyKeyDer
 from parsec.core.types import BackendOrganizationBootstrapAddr
 from parsec.api.protocol import HumanHandle, DeviceLabel
 from parsec.core.local_device import save_device_with_password_in_config
@@ -33,6 +36,12 @@ async def organization_bootstrap():
             backend_addr = BackendOrganizationBootstrapAddr.from_url(organization_url)
         except ValueError:
             bad_fields.add("organization_url")
+        sequester_key = data.get("sequester_verify_key")
+        if sequester_key:
+            try:
+                sequester_key = SequesterVerifyKeyDer(base64.b64decode(sequester_key))
+            except (ValueError, TypeError, binascii.Error):
+                bad_fields.add("sequester_verify_key")
 
     try:
         device_label = DeviceLabel(platform.node() or "-unknown-")
@@ -42,7 +51,10 @@ async def organization_bootstrap():
     with backend_errors_to_api_exceptions():
         try:
             new_device = await bootstrap_organization(
-                backend_addr, human_handle=human_handle, device_label=device_label
+                backend_addr,
+                human_handle=human_handle,
+                device_label=device_label,
+                sequester_authority_verify_key=sequester_key,
             )
             save_device_with_password_in_config(
                 config_dir=current_app.config["CORE_CONFIG"].config_dir,
