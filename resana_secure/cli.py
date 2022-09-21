@@ -12,6 +12,7 @@ from parsec.core.config import CoreConfig
 
 from .app import serve_app
 from ._version import __version__
+from .gui import run_gui
 
 
 logger = structlog.get_logger()
@@ -95,7 +96,6 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
         metavar="URL",
         default="https://resana.numerique.gouv.fr/",
     )
-    parser.add_argument("--disable-gui", action="store_true")
     parser.add_argument("--disable-mountpoint", action="store_true")
     parser.add_argument(
         "--log-level", choices=("DEBUG", "INFO", "WARNING", "ERROR"), default=default_log_level
@@ -144,11 +144,4 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
         client_allowed_origins=args.client_origin,
     )
 
-    if args.disable_gui:
-        trio.run(trio_main)
-
-    else:
-        # Inline import to avoid importing pyqt if gui is disabled
-        from .gui import run_gui
-
-        run_gui(trio_main=trio_main, resana_website_url=args.resana_website_url, config=config)
+    run_gui(trio_main=trio_main, resana_website_url=args.resana_website_url, config=config)

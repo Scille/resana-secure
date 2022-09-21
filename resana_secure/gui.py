@@ -3,7 +3,7 @@ from importlib import resources
 from contextlib import asynccontextmanager
 import trio
 from structlog import get_logger
-from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu
+from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QFileDialog
 from PyQt5.QtGui import QDesktopServices, QIcon
 from PyQt5.QtCore import pyqtSignal, QUrl
 
@@ -15,6 +15,8 @@ from parsec.core.ipcinterface import (
     IPCServerNotRunning,
     IPCCommand,
 )
+import multiprocessing
+from parsec.core.gui.custom_dialogs import QDialogInProcess
 
 
 logger = get_logger()
@@ -52,6 +54,7 @@ class TrioQtApplication(QApplication):
     _run_in_qt_loop = pyqtSignal(object)
 
     foreground_needed = pyqtSignal()
+    save_file_requested = pyqtSignal(object, object, object)
 
     def __init__(self, config: CoreConfig):
         super().__init__([])
@@ -63,6 +66,19 @@ class TrioQtApplication(QApplication):
         self._run_in_qt_loop.connect(_exec_fn)
         self._trio_main_cancel_scope: Optional[trio.CancelScope] = None
         self._quit_cb: Callable = super().quit
+        self.save_file_requested.connect(self._on_save_file_requested)
+        self.nursery = None
+
+    async def _save_file(self, save_path, workspace_fs, file_path):
+        async with await trio.open_file(save_path, "wb") as dest_fd:
+            async with await workspace_fs.open_file(file_path, "rb") as wk_fd:
+                await dest_fd.write(await wk_fd.read())
+                print("FILE SAVED")
+
+    def _on_save_file_requested(self, core, workspace_fs, file_path):
+        dest, _ = QDialogInProcess.getSaveFileName(None, "WHERE TO?")
+        print("SAVE FILE TO", dest)
+        self.nursery.start_soon(self._save_file, dest, workspace_fs, file_path)
 
     def exec_(self, trio_main, *args, **kwargs):
         def _run_sync_soon_threadsafe(fn):
@@ -81,7 +97,9 @@ class TrioQtApplication(QApplication):
             with trio.CancelScope() as self._trio_main_cancel_scope:
                 async with self._run_ipc_server():
                     try:
-                        await trio_main()
+                        async with trio.open_nursery() as nursery:
+                            self.nursery = nursery
+                            await trio_main()
                     finally:
                         self._trio_main_cancel_scope = None
 
@@ -135,16 +153,19 @@ class TrioQtApplication(QApplication):
 
 
 def run_gui(trio_main: Callable[[], Awaitable[None]], resana_website_url: str, config: CoreConfig):
-    app = TrioQtApplication(config)
-    app.setQuitOnLastWindowClosed(False)
-    tray = Systray()
+    multiprocessing.set_start_method("spawn")
 
-    tray.on_close.connect(app.quit)
+    with QDialogInProcess.manage_pools():
+        app = TrioQtApplication(config)
+        app.setQuitOnLastWindowClosed(False)
+        tray = Systray()
 
-    def _open_resana_website():
-        QDesktopServices.openUrl(QUrl(resana_website_url))
+        tray.on_close.connect(app.quit)
 
-    tray.on_open.connect(_open_resana_website)
-    app.foreground_needed.connect(_open_resana_website)
+        def _open_resana_website():
+            QDesktopServices.openUrl(QUrl(resana_website_url))
 
-    app.exec_(trio_main)
+        tray.on_open.connect(_open_resana_website)
+        app.foreground_needed.connect(_open_resana_website)
+
+        app.exec_(trio_main)

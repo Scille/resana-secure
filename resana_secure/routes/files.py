@@ -15,6 +15,7 @@ from parsec.core.fs.exceptions import (
     FSPermissionError,
     FSIsADirectoryError,
 )
+from PyQt5.QtWidgets import QApplication
 
 from ..utils import APIException, authenticated, check_data, backend_errors_to_api_exceptions
 
@@ -306,6 +307,27 @@ async def rename_workspace_file(core, workspace_id):
 @authenticated
 async def delete_workspace_file(core, workspace_id, file_id):
     return await _delete_workspace_entry(core, workspace_id, file_id, expected_entry_type="file")
+
+
+@files_bp.route("/workspaces/<string:workspace_id>/download/<string:file_id>", methods=["GET"])
+@authenticated
+async def save_workspace_file(core, workspace_id, file_id):
+    try:
+        workspace_id = EntryID.from_hex(workspace_id)
+    except ValueError:
+        raise APIException(404, {"error": "unknown_workspace"})
+    try:
+        file_id = EntryID.from_hex(file_id)
+    except ValueError:
+        raise APIException(404, {"error": "unknown_file"})
+
+    with backend_errors_to_api_exceptions():
+        workspace_fs = core.user_fs.get_workspace(workspace_id)
+        file_path, _ = await entry_id_to_path(workspace_fs, file_id)
+        print("YO", file_path)
+        qt_app = QApplication.instance()
+        await trio.to_thread.run_sync(qt_app.save_file_requested.emit, core, workspace_fs, file_path)
+        return {}, 200
 
 
 @files_bp.route("/workspaces/<string:workspace_id>/open/<string:entry_id>", methods=["POST"])
