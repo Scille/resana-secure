@@ -6,6 +6,9 @@ from quart import current_app
 from pathlib import Path
 from contextlib import asynccontextmanager
 
+from PyQt5.QtWidgets import QApplication
+
+from parsec.core.core_events import CoreEvent
 from parsec.core.types import LocalDevice
 from parsec.core.logged_core import logged_core_factory, LoggedCore
 from parsec.core.config import CoreConfig
@@ -68,9 +71,24 @@ async def start_core(
 ) -> AsyncIterator[LoggedCore]:
     async with logged_core_factory(config, device) as core:
         try:
+            core.event_bus.connect(
+                CoreEvent.WEBHOOK_UPLOAD_REJECTED_ERROR, _on_webhook_upload_rejected
+            )
             yield core
         finally:
+            core.event_bus.disconnect(
+                CoreEvent.WEBHOOK_UPLOAD_REJECTED_ERROR, _on_webhook_upload_rejected
+            )
             on_stopped()
+
+
+async def _on_webhook_upload_rejected(event, error_reason, workspace_id, file_path):
+    if event == CoreEvent.WEBHOOK_UPLOAD_REJECTED_ERROR and error_reason == "antivirus":
+        trio.to_thread.run_sync(
+            QApplication.message_requested.emit,
+            "Fichier malicieux détecté",
+            f"Le fichier `{file_path}` a été détecté comme malicieux. Il ne sera pas synchronisé.",
+        )
 
 
 class CoresManager:
