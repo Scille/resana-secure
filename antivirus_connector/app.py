@@ -1,7 +1,5 @@
 import re
-import secrets
 import logging
-import trio
 from typing import List
 from contextlib import asynccontextmanager
 from quart import current_app
@@ -20,12 +18,12 @@ from .config import AppConfig
 
 
 @asynccontextmanager
-async def run_pg_db_handler(db_url):
+async def run_pg_db_handler(db_url, min_connections, max_connections):
     if not db_url:
         yield None
     else:
         event_bus = EventBus()
-        dbh = PGHandler(db_url, 5, 7, event_bus)
+        dbh = PGHandler(db_url, min_connections, max_connections, event_bus)
 
         async with open_service_nursery() as nursery:
             await dbh.init(nursery)
@@ -40,13 +38,11 @@ async def app_factory(config: AppConfig, blockstore, client_allowed_origins: Lis
     app = QuartTrio(__name__, static_folder=None)
 
     app.config.from_mapping(
-        # Secret key changes each time the application is started, this is
-        # fine as long as we only use it for session cookies.
-        # The reason for doing this is we serve the api on localhost, so
-        # storing the secret on the hard drive in a no go.
-        SECRET_KEY=secrets.token_hex(),
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="strict",
+        # Maximum size of content. Limit is the same as Quart's default (16MB)
+        # but I'd rather have it explicitly set.
+        MAX_CONTENT_LENGTH=16 * 1024 * 1024,
         # Access-Control-Allow-Origin=* and Access-Control-Allow-Credential=include are mutually exclusive
         QUART_CORS_ALLOW_CREDENTIALS="*" not in client_allowed_origins,
         QUART_CORS_ALLOW_ORIGIN=client_allowed_origins,
@@ -92,9 +88,7 @@ async def app_factory(config: AppConfig, blockstore, client_allowed_origins: Lis
     yield app
 
 
-async def serve_app(
-    host: str, port: int, config: AppConfig, client_allowed_origins: List[str]
-):
+async def serve_app(host: str, port: int, config: AppConfig, client_allowed_origins: List[str]):
     hyper_config = HyperConfig.from_mapping(
         {
             "bind": [f"{host}:{port}"],
@@ -103,10 +97,10 @@ async def serve_app(
         }
     )
 
-    async with run_pg_db_handler(config.db_url) as dbh:
-        blockstore = blockstore_factory(
-            config=config.blockstore_config, postgresql_dbh=dbh
-        )
+    async with run_pg_db_handler(
+        config.db_url, config.db_min_connections, config.db_max_connections
+    ) as dbh:
+        blockstore = blockstore_factory(config=config.blockstore_config, postgresql_dbh=dbh)
         async with app_factory(
             config=config,
             blockstore=blockstore,

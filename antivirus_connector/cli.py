@@ -1,12 +1,12 @@
 import click
-from typing import Optional, Tuple
-from collections import namedtuple
+from typing import Optional
 from pathlib import Path
 from functools import partial
 import sys
 import logging
 import structlog
 import trio_asyncio
+import oscrypto.asymmetric
 
 from parsec.backend.config import BaseBlockStoreConfig
 from parsec.backend.blockstore import PostgreSQLBlockStoreConfig
@@ -48,39 +48,51 @@ def _setup_logging(log_level: str, log_file: Optional[Path]) -> None:
     level = getattr(logging, log_level)
     if log_file:
         log_file.parent.mkdir(exist_ok=True, parents=True)
-        logging.basicConfig(
-            format=format, datefmt=datefmt, filename=log_file, level=level
-        )
+        logging.basicConfig(format=format, datefmt=datefmt, filename=log_file, level=level)
     else:
-        logging.basicConfig(
-            format=format, datefmt=datefmt, stream=sys.stdout, level=level
-        )
+        logging.basicConfig(format=format, datefmt=datefmt, stream=sys.stdout, level=level)
 
 
 @click.command(short_help="Runs the antivirus connector")
-@click.option("--port", type=int, default=5775)
-@click.option("--host", default="127.0.0.1")
-@click.option("--client-origin", type=lambda x: x.split(";"), default="*")
+@click.option("--port", type=int, default=5775, envvar="ANTIVIRUS_CONNECTOR_PORT")
+@click.option("--host", default="127.0.0.1", envvar="ANTIVIRUS_CONNECTOR_HOST")
+@click.option(
+    "--client-origin",
+    type=lambda x: x.split(";"),
+    default="*",
+    envvar="ANTIVIRUS_CONNECTOR_CLIENT_ORIGIN",
+)
 @click.option(
     "-l",
     "--log-level",
     default="INFO",
     type=click.Choice(("DEBUG", "INFO", "WARNING", "ERROR"), case_sensitive=False),
+    envvar="ANTIVIRUS_CONNECTOR_LOG_LEVEL",
 )
-@click.option("--log-file", type=Path, default=None)
+@click.option("--log-file", type=Path, default=None, envvar="ANTIVIRUS_CONNECTOR_LOG_FILE")
 @click.option(
     "--authority-private-key",
-    envvar="ANTIVIRUS_AUTHORITY_PRIVATE_KEY",
+    envvar="ANTIVIRUS_CONNECTOR_AUTHORITY_PRIVATE_KEY",
     type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
     required=True,
 )
+@click.option("--antivirus-api-url", envvar="ANTIVIRUS_CONNECTOR_API_URL", type=str, required=True)
+@click.option("--antivirus-api-key", envvar="ANTIVIRUS_CONNECTOR_API_KEY", type=str, required=True)
+@click.option("--db", envvar="ANTIVIRUS_CONNECTOR_DB_URL", type=str, required=False)
 @click.option(
-    "--antivirus-api-url", envvar="ANTIVIRUS_API_URL", type=str, required=True
+    "--db-min-connections",
+    default=5,
+    show_default=True,
+    envvar="ANTIVIRUS_CONNECTOR_DB_MIN_CONNECTIONS",
+    help="Minimal number of connections to the database",
 )
 @click.option(
-    "--antivirus-api-key", envvar="ANTIVIRUS_API_KEY", type=str, required=True
+    "--db-max-connections",
+    default=7,
+    show_default=True,
+    envvar="ANTIVIRUS_CONNECTOR_DB_MAX_CONNECTIONS",
+    help="Maximum number of connections to the database",
 )
-@click.option("--db", envvar="ANTIVIRUS_DB_URL", type=str, required=False)
 @blockstore_backend_options
 def run_cli(
     port: int,
@@ -92,6 +104,8 @@ def run_cli(
     antivirus_api_url: str,
     antivirus_api_key: str,
     db: str,
+    db_min_connections: int,
+    db_max_connections: int,
     blockstore: BaseBlockStoreConfig,
 ):
 
@@ -99,16 +113,25 @@ def run_cli(
     logger.debug("Starting antivirus-connector !", version=__version__)
 
     if isinstance(blockstore, PostgreSQLBlockStoreConfig) and not db:
-        sys.exit("`--db` argument is required with PostgreSQL blockstore")
+        raise SystemExit("`--db` argument is required with PostgreSQL blockstore")
     elif not isinstance(blockstore, PostgreSQLBlockStoreConfig) and db:
         logger.warn("`--db` argument is ignored when blockstore is not PostgreSQL")
 
+    # Some HTTP servers will perform the redirection automatically in case of double slashes
+    # but the antivirus API does not.
+    if antivirus_api_url.endswith("/"):
+        antivirus_api_url = antivirus_api_url[:-1]
+
     config = AppConfig(
-        authority_private_key_path=authority_private_key,
+        authority_private_key=oscrypto.asymmetric.load_private_key(
+            authority_private_key.read_bytes()
+        ),
         antivirus_api_url=antivirus_api_url,
         antivirus_api_key=antivirus_api_key,
         blockstore_config=blockstore,
         db_url=db,
+        db_min_connections=db_min_connections,
+        db_max_connections=db_max_connections,
     )
 
     trio_main = partial(

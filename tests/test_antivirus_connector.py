@@ -20,7 +20,7 @@ async def antivirus_test_app():
 async def test_submit_methods(antivirus_test_app, method):
     test_client = antivirus_test_app.test_client()
 
-    response = await getattr(test_client, method.lower())("/submit")
+    response = await getattr(test_client, method.lower())("/submit/OrgID")
     assert response.status_code == 405
 
 
@@ -39,12 +39,9 @@ async def test_submit(antivirus_test_app, monkeypatch):
         AsyncMock(return_value=MagicMock()),
     )
 
-    data = {
-        "organization_id": "OrgID",
-        "sequester_blob": base64.urlsafe_b64encode(b"a"),
-    }
     response = await test_client.post(
-        "/submit", data=urllib.parse.urlencode(data).encode()
+        "/submit/Org",
+        data=b"a",
     )
     assert response.status_code == 200
     body = await response.get_json()
@@ -55,63 +52,27 @@ async def test_submit(antivirus_test_app, monkeypatch):
 async def test_submit_invalid_args(antivirus_test_app):
     test_client = antivirus_test_app.test_client()
 
-    data = {
-        "organization_id": " a b c ",
-        "sequester_blob": base64.urlsafe_b64encode(b"a"),
-    }
     # Invalid org id
     response = await test_client.post(
-        "/submit", data=urllib.parse.urlencode(data).encode()
+        "/submit/a38^#'",
+        data=b"a",
     )
     assert response.status_code == 400
     body = await response.get_json()
-    assert body == {"error": "Invalid value for argument: Invalid OrganizationID"}
+    assert body == {"error": "Failed to parse arguments: Invalid OrganizationID"}
 
-    data = {
-        "sequester_blob": base64.urlsafe_b64encode(b"a"),
-    }
     # Missing org id
     response = await test_client.post(
-        "/submit", data=urllib.parse.urlencode(data).encode()
+        "/submit",
+        data=b"a",
     )
-    assert response.status_code == 400
-    body = await response.get_json()
-    assert body == {"error": "Missing argument: 'organization_id'"}
+    assert response.status_code == 404
 
-    data = {
-        "organization_id": "OrgID",
-    }
     # Missing sequester blob
-    response = await test_client.post(
-        "/submit", data=urllib.parse.urlencode(data).encode()
-    )
+    response = await test_client.post("/submit/Org", data=b"")
     assert response.status_code == 400
     body = await response.get_json()
-    assert body == {"error": "Missing argument: 'sequester_blob'"}
-
-    data = {
-        "organization_id": "OrgID",
-        "sequester_blob": b"aaa",
-    }
-    # Invalid sequester blob (not base64 encoded)
-    response = await test_client.post(
-        "/submit", data=urllib.parse.urlencode(data).encode()
-    )
-    assert response.status_code == 400
-    body = await response.get_json()
-    assert body == {"error": "Invalid value for argument: Incorrect padding"}
-
-    data = {
-        "organization_id": "OrgID",
-        "sequester_blob": 42,
-    }
-    # Invalid sequester blob (invalid type)
-    response = await test_client.post(
-        "/submit", data=urllib.parse.urlencode(data).encode()
-    )
-    assert response.status_code == 400
-    body = await response.get_json()
-    assert body == {"error": "Invalid value for argument: Incorrect padding"}
+    assert body == {"error": "Vlob decryption failed: "}
 
 
 @pytest.mark.trio
@@ -122,13 +83,9 @@ async def test_submit_deserialization_failure(antivirus_test_app, monkeypatch):
     )
     test_client = antivirus_test_app.test_client()
 
-    data = {
-        "organization_id": "OrgID",
-        "sequester_blob": base64.urlsafe_b64encode(b"a"),
-    }
-
     response = await test_client.post(
-        "/submit", data=urllib.parse.urlencode(data).encode()
+        "/submit/OrgID",
+        data=b"a",
     )
     assert response.status_code == 400
     body = await response.get_json()
@@ -146,13 +103,9 @@ async def test_submit_reassembly_failure(antivirus_test_app, monkeypatch):
     )
     test_client = antivirus_test_app.test_client()
 
-    data = {
-        "organization_id": "OrgID",
-        "sequester_blob": base64.urlsafe_b64encode(b"a"),
-    }
-
     response = await test_client.post(
-        "/submit", data=urllib.parse.urlencode(data).encode()
+        "/submit/OrgID",
+        data=b"a",
     )
     assert response.status_code == 400
     body = await response.get_json()
@@ -174,13 +127,9 @@ async def test_submit_antivirus_ko(antivirus_test_app, monkeypatch):
     )
     test_client = antivirus_test_app.test_client()
 
-    data = {
-        "organization_id": "OrgID",
-        "sequester_blob": base64.urlsafe_b64encode(b"a"),
-    }
-
     response = await test_client.post(
-        "/submit", data=urllib.parse.urlencode(data).encode()
+        "/submit/OrgID",
+        data=b"a",
     )
     assert response.status_code == 400
     body = await response.get_json()

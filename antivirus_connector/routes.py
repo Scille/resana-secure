@@ -1,8 +1,8 @@
 import io
-import urllib
-import base64
+from typing import Optional
 import structlog
 from quart import Blueprint, request, current_app
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from parsec.sequester_crypto import sequester_service_decrypt
 from parsec.api.data import FileManifest
@@ -29,7 +29,6 @@ class ReassemblyError(Exception):
 
 async def load_manifest(vlob: bytes) -> Optional[FileManifest]:
     try:
-        assert isinstance(vlob, bytes)
         decrypted_vlob = sequester_service_decrypt(
             current_app.config["APP_CONFIG"].authority_private_key, vlob
         )
@@ -39,27 +38,24 @@ async def load_manifest(vlob: bytes) -> Optional[FileManifest]:
             return None
         return manifest
     except Exception as exc:
-        raise ManifestError(str(exc))
+        raise ManifestError() from exc
 
 
-async def reassemble_file(manifest, organization_id):
-    assert isinstance(manifest, FileManifest)
-
+async def reassemble_file(manifest: FileManifest, organization_id: OrganizationID) -> bytes:
     out = io.BytesIO()
+    out.truncate(manifest.size)
     blockstore = current_app.config["BLOCKSTORE"]
 
     for block in manifest.blocks:
         try:
-            block_data = await blockstore.read(
-                organization_id=organization_id, id=block.id
-            )
+            block_data = await blockstore.read(organization_id=organization_id, block_id=block.id)
         except Exception as exc:
-            raise ReassemblyError(f"Failed to download a block: {exc}")
+            raise ReassemblyError(f"Failed to download a block: {exc}") from exc
 
         try:
             cleardata = block.key.decrypt(block_data)
         except Exception as exc:
-            raise ReassemblyError(f"Failed to decrypt a block: {exc}")
+            raise ReassemblyError(f"Failed to decrypt a block: {exc}") from exc
 
         try:
             if out.tell() != block.offset:
@@ -69,32 +65,23 @@ async def reassemble_file(manifest, organization_id):
             else:
                 out.write(cleardata)
         except OSError as exc:
-            raise ReassemblyError(f"Failed to reassemble the file: {exc}")
+            raise ReassemblyError(f"Failed to reassemble the file: {exc}") from exc
 
     return out
 
 
-@bp.route("/submit", methods=["POST"])
-async def submit():
+@bp.route("/submit/<string:organization_id>", methods=["POST"])
+async def submit(organization_id):
     try:
-        # Get the raw data, `application/x-www-form-urlencoded`
-        data = await request.get_data()
-        # Decode it
-        decoded = data.decode()
-        # Parse it to a dict of list of values
-        content = urllib.parse.parse_qs(decoded)
-        b64_vlob = content["sequester_blob"][0]
-        # Decode the base64
-        vlob = base64.urlsafe_b64decode(b64_vlob.encode())
-        # Get the organization_id
-        organization_id = OrganizationID(content["organization_id"][0])
-    except KeyError as exc:
-        raise APIException(400, {"error": f"Missing argument: {exc}"})
-    except ValueError as exc:
-        raise APIException(400, {"error": f"Invalid value for argument: {exc}"})
+        organization_id = OrganizationID(organization_id)
+        vlob = await request.get_data(cache=False)
+    except RequestEntityTooLarge as exc:
+        # Request body is too large
+        logger.warning("Request too large", exc_info=exc)
+        return {}, 413
     except Exception as exc:
-        logger.warn(f"Error while parsing the arguments: {exc}")
-        raise APIException(400, {"error": f"Error parsing arguments: {exc}"})
+        logger.warning("Failed to parse the arguments", exc_info=exc)
+        raise APIException(400, {"error": f"Failed to parse arguments: {exc}"})
     try:
         # Decrypt and deserialize the manifest
         manifest = await load_manifest(vlob)
@@ -106,22 +93,26 @@ async def submit():
         content_stream = await reassemble_file(manifest, organization_id)
 
         # Send to the antivirus
-        malwares = await check_for_malwares(
-            content_stream, current_app.config["APP_CONFIG"]
-        )
+        malwares = await check_for_malwares(content_stream, current_app.config["APP_CONFIG"])
         if not malwares:
             return {}, 200
         else:
-            logger.warn(f"Malwares detected: {', '.join(malwares)}")
+            logger.warning(
+                "Malwares detected",
+                organizationd_id=organization_id,
+                vlob_id=manifest.id,
+                vlob_version=manifest.version,
+                malwares=malwares,
+            )
             return {
                 "error": f"Malicious file detected by anti-virus scan: {', '.join(malwares)}"
             }, 400
     except ManifestError as exc:
-        logger.warn(f"Error while deserializing the manifest: {exc}")
+        logger.warning("Failed to deserialize the manifest", exc_info=exc)
         raise APIException(400, {"error": f"Vlob decryption failed: {exc}"})
     except ReassemblyError as exc:
-        logger.warn(f"Error while reassembling the file: {exc}")
+        logger.warning("Failed to reassemble the file", exc_info=exc)
         raise APIException(400, {"error": f"The file cannot be reassembled: {exc}"})
     except AntivirusError as exc:
-        logger.warn(f"Error with the antivirus analysis: {exc}")
+        logger.warning("Antivirus analysis failed", exc_info=exc)
         raise APIException(400, {"error": f"Antivirus analysis failed: {exc}"})
