@@ -27,7 +27,7 @@ class ReassemblyError(Exception):
     pass
 
 
-async def load_manifest(vlob):
+async def load_manifest(vlob: bytes) -> Optional[FileManifest]:
     try:
         assert isinstance(vlob, bytes)
         decrypted_vlob = sequester_service_decrypt(
