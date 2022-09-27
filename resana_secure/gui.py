@@ -111,7 +111,7 @@ async def _qtrio_run(
 ):
     with trio.CancelScope() as cancel_scope:
         # Exits gracefully with a Ctrl+C
-        signal.signal(signal.SIGINT, lambda _: cancel_scope.cancel())
+        signal.signal(signal.SIGINT, lambda *_: cancel_scope.cancel())
         async with _run_ipc_server(cancel_scope, config, resana_website_url):
             app = ResanaGuiApp(cancel_scope, config, resana_website_url)
             app.setQuitOnLastWindowClosed(False)
