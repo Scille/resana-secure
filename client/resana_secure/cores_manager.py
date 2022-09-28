@@ -1,8 +1,7 @@
 import trio
 from uuid import uuid4
-from typing import AsyncIterator, Callable, Dict, Optional, Tuple
+from typing import AsyncIterator, Callable, Dict, Optional, Tuple, Generator
 from functools import partial
-from quart import current_app, g
 from pathlib import Path
 from contextlib import asynccontextmanager
 import structlog
@@ -16,11 +15,13 @@ from parsec.core.local_device import (
     list_available_devices,
     load_device_with_password,
     LocalDeviceError,
+    AvailableDevice,
 )
 from parsec.api.protocol import OrganizationID
 
 
-from .ltcm import ComponentNotRegistered
+from .crypto import decrypt_parsec_key, CryptoError
+from .ltcm import ComponentNotRegistered, LTCM
 
 
 logger = structlog.get_logger()
@@ -42,10 +43,9 @@ class CoreDeviceInvalidPasswordError(CoreManagerError):
     pass
 
 
-def load_device_or_error(
-    config_dir: Path, email: str, password: str, organization_id: Optional[OrganizationID] = None
-) -> Optional[LocalDevice]:
-    found_email = False
+def iter_matching_devices(
+    config_dir: Path, email: str, organization_id: Optional[OrganizationID] = None
+) -> Generator:
     for available_device in list_available_devices(config_dir):
         if (
             (
@@ -56,27 +56,39 @@ def load_device_or_error(
             and available_device.human_handle
             and available_device.human_handle.email == email
         ):
-            found_email = True
-            try:
-                return load_device_with_password(
-                    key_file=available_device.key_file_path, password=password
-                )
+            yield available_device
 
-            except LocalDeviceError:
-                # Maybe another device file is available for this email...
-                continue
-    else:
-        if found_email:
-            raise CoreDeviceInvalidPasswordError
-        else:
-            raise CoreDeviceNotFoundError
+
+def load_device_or_error(available_device: AvailableDevice, password: str) -> Optional[LocalDevice]:
+    try:
+        return load_device_with_password(key_file=available_device.key_file_path, password=password)
+    except LocalDeviceError:
+        raise CoreDeviceInvalidPasswordError
+
+
+def load_device_encrypted_key(device: AvailableDevice) -> Optional[str]:
+    try:
+        return (device.key_file_path.parent / f"{device.slughash}.enc_key").read_text()
+    except OSError:
+        return None
+
+
+def save_device_encrypted_key(device: AvailableDevice, encrypted_key: str) -> None:
+    try:
+        (device.key_file_path.parent / f"{device.slughash}.enc_key").write_text(encrypted_key)
+    except OSError:
+        pass
+
+
+def device_has_encrypted_key(device: AvailableDevice) -> bool:
+    return load_device_encrypted_key(device) is not None
 
 
 @asynccontextmanager
 async def start_core(
-    config: CoreConfig, device: LocalDevice, on_stopped: Callable
+    core_config: CoreConfig, device: LocalDevice, on_stopped: Callable
 ) -> AsyncIterator[LoggedCore]:
-    async with logged_core_factory(config, device) as core:
+    async with logged_core_factory(core_config, device) as core:
         try:
             core.event_bus.connect(
                 CoreEvent.FS_ENTRY_SYNC_REJECTED_BY_SEQUESTER_SERVICE,
@@ -105,28 +117,75 @@ async def _on_fs_sync_refused_by_sequester_service(
 
 
 class CoresManager:
-    def __init__(self):
-        self._email_to_auth_token: Dict[Tuple(OrganizationID, str), str] = {}
+    _instance = None
+
+    def __init__(self, core_config: CoreConfig, ltcm: LTCM):
+        self._email_to_auth_token: Dict[Tuple[OrganizationID, str], str] = {}
         self._auth_token_to_component_handle: Dict[str, int] = {}
         self._login_lock = trio.Lock()
+        self.core_config = core_config
+        self.ltcm = ltcm
 
     async def login(
-        self, email: str, password: str, organization_id: Optional[OrganizationID] = None
+        self,
+        email: str,
+        key: Optional[str] = None,
+        user_password: Optional[str] = None,
+        encrypted_key: Optional[str] = None,
+        organization_id: Optional[OrganizationID] = None,
     ) -> str:
         """
         Raises:
             CoreDeviceNotFoundError
             CoreDeviceInvalidPasswordError
         """
-        config = current_app.config["CORE_CONFIG"]
-        # First load the device from disk
-        # This operation can be done concurrently and ensures the email/password couple is valid
-        device = load_device_or_error(
-            config_dir=config.config_dir,
-            email=email,
-            password=password,
-            organization_id=organization_id,
-        )
+
+        device = None
+        found_device = False
+
+        # We iterate over the devices that match this email and organization_id (usually we only get one but we may have more in some cases)
+        for available_device in iter_matching_devices(
+            self.core_config.config_dir, email=email, organization_id=organization_id
+        ):
+            # Indicate that we did find a device, useful for the final error
+            found_device = True
+
+            # We have a user password
+            if user_password:
+                # But not encrypted key, meaning we're trying to log offline
+                if not encrypted_key:
+                    # Load the key from the file
+                    encrypted_key = load_device_encrypted_key(available_device)
+                # No key, probably because we never logged while online, let's try the next device
+                if not encrypted_key:
+                    continue
+                try:
+                    # Decrypt the parsec password using the user password
+                    key = decrypt_parsec_key(user_password, encrypted_key)
+                except CryptoError:
+                    # Let's try the next device
+                    continue
+            try:
+                # This operation can be done concurrently and ensures the email/password couple is valid
+                device = load_device_or_error(
+                    available_device=available_device,
+                    password=key or "",
+                )
+            except (CoreDeviceNotFoundError, CoreDeviceInvalidPasswordError):
+                # Cannot authenticate the device, let's try the next device
+                continue
+            else:
+                # Everything seems alright, if we have a user_password and an encrypted_key, let's save the encrypted_key so it stays up to date
+                if user_password and encrypted_key:
+                    save_device_encrypted_key(available_device, encrypted_key=encrypted_key)
+                break
+
+        # We did not find a matching device
+        if not found_device:
+            raise CoreDeviceNotFoundError
+        # We did find a matching device but did not manage to authenticate
+        if found_device and not device:
+            raise CoreDeviceInvalidPasswordError
 
         # The lock is needed here to avoid concurrent logins with the same email
         async with self._login_lock:
@@ -145,8 +204,10 @@ class CoresManager:
                 self._email_to_auth_token.pop((organization_id, email), None)
 
             auth_token = uuid4().hex
-            component_handle = await g.ltcm.register_component(
-                partial(start_core, config=config, device=device, on_stopped=_on_stopped)
+            component_handle = await self.ltcm.register_component(
+                partial(
+                    start_core, core_config=self.core_config, device=device, on_stopped=_on_stopped
+                )
             )
             self._auth_token_to_component_handle[auth_token] = component_handle
             self._email_to_auth_token[(organization_id, email)] = auth_token
@@ -167,7 +228,7 @@ class CoresManager:
             raise CoreNotLoggedError
 
         try:
-            await g.ltcm.unregister_component(component_handle)
+            await self.ltcm.unregister_component(component_handle)
 
         except ComponentNotRegistered as exc:
             raise CoreNotLoggedError from exc
@@ -185,8 +246,31 @@ class CoresManager:
             raise CoreNotLoggedError
 
         try:
-            async with g.ltcm.acquire_component(component_handle) as component:
+            async with self.ltcm.acquire_component(  # type: ignore[var-annotated]
+                component_handle
+            ) as component:
                 yield component
 
         except ComponentNotRegistered as exc:
             raise CoreNotLoggedError from exc
+
+    async def list_available_devices(
+        self, only_offline_available: bool = False
+    ) -> dict[Tuple[OrganizationID, str], Tuple[AvailableDevice, Optional[str]]]:
+        devices = {}
+        for available_device in list_available_devices(self.core_config.config_dir):
+            if only_offline_available and not device_has_encrypted_key(available_device):
+                continue
+            # The lock is needed here to avoid concurrent logins with the same email
+            async with self._login_lock:
+                # Check if the device is logged in
+                existing_auth_token = self._email_to_auth_token.get(
+                    (available_device.organization_id, available_device.human_handle.email)
+                )
+                # Ensuring that two devices from the same user only appear once
+                # It doesn't really matter if there are many devices with the same email and org_id,
+                # when login we try them all anyway.
+                key = (available_device.organization_id, available_device.human_handle.email)
+                if key not in devices:
+                    devices[key] = (available_device, existing_auth_token)
+        return devices

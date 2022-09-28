@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 import secrets
 import logging
@@ -10,7 +12,7 @@ from quart import current_app, ctx
 from quart_cors import cors
 from quart_trio import QuartTrio
 from hypercorn.config import Config as HyperConfig
-from hypercorn.trio import serve
+from hypercorn.trio import serve as hypercorn_trio_serve
 
 from parsec.core.config import CoreConfig
 
@@ -34,6 +36,9 @@ class ResanaApp(QuartTrio):
     cores_manager: CoresManager
     greeters_manager: GreetersManager
     claimers_manager: ClaimersManager
+    core_config: CoreConfig
+    hyper_config: HyperConfig
+    task_status: trio_typing.TaskStatus
 
     def app_context(self) -> ctx.AppContext:
         app_context = super().app_context()
@@ -41,7 +46,11 @@ class ResanaApp(QuartTrio):
         app_context.g.cores_manager = self.cores_manager
         app_context.g.greeters_manager = self.greeters_manager
         app_context.g.claimers_manager = self.claimers_manager
+        app_context.g.core_config = self.core_config
         return app_context
+
+    async def serve(self):
+        return await hypercorn_trio_serve(self, self.hyper_config, task_status=self.task_status)
 
 
 @asynccontextmanager
@@ -62,7 +71,6 @@ async def app_factory(
         # Access-Control-Allow-Origin=* and Access-Control-Allow-Credential=include are mutually exclusive
         QUART_CORS_ALLOW_CREDENTIALS="*" not in client_allowed_origins,
         QUART_CORS_ALLOW_ORIGIN=client_allowed_origins,
-        CORE_CONFIG=config,
     )
 
     cors(app)
@@ -109,19 +117,21 @@ async def app_factory(
 
     async with LTCM.run() as ltcm:
         app.ltcm = ltcm
-        app.cores_manager = CoresManager()
+        app.core_config = config
+        app.cores_manager = CoresManager(core_config=config, ltcm=ltcm)
         app.greeters_manager = GreetersManager()
         app.claimers_manager = ClaimersManager()
         yield app
 
 
+@asynccontextmanager
 async def serve_app(
     host: str,
     port: int,
     config: CoreConfig,
     client_allowed_origins: List[str],
     task_status: trio_typing.TaskStatus = trio.TASK_STATUS_IGNORED,
-):
+) -> AsyncIterator[ResanaApp]:
     hyper_config = HyperConfig.from_mapping(
         {
             "bind": [f"{host}:{port}"],
@@ -131,4 +141,6 @@ async def serve_app(
     )
 
     async with app_factory(config=config, client_allowed_origins=client_allowed_origins) as app:
-        await serve(app, hyper_config, task_status=task_status)
+        app.hyper_config = hyper_config
+        app.task_status = task_status
+        yield app

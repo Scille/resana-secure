@@ -4,7 +4,6 @@ from pathlib import Path
 from functools import partial
 import os
 import sys
-import trio
 import logging
 import structlog
 
@@ -136,7 +135,7 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
 
         manager.get_mountpoint_runner = _get_mountpoint_runner_mocked
 
-    trio_main = partial(
+    quart_app_context = partial(
         serve_app,
         host=args.host,
         port=args.port,
@@ -145,10 +144,17 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
     )
 
     if args.disable_gui:
-        trio.run(trio_main)
+
+        async def trio_main():
+            async with quart_app_context() as app:
+                await app.serve()
 
     else:
         # Inline import to avoid importing pyqt if gui is disabled
         from .gui import run_gui
 
-        run_gui(trio_main=trio_main, resana_website_url=args.resana_website_url, config=config)
+        run_gui(
+            quart_app_context=quart_app_context,
+            resana_website_url=args.resana_website_url,
+            config=config,
+        )

@@ -2,7 +2,7 @@ from resana_secure.ltcm import ComponentNotRegistered
 import trio
 from typing import Dict, Type, AsyncIterator
 from functools import partial
-from quart import current_app, g
+from quart import g
 from contextlib import asynccontextmanager
 
 from parsec.api.protocol import InvitationType
@@ -53,12 +53,7 @@ class BaseInviteManager:
         self, addr: BackendInvitationAddr, **kwargs
     ) -> AsyncIterator[BaseLongTermCtx]:
         component_handle = await g.ltcm.register_component(
-            partial(
-                self._LONG_TERM_CTX_CLS.start,
-                config=current_app.config["CORE_CONFIG"],
-                addr=addr,
-                **kwargs
-            )
+            partial(self._LONG_TERM_CTX_CLS.start, config=g.core_config, addr=addr, **kwargs)
         )
 
         # Register the component and teardown any previous one
