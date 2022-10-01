@@ -115,7 +115,7 @@ def run_cli(
     if isinstance(blockstore, PostgreSQLBlockStoreConfig) and not db:
         raise SystemExit("`--db` argument is required with PostgreSQL blockstore")
     elif not isinstance(blockstore, PostgreSQLBlockStoreConfig) and db:
-        logger.warn("`--db` argument is ignored when blockstore is not PostgreSQL")
+        logger.warning("`--db` argument is ignored when blockstore is not PostgreSQL")
 
     # Some HTTP servers will perform the redirection automatically in case of double slashes
     # but the antivirus API does not.

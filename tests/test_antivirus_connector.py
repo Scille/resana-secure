@@ -1,16 +1,27 @@
 import pytest
+from io import BytesIO
 from unittest.mock import AsyncMock, MagicMock
-import base64
-import urllib
+import httpx
 
-from antivirus_connector.app import app_factory
-from antivirus_connector.routes import ManifestError, ReassemblyError, reassemble_file
-from antivirus_connector.antivirus import AntivirusError
+from parsec.backend.config import MockedBlockStoreConfig
+
+from antivirus_connector.app import app_factory, AppConfig
+from antivirus_connector.routes import ManifestError, ReassemblyError
 
 
 @pytest.fixture
 async def antivirus_test_app():
-    async with app_factory(None, None, []) as app:
+    config = AppConfig(
+        authority_private_key=b"\x00" * 32,
+        antivirus_api_url="http://antivirus.localhost",
+        antivirus_api_key="1234",
+        blockstore_config=MockedBlockStoreConfig(),
+        db_url="postgresql://db.localhost",
+        db_min_connections=5,
+        db_max_connections=7,
+    )
+
+    async with app_factory(config=config, blockstore=MagicMock(), client_allowed_origins=[]) as app:
         async with app.test_app() as test_app:
             yield test_app
 
@@ -25,27 +36,56 @@ async def test_submit_methods(antivirus_test_app, method):
 
 
 @pytest.mark.trio
-async def test_submit(antivirus_test_app, monkeypatch):
+@pytest.mark.parametrize("is_malware", (False, True))
+async def test_submit(antivirus_test_app, monkeypatch, is_malware):
     test_client = antivirus_test_app.test_client()
 
-    monkeypatch.setattr(
-        "antivirus_connector.routes.check_for_malwares", AsyncMock(return_value=[])
-    )
+    antivirus_state = "stalled"
+
     monkeypatch.setattr(
         "antivirus_connector.routes.load_manifest", AsyncMock(return_value=MagicMock())
     )
     monkeypatch.setattr(
         "antivirus_connector.routes.reassemble_file",
-        AsyncMock(return_value=MagicMock()),
+        AsyncMock(return_value=BytesIO(b"<file content>")),
     )
+
+    async def fake_antivirus_http_post(self, url, headers, files):
+        nonlocal antivirus_state
+        assert antivirus_state == "stalled"
+        assert url.endswith("/submit")
+        assert headers["X-Auth-Token"]
+        assert files["file"]
+        antivirus_state = "work_started"
+        return httpx.Response(200, json={"status": True, "uuid": "d8b5a554-04b8-4af6-9e08-524d76ec8d12"})
+    monkeypatch.setattr("httpx.AsyncClient.post", fake_antivirus_http_post)
+
+    async def fake_antivirus_http_get(self, url, headers):
+        nonlocal antivirus_state
+        assert antivirus_state in ("work_started", "work_continued")
+        assert url.endswith("/results/d8b5a554-04b8-4af6-9e08-524d76ec8d12")
+        assert headers["X-Auth-Token"]
+        if antivirus_state == "work_started":
+            antivirus_state = "work_continued"
+            return httpx.Response(200, json={"status": True, "done": False, "is_malware": False})
+        elif antivirus_state == "work_continued":
+            antivirus_state = "finished"
+            malwares = ["keylogger"] if is_malware else []
+            return httpx.Response(200, json={"status": True, "done": True, "is_malware": is_malware, "malwares": malwares})
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_antivirus_http_get)
 
     response = await test_client.post(
         "/submit/Org",
         data=b"a",
     )
-    assert response.status_code == 200
-    body = await response.get_json()
-    assert body == {}
+    if is_malware:
+        assert response.status_code == 400
+        body = await response.get_json()
+        assert body == {"reason": "Malicious file detected by anti-virus scan: keylogger"}
+    else:
+        assert response.status_code == 200
+        body = await response.get_json()
+        assert body == {}
 
 
 @pytest.mark.trio
@@ -57,7 +97,7 @@ async def test_submit_invalid_args(antivirus_test_app):
         "/submit/a38^#'",
         data=b"a",
     )
-    assert response.status_code == 400
+    assert response.status_code == 422
     body = await response.get_json()
     assert body == {"error": "Failed to parse arguments: Invalid OrganizationID"}
 
@@ -72,7 +112,7 @@ async def test_submit_invalid_args(antivirus_test_app):
     response = await test_client.post("/submit/Org", data=b"")
     assert response.status_code == 400
     body = await response.get_json()
-    assert body == {"error": "Vlob decryption failed: "}
+    assert body == {"reason": "Vlob decryption failed: "}
 
 
 @pytest.mark.trio
@@ -89,7 +129,7 @@ async def test_submit_deserialization_failure(antivirus_test_app, monkeypatch):
     )
     assert response.status_code == 400
     body = await response.get_json()
-    assert body == {"error": "Vlob decryption failed: invalid key"}
+    assert body == {"reason": "Vlob decryption failed: invalid key"}
 
 
 @pytest.mark.trio
@@ -109,28 +149,4 @@ async def test_submit_reassembly_failure(antivirus_test_app, monkeypatch):
     )
     assert response.status_code == 400
     body = await response.get_json()
-    assert body == {"error": "The file cannot be reassembled: cannot decrypt block"}
-
-
-@pytest.mark.trio
-async def test_submit_antivirus_ko(antivirus_test_app, monkeypatch):
-    monkeypatch.setattr(
-        "antivirus_connector.routes.load_manifest", AsyncMock(return_value=MagicMock())
-    )
-    monkeypatch.setattr(
-        "antivirus_connector.routes.reassemble_file",
-        AsyncMock(return_value=MagicMock()),
-    )
-    monkeypatch.setattr(
-        "antivirus_connector.routes.check_for_malwares",
-        AsyncMock(return_value=["keylogger"]),
-    )
-    test_client = antivirus_test_app.test_client()
-
-    response = await test_client.post(
-        "/submit/OrgID",
-        data=b"a",
-    )
-    assert response.status_code == 400
-    body = await response.get_json()
-    assert body == {"error": "Malicious file detected by anti-virus scan: keylogger"}
+    assert body == {"reason": "The file cannot be reassembled: cannot decrypt block"}

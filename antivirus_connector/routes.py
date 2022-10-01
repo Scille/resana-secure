@@ -1,5 +1,5 @@
-import io
 from typing import Optional
+from io import BytesIO
 import structlog
 from quart import Blueprint, request, current_app
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -9,7 +9,6 @@ from parsec.api.data import FileManifest
 from parsec.api.data.manifest import manifest_unverified_load
 from parsec.api.protocol import OrganizationID
 
-from .utils import APIException
 from .antivirus import check_for_malwares, AntivirusError
 
 
@@ -41,8 +40,8 @@ async def load_manifest(vlob: bytes) -> Optional[FileManifest]:
         raise ManifestError() from exc
 
 
-async def reassemble_file(manifest: FileManifest, organization_id: OrganizationID) -> bytes:
-    out = io.BytesIO()
+async def reassemble_file(manifest: FileManifest, organization_id: OrganizationID) -> BytesIO:
+    out = BytesIO()
     out.truncate(manifest.size)
     blockstore = current_app.config["BLOCKSTORE"]
 
@@ -72,22 +71,29 @@ async def reassemble_file(manifest: FileManifest, organization_id: OrganizationI
 
 @bp.route("/submit/<string:organization_id>", methods=["POST"])
 async def submit(organization_id):
+    # 400 status should only used when detecting a malicious file, other 4xx/5xx should
+    # be used in case bad arguments or temporary failure. This is because Parsec consider
+    # 400 status as an indication to not save the vlob and other status as a "retry later"
+    # indication
     try:
         organization_id = OrganizationID(organization_id)
         vlob = await request.get_data(cache=False)
+
     except RequestEntityTooLarge as exc:
         # Request body is too large
         logger.warning("Request too large", exc_info=exc)
         return {}, 413
+
     except Exception as exc:
         logger.warning("Failed to parse the arguments", exc_info=exc)
-        raise APIException(400, {"error": f"Failed to parse arguments: {exc}"})
+        return {"error": f"Failed to parse arguments: {exc}"}, 422
+
     try:
         # Decrypt and deserialize the manifest
         manifest = await load_manifest(vlob)
         if not manifest:
             # Not a file manifest
-            return {"info": "Not a file manifest"}, 200
+            return {}, 200
 
         # Download the blocks and recombine into a file
         content_stream = await reassemble_file(manifest, organization_id)
@@ -105,14 +111,17 @@ async def submit(organization_id):
                 malwares=malwares,
             )
             return {
-                "error": f"Malicious file detected by anti-virus scan: {', '.join(malwares)}"
+                "reason": f"Malicious file detected by anti-virus scan: {', '.join(malwares)}"
             }, 400
+
     except ManifestError as exc:
         logger.warning("Failed to deserialize the manifest", exc_info=exc)
-        raise APIException(400, {"error": f"Vlob decryption failed: {exc}"})
+        return {"reason": f"Vlob decryption failed: {exc}"}, 400
+
     except ReassemblyError as exc:
         logger.warning("Failed to reassemble the file", exc_info=exc)
-        raise APIException(400, {"error": f"The file cannot be reassembled: {exc}"})
+        return {"reason": f"The file cannot be reassembled: {exc}"}, 400
+
     except AntivirusError as exc:
         logger.warning("Antivirus analysis failed", exc_info=exc)
-        raise APIException(400, {"error": f"Antivirus analysis failed: {exc}"})
+        return {"error": f"Antivirus analysis failed: {exc}"}, 503

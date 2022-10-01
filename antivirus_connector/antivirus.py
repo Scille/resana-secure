@@ -24,7 +24,7 @@ async def check_for_malwares(content_stream, config: AppConfig) -> List[str]:
         try:
             # Posting the file
             r = await client.post(
-                f"{url}/submit",
+                url=f"{url}/submit",
                 headers=headers,
                 files=form,
             )
@@ -36,24 +36,20 @@ async def check_for_malwares(content_stream, config: AppConfig) -> List[str]:
         try:
             data = r.json()
         except json.decoder.JSONDecodeError as exc:
-            raise AntivirusError(f"{r.status_code} Invalid JSON response") from exc
+            raise AntivirusError(f"Unexpected response {r.status_code}: Invalid JSON body") from exc
 
-        if not isinstance(data, dict):
-            raise AntivirusError("Invalid response body")
         if (
             r.status_code != 200
-            or not isinstance(data.get("status"), bool)
-            or not data.get("status")
+            or not isinstance(data, dict)
+            or data.get("status") is not True
+            or not isinstance(data.get("uuid"), str)
         ):
-            raise AntivirusError(f"Unexpected response {r.status_code}: {data.get('error', '')}")
-        if not isinstance(data.get("uuid"), str):
-            raise AntivirusError("Invalid response body")
+            raise AntivirusError(f"Unexpected response {r.status_code}: {data!r}")
 
         # File has been accepted, now we wait for it to be analyzed
         analysis_id = data["uuid"]
-        done = False
         # Retry until the analysis is done
-        while not done:
+        while True:
             try:
                 # Get analysis status
                 r = await client.get(
@@ -65,29 +61,26 @@ async def check_for_malwares(content_stream, config: AppConfig) -> List[str]:
             try:
                 data = r.json()
             except json.decoder.JSONDecodeError as exc:
-                raise AntivirusError(f"{r.status_code} Invalid JSON response") from exc
-
-            if not isinstance(data, dict):
-                raise AntivirusError("Invalid response body")
-            if r.status_code != 200 or not isinstance(
-                data.get("status", bool) or not data.get("status")
-            ):
                 raise AntivirusError(
-                    f"Unexpected response {r.status_code}: {data.get('error', '')}"
-                )
-            if not isinstance(data.get("done"), bool) or not isinstance(
-                data.get("is_malware"), bool
-            ):
-                raise AntivirusError("Invalid response body")
+                    f"Unexpected response {r.status_code}: Invalid JSON body"
+                ) from exc
 
-            done = data["done"]
-            if done:
+            if (
+                r.status_code != 200
+                or not isinstance(data, dict)
+                or data.get("status") is not True
+                or not isinstance(data.get("done"), bool)
+                or not isinstance(data.get("is_malware"), bool)
+            ):
+                raise AntivirusError(f"Unexpected response {r.status_code}: {data!r}")
+
+            if data["done"]:
                 # Analysis is finished, check if a malware has been detected
                 if data["is_malware"]:
                     if not isinstance(data.get("malwares"), list) or not all(
                         isinstance(m, str) for m in data["malwares"]
                     ):
-                        raise AntivirusError("Invalid response body")
+                        raise AntivirusError(f"Unexpected response {r.status_code}: {data!r}")
                     return data["malwares"]
                 else:
                     return []
