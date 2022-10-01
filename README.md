@@ -25,9 +25,10 @@ git pull
 git checkout -b MAJOR.MINOR
 ```
 
-1) Modify version in renasa_secure/_version.py
-2) Modify version in pyproject.toml
-3) Create the release commit
+1) Modify version in `renasa_secure/_version.py`
+2) Modify version in `antivirus_connector/_version.py`
+3) Modify version in `pyproject.toml`
+4) Create the release commit
 
 ```shell
 git commit -a -m "Bump version $VERSION"
