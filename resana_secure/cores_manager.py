@@ -5,7 +5,10 @@ from functools import partial
 from quart import current_app
 from pathlib import Path
 from contextlib import asynccontextmanager
+import structlog
+from PyQt5.QtWidgets import QApplication
 
+from parsec.core.core_events import CoreEvent
 from parsec.core.types import LocalDevice
 from parsec.core.logged_core import logged_core_factory, LoggedCore
 from parsec.core.config import CoreConfig
@@ -18,6 +21,9 @@ from parsec.api.protocol import OrganizationID
 
 
 from .ltcm import ComponentNotRegistered
+
+
+logger = structlog.get_logger()
 
 
 class CoreManagerError(Exception):
@@ -68,9 +74,28 @@ async def start_core(
 ) -> AsyncIterator[LoggedCore]:
     async with logged_core_factory(config, device) as core:
         try:
+            core.event_bus.connect(
+                CoreEvent.FS_ENTRY_SYNC_REJECTED_BY_SEQUESTER_SERVICE, _on_fs_sync_refused_by_sequester_service
+            )
             yield core
         finally:
+            core.event_bus.disconnect(
+                CoreEvent.FS_ENTRY_SYNC_REJECTED_BY_SEQUESTER_SERVICE, _on_fs_sync_refused_by_sequester_service
+            )
             on_stopped()
+
+
+async def _on_fs_sync_refused_by_sequester_service(
+    event,
+    file_path,
+    **kwargs,
+):
+    if event == CoreEvent.FS_ENTRY_SYNC_REJECTED_BY_SEQUESTER_SERVICE:
+        trio.to_thread.run_sync(
+            QApplication.message_requested.emit,
+            "Fichier malicieux détecté",
+            f"Le fichier `{file_path}` a été détecté comme malicieux. Il ne sera pas synchronisé.",
+        )
 
 
 class CoresManager:

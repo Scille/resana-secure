@@ -10,6 +10,7 @@ quart = "^0.17.0"
 quart-trio = "^0.9.1"
 quart-cors = "^0.5"
 hypercorn = "^0.13.2"
+httpx = "0.16.0"
 
 parsec-cloud = { path = "./modules/parsec-cloud", extras = ["backend", "core"], develop = false }
 

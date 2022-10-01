@@ -52,6 +52,7 @@ class TrioQtApplication(QApplication):
     _run_in_qt_loop = pyqtSignal(object)
 
     foreground_needed = pyqtSignal()
+    message_requested = pyqtSignal(str, str)
 
     def __init__(self, config: CoreConfig):
         super().__init__([])
@@ -121,7 +122,9 @@ class TrioQtApplication(QApplication):
             except IPCServerAlreadyRunning:
                 # Application is already started, give it our work then
                 try:
-                    await send_to_ipc_server(self.config.ipc_socket_file, IPCCommand.FOREGROUND)
+                    await send_to_ipc_server(
+                        self.config.ipc_socket_file, IPCCommand.FOREGROUND
+                    )
 
                 except IPCServerNotRunning:
                     # IPC server has closed, retry to create our own
@@ -134,12 +137,18 @@ class TrioQtApplication(QApplication):
                 await trio.sleep_forever()
 
 
-def run_gui(trio_main: Callable[[], Awaitable[None]], resana_website_url: str, config: CoreConfig):
+def run_gui(
+    trio_main: Callable[[], Awaitable[None]],
+    resana_website_url: str,
+    config: CoreConfig,
+):
     app = TrioQtApplication(config)
     app.setQuitOnLastWindowClosed(False)
-    tray = Systray()
 
+    tray = Systray()
     tray.on_close.connect(app.quit)
+
+    app.message_requested.connect(tray.showMessage)
 
     def _open_resana_website():
         QDesktopServices.openUrl(QUrl(resana_website_url))
