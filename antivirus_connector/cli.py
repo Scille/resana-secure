@@ -10,7 +10,7 @@ import oscrypto.asymmetric
 
 from parsec.backend.config import BaseBlockStoreConfig
 from parsec.backend.blockstore import PostgreSQLBlockStoreConfig
-from parsec.backend.cli.utils import blockstore_backend_options
+from parsec.backend.cli.utils import _parse_blockstore_params
 
 from .app import serve_app, AppConfig
 from ._version import __version__
@@ -71,14 +71,15 @@ def _setup_logging(log_level: str, log_file: Optional[Path]) -> None:
 )
 @click.option("--log-file", type=Path, default=None, envvar="ANTIVIRUS_CONNECTOR_LOG_FILE")
 @click.option(
-    "--authority-private-key",
-    envvar="ANTIVIRUS_CONNECTOR_AUTHORITY_PRIVATE_KEY",
-    type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
+    "--sequester-service-private-key",
+    envvar="ANTIVIRUS_CONNECTOR_SEQUESTER_SERVICE_PRIVATE_KEY",
+    type=str,
     required=True,
+    help="Sequester service's private RSA key (encoded in PEM format) used to decrypt the incoming data",
 )
 @click.option("--antivirus-api-url", envvar="ANTIVIRUS_CONNECTOR_API_URL", type=str, required=True)
 @click.option("--antivirus-api-key", envvar="ANTIVIRUS_CONNECTOR_API_KEY", type=str, required=True)
-@click.option("--db", envvar="ANTIVIRUS_CONNECTOR_DB_URL", type=str, required=False)
+@click.option("--db", envvar="ANTIVIRUS_CONNECTOR_DB", type=str, required=False)
 @click.option(
     "--db-min-connections",
     default=5,
@@ -93,14 +94,23 @@ def _setup_logging(log_level: str, log_file: Optional[Path]) -> None:
     envvar="ANTIVIRUS_CONNECTOR_DB_MAX_CONNECTIONS",
     help="Maximum number of connections to the database",
 )
-@blockstore_backend_options
+@click.option(
+    "--blockstore",
+    "-b",
+    required=True,
+    multiple=True,
+    callback=lambda ctx, param, value: _parse_blockstore_params(value),
+    envvar="ANTIVIRUS_CONNECTOR_BLOCKSTORE",
+    metavar="CONFIG",
+    help="Blockstore configuration"
+)
 def run_cli(
     port: int,
     host: str,
     client_origin: str,
     log_level: str,
     log_file: str,
-    authority_private_key: Path,
+    sequester_service_decryption_key: Path,
     antivirus_api_url: str,
     antivirus_api_key: str,
     db: str,
@@ -123,8 +133,8 @@ def run_cli(
         antivirus_api_url = antivirus_api_url[:-1]
 
     config = AppConfig(
-        authority_private_key=oscrypto.asymmetric.load_private_key(
-            authority_private_key.read_bytes()
+        sequester_service_decryption_key=oscrypto.asymmetric.load_private_key(
+            sequester_service_decryption_key.read_bytes()
         ),
         antivirus_api_url=antivirus_api_url,
         antivirus_api_key=antivirus_api_key,

@@ -29,7 +29,7 @@ class ReassemblyError(Exception):
 async def load_manifest(vlob: bytes) -> Optional[FileManifest]:
     try:
         decrypted_vlob = sequester_service_decrypt(
-            current_app.config["APP_CONFIG"].authority_private_key, vlob
+            current_app.config["APP_CONFIG"].sequester_service_decryption_key, vlob
         )
         # Connector does not care if data is signed or not
         manifest = manifest_unverified_load(decrypted_vlob)

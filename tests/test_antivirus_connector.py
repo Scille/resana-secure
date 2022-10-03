@@ -12,7 +12,7 @@ from antivirus_connector.routes import ManifestError, ReassemblyError
 @pytest.fixture
 async def antivirus_test_app():
     config = AppConfig(
-        authority_private_key=b"\x00" * 32,
+        sequester_service_decryption_key=b"\x00" * 32,
         antivirus_api_url="http://antivirus.localhost",
         antivirus_api_key="1234",
         blockstore_config=MockedBlockStoreConfig(),
