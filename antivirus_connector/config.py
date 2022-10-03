@@ -5,7 +5,7 @@ from parsec.backend.config import BaseBlockStoreConfig
 
 @dataclass
 class AppConfig:
-    authority_private_key: bytes
+    sequester_service_decryption_key: bytes
     antivirus_api_url: str
     antivirus_api_key: str
     blockstore_config: BaseBlockStoreConfig
