@@ -580,6 +580,7 @@ def test_user_invitations(auth_token, resana_addr, org_id):
     r = make_request(
         "DELETE",
         f"{resana_addr}/invitations/{token}",
+        auth_token=auth_token,
     )
     try:
         assert r.status_code == 204
@@ -861,11 +862,13 @@ def test_device_invitations(auth_token, resana_addr, org_id):
     r = make_request(
         "DELETE",
         f"{resana_addr}/invitations/{token}",
+        auth_token=auth_token,
     )
     try:
         assert r.status_code == 204
     except AssertionError:
         logger.exception("[KO] Delete device invitation")
+        logger.debug(r.status_code, r.json())
     else:
         logger.info("[OK] Delete device invitation")
 
