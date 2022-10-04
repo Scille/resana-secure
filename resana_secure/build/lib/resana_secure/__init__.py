@@ -6,7 +6,7 @@ def _monkeypatch_user_agent():
     import parsec.api.transport
     import parsec.core.backend_connection.transport
 
-    USER_AGENT = f"antivirus-connector/{__version__}"
+    USER_AGENT = f"resana-secure/{__version__}"
     parsec.api.transport.USER_AGENT = USER_AGENT
     parsec.core.backend_connection.transport.USER_AGENT = USER_AGENT
 
