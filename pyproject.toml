@@ -30,7 +30,7 @@ resana_secure = [
 ]
 
 antivirus_connector = [
-    "httpx",
+    "httpx"
 ]
 
 [tool.poetry.dev-dependencies]
