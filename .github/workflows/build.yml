@@ -39,7 +39,7 @@ jobs:
           pipx install poetry
           poetry --version
       - name: 'Install project'
-        run: poetry install
+        run: poetry install -E resana_secure -E antivirus_connector
       - name: 'Run tests'
         run: poetry run py.test tests
         timeout-minutes: 10
@@ -74,7 +74,7 @@ jobs:
           set -eux
           choco install -y --limit-output winfsp --version=${{ env.WINFSP_VERSION }}
       - name: 'Install project'
-        run: poetry install
+        run: poetry install -E resana_secure -E antivirus_connector
       - name: 'Run tests'
         run: poetry run py.test tests
         timeout-minutes: 10
