@@ -17,7 +17,7 @@ quart = "^0.17.0"
 quart-trio = "^0.9.1"
 quart-cors = "^0.5"
 hypercorn = "^0.13.2"
-parsec-cloud = {extras = ["backend", "core"], version = "^2.13.0rc1" }
+parsec-cloud = {extras = ["backend"], version = "^2.13.0rc1" }
 httpx = { version="0.16.0" }
 
 [tool.poetry.dev-dependencies]
