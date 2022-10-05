@@ -1,1 +1,1 @@
-resana-repository @ git+ssh://git@github.com/Scille/resana-secure.git@e3bf8a6c1c1e571096c5a5225f10c81cd06337e9
+resana-repository @ git+ssh://git@github.com/Scille/resana-secure.git@7740a74beb1f722a2f65167069f2b2f535e2a139
