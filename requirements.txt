@@ -1,2 +1,2 @@
-resana-repository @ git+ssh://git@github.com/Scille/resana-secure.git@5e25c79ea63ec95d0cddc72890d8945c833201e4
+resana-repository @ git+ssh://git@github.com/Scille/resana-secure.git@a2210adfb925756c8582b323bff7edfbffeb6793
 PyPAC==0.16.0
