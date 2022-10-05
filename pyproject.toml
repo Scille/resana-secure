@@ -18,20 +18,7 @@ quart-trio = "^0.9.1"
 quart-cors = "^0.5"
 hypercorn = "^0.13.2"
 parsec-cloud = {extras = ["backend", "core"], version = "^2.13.0rc1" }
-
-# Resana secure requirements
-
-# Antivirus connector requirements
-httpx = { version="0.16.0", optional=true }
-
-
-[tool.poetry.extras]
-resana_secure = [
-]
-
-antivirus_connector = [
-    "httpx"
-]
+httpx = { version="0.16.0" }
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.0"
