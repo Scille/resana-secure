@@ -134,7 +134,7 @@ def run_cli(
 
     config = AppConfig(
         sequester_service_decryption_key=oscrypto.asymmetric.load_private_key(
-            Path(sequester_service_private_key).read_bytes()
+            sequester_service_private_key
         ),
         antivirus_api_url=antivirus_api_url,
         antivirus_api_key=antivirus_api_key,
