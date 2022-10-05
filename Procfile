@@ -1,2 +1,2 @@
-web: ./bin/webhook_on_logs.py
-antivirus: ./bin/webhook_on_logs.py
+web: ./bin/webhook_on_logs.py -- echo ""
+antivirus: ./bin/webhook_on_logs.py -- echo ""
