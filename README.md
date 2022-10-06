@@ -18,18 +18,24 @@ git add modules/parsec-cloud
 
 ### 1 - Generate a new release
 
-On the master branch:
+Make a release branch from `master`:
+```shell
+git checkout master
+git pull
+git checkout -b MAJOR.MINOR
+```
 
-1) Modify version in renasa_secure/_version.py
-2) Modify version in pyproject.toml
-3) Create the release commit
+1) Modify version in `renasa_secure/_version.py`
+2) Modify version in `antivirus_connector/_version.py`
+3) Modify version in `pyproject.toml`
+4) Create the release commit
 
 ```shell
 git commit -a -m "Bump version $VERSION"
 git push
 ```
 
-Then wait for a green CI ;-)
+Then make the corresponding PR and wait for a green CI ;-)
 
 ### 2 - Create a tag and push it
 
@@ -111,3 +117,7 @@ Once the tag pushed, it can be converted as a release on github using the
 ["Draft a new release"](https://github.com/Scille/resana-secure/releases) button.
 
 /!\ Don't forget to check "This is a pre-release" if your creating a release candidate !
+
+### 4 - Merge the PR
+
+Merge the PR once the last release for this version has been created.

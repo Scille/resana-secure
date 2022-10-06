@@ -169,7 +169,7 @@ async def other_device(running_backend, local_device):
     device_certificate = DeviceCertificate(
         author=author,
         timestamp=now,
-        device_id=DeviceID(f"{local_device.device.user_id}@{DeviceName.new()}"),
+        device_id=DeviceID(f"{local_device.device.user_id.str}@{DeviceName.new().str}"),
         device_label=DeviceLabel("-unknown-"),
         verify_key=SigningKey.generate().verify_key,
     )

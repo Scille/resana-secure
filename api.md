@@ -1352,7 +1352,7 @@ Request:
 
 ```python
 {
-    "recovery_device_file_content": <string>
+    "recovery_device_file_content": <base64>
     "recovery_device_passphrase": <string>
     "new_device_key": <string>
 }

@@ -7,7 +7,7 @@ import signal
 from structlog import get_logger
 from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu
 from PyQt5.QtGui import QDesktopServices, QIcon
-from PyQt5.QtCore import QUrl, Qt
+from PyQt5.QtCore import QUrl, Qt, pyqtSignal
 
 from parsec.core.config import CoreConfig
 from parsec.core.ipcinterface import (
@@ -51,6 +51,8 @@ class Systray(QSystemTrayIcon):
 
 
 class ResanaGuiApp(QApplication):
+    message_requested = pyqtSignal(str, str)
+
     def __init__(
         self,
         cancel_scope: trio.CancelScope,
@@ -63,6 +65,7 @@ class ResanaGuiApp(QApplication):
         self.tray = Systray(parent=self)
         self.tray.on_close.connect(self.quit)
         self.tray.on_open.connect(self._on_open_clicked)
+        self.message_requested.connect(self.tray.showMessage)
         self._cancel_scope: trio.CancelScope = cancel_scope
 
     def _on_open_clicked(self):

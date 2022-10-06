@@ -27,23 +27,23 @@ async def get_invitations(core):
         apitoken = build_apitoken(
             backend_addr=core.device.organization_addr,
             organization_id=core.device.organization_id,
-            invitation_type=invitation["type"],
-            token=invitation["token"],
+            invitation_type=invitation.type,
+            token=invitation.token,
         )
-        if invitation["type"] == InvitationType.USER:
+        if invitation.type == InvitationType.USER:
             cooked["users"].append(
                 {
                     "token": apitoken,
-                    "created_on": invitation["created_on"].to_rfc3339(),
-                    "claimer_email": invitation["claimer_email"],
-                    "status": invitation["status"].value,
+                    "created_on": invitation.created_on.to_rfc3339(),
+                    "claimer_email": invitation.claimer_email,
+                    "status": invitation.status.name,
                 }
             )
         else:  # Device
             cooked["device"] = {
                 "token": apitoken,
-                "created_on": invitation["created_on"].to_rfc3339(),
-                "status": invitation["status"].value,
+                "created_on": invitation.created_on.to_rfc3339(),
+                "status": invitation.status.name,
             }
 
     return cooked, 200

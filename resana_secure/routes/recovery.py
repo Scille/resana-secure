@@ -1,3 +1,4 @@
+import os
 from quart import Blueprint, current_app
 from base64 import b64encode, b64decode
 import tempfile
@@ -23,17 +24,26 @@ async def export_device(core):
     async with check_data() as (data, bad_fields):
         bad_fields |= data.keys()  # No fields allowed
 
-    with tempfile.NamedTemporaryFile(suffix=".psrk") as fp:
-        path = Path(fp.name)
-        # On Windows, can't open on the same temporary file twice
-        fp.close()
-        passphrase = await save_recovery_device(Path(fp.name), core.device, True)
+    fp, path = tempfile.mkstemp(suffix=".psrk")
+    # Closing the open file returned by mkstemp
+    os.close(fp)
+    path = Path(path)
+    try:
+        passphrase = await save_recovery_device(path, core.device, True)
         raw = path.read_bytes()
+    finally:
+        path.unlink()
 
-    file_name = get_recovery_device_file_name(core.device).replace("parsec-", "resana-secure-", 1)
+    file_name = get_recovery_device_file_name(core.device).replace(
+        "parsec-", "resana-secure-", 1
+    )
 
     return (
-        {"file_content": b64encode(raw).decode(), "file_name": file_name, "passphrase": passphrase},
+        {
+            "file_content": b64encode(raw).decode(),
+            "file_name": file_name,
+            "passphrase": passphrase,
+        },
         200,
     )
 
@@ -60,15 +70,18 @@ async def import_device():
         if not isinstance(password, str):
             bad_fields.add("new_device_key")
 
-    with tempfile.NamedTemporaryFile(suffix=".psrk") as fp:
-        path = Path(fp.name)
-        # On Windows, can't open on the same temporary file twice
-        fp.close()
+    fp, path = tempfile.mkstemp(suffix=".psrk")
+    # Closing the open file returned by mkstemp
+    os.close(fp)
+    path = Path(path)
+    try:
         path.write_bytes(file_content)
         try:
             new_device = await load_recovery_device(path, passphrase)
         except LocalDeviceCryptoError:
             raise APIException(400, {"error": "invalid_passphrase"})
+    finally:
+        path.unlink()
 
     save_device_with_password_in_config(
         config_dir=current_app.config["CORE_CONFIG"].config_dir,

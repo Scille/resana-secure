@@ -1,5 +1,7 @@
 import pytest
 from base64 import b64encode
+from tempfile import mkstemp
+import pathlib
 
 
 @pytest.mark.trio
@@ -9,7 +11,7 @@ async def test_recovery_ok(test_app, local_device, authenticated_client):
     assert response.status_code == 200
     assert (
         body["file_name"]
-        == f"resana-secure-recovery-{local_device.device.organization_id}-{local_device.device.short_user_display}.psrk"
+        == f"resana-secure-recovery-{local_device.device.organization_id.str}-{local_device.device.short_user_display}.psrk"
     )
     assert "file_content" in body
     assert "passphrase" in body
@@ -41,18 +43,22 @@ async def test_recovery_ok(test_app, local_device, authenticated_client):
 
 
 @pytest.mark.trio
-async def test_recovery_invalid_passphrase(test_app, local_device, authenticated_client):
+async def test_recovery_invalid_passphrase(
+    test_app, local_device, authenticated_client
+):
     response = await authenticated_client.post("/recovery/export", json={})
     body = await response.get_json()
     assert response.status_code == 200
     assert (
         body["file_name"]
-        == f"resana-secure-recovery-{local_device.device.organization_id}-{local_device.device.short_user_display}.psrk"
+        == f"resana-secure-recovery-{local_device.device.organization_id.str}-{local_device.device.short_user_display}.psrk"
     )
     assert "file_content" in body
     assert "passphrase" in body
 
-    invalid_passphrase = "1234-1234-1234-1234-1234-1234-1234-1234-1234-1234-1234-1234-1234"
+    invalid_passphrase = (
+        "1234-1234-1234-1234-1234-1234-1234-1234-1234-1234-1234-1234-1234"
+    )
 
     new_device_key = b"P@ssw0rd."
     anonymous_client = test_app.test_client()
@@ -68,3 +74,42 @@ async def test_recovery_invalid_passphrase(test_app, local_device, authenticated
     body = await response.get_json()
     assert response.status_code == 400
     assert body == {"error": "invalid_passphrase"}
+
+
+@pytest.mark.trio
+async def test_recovery_delete_temp_file(
+    test_app, local_device, authenticated_client, monkeypatch
+):
+    response = await authenticated_client.post("/recovery/export", json={})
+    body = await response.get_json()
+    assert response.status_code == 200
+
+    temp_path: str
+
+    new_device_key = b"P@ssw0rd."
+    anonymous_client = test_app.test_client()
+
+    def _mkstemp_patch(*args, **kwargs):
+        nonlocal temp_path
+
+        fp, temp_path = mkstemp(*args, **kwargs)
+        assert pathlib.Path(temp_path).is_file()
+        return fp, temp_path
+
+    monkeypatch.setattr(
+        "resana_secure.routes.recovery.tempfile.mkstemp", _mkstemp_patch
+    )
+
+    response = await anonymous_client.post(
+        "/recovery/import",
+        json={
+            "recovery_device_file_content": body["file_content"],
+            "recovery_device_passphrase": body["passphrase"],
+            "new_device_key": b64encode(new_device_key).decode("ascii"),
+        },
+    )
+    assert response.status_code == 200
+    body = await response.get_json()
+    assert body == {}
+
+    assert not pathlib.Path(temp_path).exists()
