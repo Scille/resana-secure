@@ -199,11 +199,45 @@ async def test_authentication_bad_key(test_app, local_device):
 
 
 @pytest.mark.trio
-async def test_authentication_incorrect_organization_id(test_app, local_device):
+async def test_authentication_missing_organization_id(test_app, local_device):
+    # OrgID is not mandatory for now, so this should work
+    test_client = test_app.test_client()
+    response = await test_client.post(
+        "/auth",
+        json={"email": local_device.email, "key": local_device.key},
+    )
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {"token": ANY}
+    token = body["token"]
+
+    # Try with the org
+    response = await test_client.post(
+        "/auth",
+        json={"email": local_device.email, "key": local_device.key, "organization": local_device.organization.str},
+    )
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {"token": ANY}
+
+    # Tokens should not be the same
+    assert body["token"] != token
+
+
+@pytest.mark.trio
+async def test_authentication_bad_organization_id(test_app, local_device):
     test_client = test_app.test_client()
     response = await test_client.post(
         "/auth",
         json={"email": local_device.email, "key": local_device.key, "organization": ""},
+    )
+    body = await response.get_json()
+    assert response.status_code == 400
+    assert body == {"error": "bad_data", "fields": ["organization"]}
+
+    response = await test_client.post(
+        "/auth",
+        json={"email": local_device.email, "key": local_device.key, "organization": "Not a valid org id"},
     )
     body = await response.get_json()
     assert response.status_code == 400

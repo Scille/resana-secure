@@ -27,10 +27,11 @@ async def do_auth():
         if not isinstance(password, str):
             bad_fields.add("key")
         organization_id = data.get("organization")
-        try:
-            organization_id = OrganizationID(organization_id)
-        except (NameError, TypeError, ValueError):
-            bad_fields.add("organization")
+        if organization_id is not None:
+            try:
+                organization_id = OrganizationID(organization_id)
+            except (NameError, TypeError, ValueError):
+                bad_fields.add("organization")
 
     try:
         auth_token = await current_app.cores_manager.login(

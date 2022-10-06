@@ -43,12 +43,12 @@ class CoreDeviceInvalidPasswordError(CoreManagerError):
 
 
 def load_device_or_error(
-    config_dir: Path, email: str, password: str, organization_id: OrganizationID
+    config_dir: Path, email: str, password: str, organization_id: Optional[OrganizationID] = None
 ) -> Optional[LocalDevice]:
     found_email = False
     for available_device in list_available_devices(config_dir):
         if (
-            available_device.organization_id == organization_id
+            (not organization_id or organization_id and available_device.organization_id == organization_id)
             and available_device.human_handle
             and available_device.human_handle.email == email
         ):
@@ -105,7 +105,7 @@ class CoresManager:
         self._login_lock = trio.Lock()
 
     async def login(
-        self, email: str, password: str, organization_id: OrganizationID
+        self, email: str, password: str, organization_id: Optional[OrganizationID] = None
     ) -> str:
         """
         Raises:
