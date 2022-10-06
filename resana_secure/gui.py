@@ -2,10 +2,12 @@ from typing import Awaitable, Callable, Optional
 from importlib import resources
 from contextlib import asynccontextmanager
 import trio
+import qtrio
+import signal
 from structlog import get_logger
 from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu
 from PyQt5.QtGui import QDesktopServices, QIcon
-from PyQt5.QtCore import pyqtSignal, QUrl
+from PyQt5.QtCore import QUrl, Qt, pyqtSignal
 
 from parsec.core.config import CoreConfig
 from parsec.core.ipcinterface import (
@@ -48,93 +50,75 @@ class Systray(QSystemTrayIcon):
             self.on_open.emit()
 
 
-class TrioQtApplication(QApplication):
-    _run_in_qt_loop = pyqtSignal(object)
-
-    foreground_needed = pyqtSignal()
+class ResanaGuiApp(QApplication):
     message_requested = pyqtSignal(str, str)
 
-    def __init__(self, config: CoreConfig):
+    def __init__(
+        self,
+        cancel_scope: trio.CancelScope,
+        config: CoreConfig,
+        resana_website_url: str,
+    ):
         super().__init__([])
-        self.config = config
+        self.config: CoreConfig = config
+        self.resana_website_url: str = resana_website_url
+        self.tray = Systray(parent=self)
+        self.tray.on_close.connect(self.quit)
+        self.tray.on_open.connect(self._on_open_clicked)
+        self.message_requested.connect(self.tray.showMessage)
+        self._cancel_scope: trio.CancelScope = cancel_scope
 
-        def _exec_fn(fn):
-            fn()
-
-        self._run_in_qt_loop.connect(_exec_fn)
-        self._trio_main_cancel_scope: Optional[trio.CancelScope] = None
-        self._quit_cb: Callable = super().quit
-
-    def exec_(self, trio_main, *args, **kwargs):
-        def _run_sync_soon_threadsafe(fn):
-            self._run_in_qt_loop.emit(fn)
-
-        def _trio_done(trio_main_outcome):
-            try:
-                trio_main_outcome.unwrap()
-            except Exception:
-                logger.exception("Unexpected exception")
-
-            # Call the *real* quit()
-            self._quit_cb()
-
-        async def _trio_main():
-            with trio.CancelScope() as self._trio_main_cancel_scope:
-                async with self._run_ipc_server():
-                    try:
-                        await trio_main()
-                    finally:
-                        self._trio_main_cancel_scope = None
-
-        def _start_trio():
-            trio.lowlevel.start_guest_run(
-                _trio_main,
-                run_sync_soon_threadsafe=_run_sync_soon_threadsafe,
-                done_callback=_trio_done,
-            )
-
-        self._run_in_qt_loop.emit(_start_trio)
-        return super().exec_(*args, **kwargs)
+    def _on_open_clicked(self):
+        QDesktopServices.openUrl(QUrl(self.resana_website_url))
 
     def quit(self):
         # Overwrite quit so that it closes the trio loop (that will itself
         # trigger the actual closing of the application)
-        if self._trio_main_cancel_scope:
-            self._trio_main_cancel_scope.cancel()
-        else:
-            self._quit_cb()
+        self._cancel_scope.cancel()
 
-    @asynccontextmanager
-    async def _run_ipc_server(self):
-        async def _cmd_handler(cmd):
-            self.foreground_needed.emit()
-            return {"status": "ok"}
 
-        while True:
+@asynccontextmanager
+async def _run_ipc_server(
+    cancel_scope: trio.CancelScope, config: CoreConfig, resana_website_url: str
+):
+    async def _cmd_handler(_):
+        QDesktopServices.openUrl(QUrl(resana_website_url))
+        return {"status": "ok"}
+
+    while True:
+        try:
+            async with run_ipc_server(
+                _cmd_handler,
+                config.ipc_socket_file,
+                win32_mutex_name=config.ipc_win32_mutex_name,
+            ):
+                yield
+
+        except IPCServerAlreadyRunning:
+            # Application is already started, give it our work then
             try:
-                async with run_ipc_server(
-                    _cmd_handler,
-                    self.config.ipc_socket_file,
-                    win32_mutex_name=self.config.ipc_win32_mutex_name,
-                ):
-                    yield
+                await send_to_ipc_server(config.ipc_socket_file, IPCCommand.FOREGROUND)
 
-            except IPCServerAlreadyRunning:
-                # Application is already started, give it our work then
-                try:
-                    await send_to_ipc_server(
-                        self.config.ipc_socket_file, IPCCommand.FOREGROUND
-                    )
+            except IPCServerNotRunning:
+                # IPC server has closed, retry to create our own
+                continue
 
-                except IPCServerNotRunning:
-                    # IPC server has closed, retry to create our own
-                    continue
+            cancel_scope.cancel()
+            await trio.sleep_forever()
 
-                # We have successfuly noticed the other running application,
-                # time to close ourself
-                self.quit()
-                # Wait for our coroutine to be cancelled
-                await trio.sleep_forever()
+
+async def _qtrio_run(
+    trio_main: Callable[[], Awaitable[None]],
+    config: CoreConfig,
+    resana_website_url: str,
+):
+    with trio.CancelScope() as cancel_scope:
+        # Exits gracefully with a Ctrl+C
+        signal.signal(signal.SIGINT, lambda *_: cancel_scope.cancel())
+        async with _run_ipc_server(cancel_scope, config, resana_website_url):
+            app = ResanaGuiApp(cancel_scope, config, resana_website_url)
+            app.setQuitOnLastWindowClosed(False)
+            await trio_main()
 
 
 def run_gui(
@@ -142,18 +126,12 @@ def run_gui(
     resana_website_url: str,
     config: CoreConfig,
 ):
-    app = TrioQtApplication(config)
-    app.setQuitOnLastWindowClosed(False)
 
-    tray = Systray()
-    tray.on_close.connect(app.quit)
+    # Better rendering on high DPI desktops
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
+    QApplication.setHighDpiScaleFactorRoundingPolicy(
+        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+    )
 
-    app.message_requested.connect(tray.showMessage)
-
-    def _open_resana_website():
-        QDesktopServices.openUrl(QUrl(resana_website_url))
-
-    tray.on_open.connect(_open_resana_website)
-    app.foreground_needed.connect(_open_resana_website)
-
-    app.exec_(trio_main)
+    qtrio.run(_qtrio_run, trio_main, config, resana_website_url)
