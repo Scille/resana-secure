@@ -12,7 +12,7 @@ import threading
 
 
 NOTIFICATION_BASE_MSG = (
-    f"Application *{os.environ.get('APP', '<unknown app>')}* got error/warning log:\n> "
+    f"Application `{os.environ.get('APP', '<unknown app>')}` (container `{os.environ.get('CONTAINER', '<unknown container>')}`) got error/warning log:\n> "
 )
 
 
