@@ -1,25 +1,30 @@
 [tool.poetry]
-name = "resana_secure"
+name = "resana_secure_meta"
 version = "0.11.0"
 description = ""
 authors = ["Scille SAS"]
+packages = []
 
 [tool.poetry.dependencies]
 python = "~3.9.0"
-quart = "^0.17.0"
-quart-trio = "^0.9.1"
-quart-cors = "^0.5"
-hypercorn = "^0.13.2"
-httpx = "0.16.0"
 
-parsec-cloud = { path = "./modules/parsec-cloud", extras = ["backend", "core"], develop = false }
+parsec-cloud = { version = "^2.13.0rc2" }
+antivirus_connector = { path = "./antivirus_connector", optional = true }
+resana_secure = { path = "./resana_secure", optional = true }
+
+[tool.poetry.extras]
+server = [
+    "antivirus_connector",
+]
+client = [
+    "resana_secure",
+]
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.0"
 black = "^22.6.0"
 pytest-trio = "^0.7"
-pyinstaller = "~=5.3.0"
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
