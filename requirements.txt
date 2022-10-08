@@ -1,2 +1,1 @@
-resana-repository @ git+ssh://git@github.com/Scille/resana-secure.git@488bc5eb18b39a470b77270e521c3e1ba42f247f
-PyPAC==0.16.0
+git+ssh://git@github.com/Scille/resana-secure.git@686b5bb7c08c90677a87d88b3da0d4b14efae464#subdirectory=antivirus_connector
