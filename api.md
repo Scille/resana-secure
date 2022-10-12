@@ -117,13 +117,18 @@ Request:
 {
     "organization_url": <string>,
     "email": <string>,
-    "key": <base64>
+    "key": <base64>,
+    "sequester_verify_key": <string or null>,
 }
 ```
 
 Le champ `organization_url` contient une URL du type `parsec://parsec.example.com/my_org?action=bootstrap_organization&token=1234ABCD`.
 
 `key` est utilisé pour chiffrer le fichier de clé de Device résultant de l'opération de bootstrap.
+
+`sequester_verify_key` est un champ optionel devant être présent pour que l'organisation supporte le séquestre (non ultérieurement modifiable).
+Il contient la partie publique de la clé RSA (au format PEM, c'est à dire base64 avec `-----BEGIN PUBLIC KEY-----` header/footer) de l'autorité
+de séquestre.
 
 Response:
 
