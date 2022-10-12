@@ -1,5 +1,6 @@
 import click
-from typing import Optional
+import os
+from typing import Optional, Tuple, List
 from pathlib import Path
 from functools import partial
 import sys
@@ -8,6 +9,7 @@ import structlog
 import trio_asyncio
 import oscrypto.asymmetric
 
+from parsec.api.protocol import OrganizationID
 from parsec.backend.config import BaseBlockStoreConfig
 from parsec.backend.blockstore import PostgreSQLBlockStoreConfig
 from parsec.backend.cli.utils import _parse_blockstore_params
@@ -53,6 +55,29 @@ def _setup_logging(log_level: str, log_file: Optional[Path]) -> None:
         logging.basicConfig(format=format, datefmt=datefmt, stream=sys.stdout, level=level)
 
 
+def _parse_sequester_service_private_key_param(param: str) -> Tuple[OrganizationID, oscrypto.asymmetric.PrivateKey]:
+    try:
+        raw_id, raw_pem = param.split(":", 1)
+        organization_id = OrganizationID(raw_id)
+    except ValueError:
+        # We absolutely want to avoid leaking the key with a potentially uncatched exception
+        raise SystemExit("Invalid --sequester-service-private-key, expected format `<sequester_id>:<pem_key>`")
+
+    # Good enough check to make sure that the key is a RSA key in a PEM format
+    if "-----BEGIN RSA PRIVATE KEY-----" not in raw_pem:
+        raise SystemExit("Invalid --sequester-service-private-key, missing PEM RSA header for key part")
+
+    try:
+        # `oscrypto.asymmetric.load_private_key` treats argument as a file if its type is str and
+        # as the raw key if it's bytes, hence the encode.
+        service_private_key = oscrypto.asymmetric.load_private_key(raw_pem.encode())
+    except Exception:
+        # We absolutely want to avoid leaking the key with a potentially uncatched exception
+        raise SystemExit("Invalid --sequester-service-private-key, failed to load key part")
+
+    return organization_id, service_private_key
+
+
 @click.command(short_help="Runs the antivirus connector")
 @click.option("--port", type=int, default=5775, envvar="ANTIVIRUS_CONNECTOR_PORT")
 @click.option("--host", default="127.0.0.1", envvar="ANTIVIRUS_CONNECTOR_HOST")
@@ -72,10 +97,9 @@ def _setup_logging(log_level: str, log_file: Optional[Path]) -> None:
 @click.option("--log-file", type=Path, default=None, envvar="ANTIVIRUS_CONNECTOR_LOG_FILE")
 @click.option(
     "--sequester-service-private-key",
-    envvar="ANTIVIRUS_CONNECTOR_SEQUESTER_SERVICE_PRIVATE_KEY",
-    type=str,
-    required=True,
-    help="Sequester service's private RSA key (encoded in PEM format) used to decrypt the incoming data",
+    type=_parse_sequester_service_private_key_param,
+    multiple=True,
+    help="Sequester service's private RSA key (encoded in PEM format) used to decrypt the incoming data\nShould be passed as `<organization_id>:<pem_key>`",
 )
 @click.option("--antivirus-api-url", envvar="ANTIVIRUS_CONNECTOR_API_URL", type=str, required=True)
 @click.option("--antivirus-api-key", envvar="ANTIVIRUS_CONNECTOR_API_KEY", type=str, required=True)
@@ -110,7 +134,7 @@ def run_cli(
     client_origin: str,
     log_level: str,
     log_file: str,
-    sequester_service_private_key: str,
+    sequester_service_private_key: List[Tuple[OrganizationID, oscrypto.asymmetric.PrivateKey]],
     antivirus_api_url: str,
     antivirus_api_key: str,
     db: str,
@@ -118,6 +142,10 @@ def run_cli(
     db_max_connections: int,
     blockstore: BaseBlockStoreConfig,
 ):
+    if not sequester_service_private_key:
+        var = os.environ.get("ANTIVIRUS_CONNECTOR_SEQUESTER_SERVICE_PRIVATE_KEY")
+        if var:
+            sequester_service_private_key = [_parse_sequester_service_private_key_param(x) for x in var.split(";")]
 
     _setup_logging(log_level, log_file)
     logger.debug("Starting antivirus-connector !", version=__version__)
@@ -132,20 +160,8 @@ def run_cli(
     if antivirus_api_url.endswith("/"):
         antivirus_api_url = antivirus_api_url[:-1]
 
-    # Good enough check to make sure that the key is a RSA key in a PEM format
-    if "-----BEGIN RSA PRIVATE KEY-----" not in sequester_service_private_key:
-        raise SystemExit("Invalid `sequester_service_private_key`, missing PEM RSA header")
-
-    try:
-        # `oscrypto.asymmetric.load_private_key` treats argument as a file if its type is str and
-        # as the raw key if it's bytes, hence the encode.
-        sequester_service_decryption_key = oscrypto.asymmetric.load_private_key(sequester_service_private_key.encode())
-    except Exception:
-        # We absolutely want to avoid leaking the key with a potentially uncatched exception
-        raise SystemExit("Failed to load key given by argument `--sequester-service-private-key`")
-
     config = AppConfig(
-        sequester_service_decryption_key=sequester_service_decryption_key,
+        sequester_services_decryption_key=dict(sequester_service_private_key),
         antivirus_api_url=antivirus_api_url,
         antivirus_api_key=antivirus_api_key,
         blockstore_config=blockstore,
