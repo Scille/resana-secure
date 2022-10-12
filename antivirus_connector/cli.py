@@ -110,7 +110,7 @@ def run_cli(
     client_origin: str,
     log_level: str,
     log_file: str,
-    sequester_service_decryption_key: Path,
+    sequester_service_private_key: str,
     antivirus_api_url: str,
     antivirus_api_key: str,
     db: str,
@@ -132,10 +132,20 @@ def run_cli(
     if antivirus_api_url.endswith("/"):
         antivirus_api_url = antivirus_api_url[:-1]
 
+    # Good enough check to make sure that the key is a RSA key in a PEM format
+    if "-----BEGIN RSA PRIVATE KEY-----" not in sequester_service_private_key:
+        raise SystemExit("Invalid `sequester_service_private_key`, missing PEM RSA header")
+
+    try:
+        # `oscrypto.asymmetric.load_private_key` treats argument as a file if its type is str and
+        # as the raw key if it's bytes, hence the encode.
+        sequester_service_decryption_key = oscrypto.asymmetric.load_private_key(sequester_service_private_key.encode())
+    except Exception:
+        # We absolutely want to avoid leaking the key with a potentially uncatched exception
+        raise SystemExit("Failed to load key given by argument `--sequester-service-private-key`")
+
     config = AppConfig(
-        sequester_service_decryption_key=oscrypto.asymmetric.load_private_key(
-            sequester_service_decryption_key.read_bytes()
-        ),
+        sequester_service_decryption_key=sequester_service_decryption_key,
         antivirus_api_url=antivirus_api_url,
         antivirus_api_key=antivirus_api_key,
         blockstore_config=blockstore,
