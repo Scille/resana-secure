@@ -36,14 +36,14 @@ async def get_invitations(core):
                     "token": apitoken,
                     "created_on": invitation.created_on.to_rfc3339(),
                     "claimer_email": invitation.claimer_email,
-                    "status": invitation.status.name,
+                    "status": invitation.status.str,
                 }
             )
         else:  # Device
             cooked["device"] = {
                 "token": apitoken,
                 "created_on": invitation.created_on.to_rfc3339(),
-                "status": invitation.status.name,
+                "status": invitation.status.str,
             }
 
     return cooked, 200
