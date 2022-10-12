@@ -39,10 +39,10 @@ jobs:
           python -m pip install --user pipx
           pipx install poetry
           poetry --version
-      - name: 'Install project'
+      - name: 'Install Client Project'
         run: poetry install
         working-directory: client
-      - name: 'Run tests'
+      - name: 'Run Client Tests'
         run: poetry run py.test tests
         timeout-minutes: 10
         working-directory: client
@@ -54,10 +54,10 @@ jobs:
           python -m pip install --user pipx
           pipx install poetry
           poetry --version
-      - name: 'Install project'
+      - name: 'Install Server Project'
         run: poetry install
         working-directory: server
-      - name: 'Run tests'
+      - name: 'Run Server Tests'
         run: poetry run py.test tests
         timeout-minutes: 10
         working-directory: server
