@@ -1,1 +1,1 @@
-git+ssh://git@github.com/Scille/resana-secure.git@686b5bb7c08c90677a87d88b3da0d4b14efae464#subdirectory=antivirus_connector
+git+ssh://git@github.com/Scille/resana-secure.git@e811861782f3c5388778fa90b9e54c97e29789bb#subdirectory=antivirus_connector
