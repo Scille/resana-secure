@@ -10,6 +10,7 @@ import argparse
 import subprocess
 import threading
 import signal
+import queue
 
 
 NOTIFICATION_BASE_MSG = (
@@ -82,15 +83,38 @@ if __name__ == "__main__":
         raise KeyboardInterrupt
     signal.signal(signal.SIGTERM, sigterm_handler)
 
+    # Run the services
+
     parsec_proc = run_cmd_with_log_scan(["parsec", "backend", "run"])
     antivirus_proc = run_cmd_with_log_scan(["python", "-m", "antivirus_connector", "--port", "5775"])
 
+    # Run threads to monitor the service...
+
+    procs = (parsec_proc, antivirus_proc)
+    proc_queue = queue.Queue()
+
+    def _watch_process(proc):
+        proc.wait()
+        proc_queue.put(proc)
+
+    for proc in procs:
+        threading.Thread(
+            target=_watch_process,
+            args=(proc, ),
+            daemon=True,
+        ).start()
+
+    # ...wait until a service is stopped, and stop the rest
+
     try:
-        parsec_proc.wait()
-        antivirus_proc.wait()
-    except (KeyboardInterrupt, EOFError):
-        # If we are here, we are required to finish asap
-        parsec_proc.terminate()
-        antivirus_proc.terminate()
-        parsec_proc.wait()
-        antivirus_proc.wait()
+        proc_queue.get()
+    except KeyboardInterrupt:
+        pass
+
+    ret = 0
+    for proc in procs:
+        proc.terminate()
+        proc.wait()
+        ret |= proc.returncode
+
+    raise SystemExit(ret)
