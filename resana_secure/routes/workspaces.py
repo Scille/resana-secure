@@ -16,10 +16,13 @@ async def list_workspaces(core):
     user_manifest = core.user_fs.get_user_manifest()
     return (
         {
-            "workspaces": sorted([
-                {"id": entry.id.hex, "name": entry.name.str, "role": entry.role.value}
-                for entry in user_manifest.workspaces
-            ], key=lambda elem: elem["name"])
+            "workspaces": sorted(
+                [
+                    {"id": entry.id.hex, "name": entry.name.str, "role": entry.role.str}
+                    for entry in user_manifest.workspaces
+                ],
+                key=lambda elem: elem["name"],
+            )
         },
         200,
     )
@@ -118,7 +121,7 @@ async def get_workspace_share_info(core, workspace_id):
         for user_id, role in roles.items():
             user_info = await core.get_user_info(user_id)
             assert user_info.human_handle is not None
-            cooked_roles[user_info.human_handle.email] = role.value
+            cooked_roles[user_info.human_handle.email] = role.str
 
     return {"roles": cooked_roles}, 200
 
@@ -137,8 +140,8 @@ async def share_workspace(core, workspace_id):
             bad_fields.add("email")
         role = data.get("role")
         if role is not None:
-            for choice in RealmRole:
-                if choice.value == role:
+            for choice in RealmRole.values():
+                if choice.str == role:
                     role = choice
                     break
             else:
