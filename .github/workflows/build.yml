@@ -74,7 +74,7 @@ jobs:
           set -eux
           choco install -y --limit-output winfsp --version=${{ env.WINFSP_VERSION }}
       - name: 'Install project'
-        run: poetry install -E server -E client
+        run: poetry install
       - name: 'Run tests'
         run: poetry run py.test tests
         timeout-minutes: 10
@@ -104,7 +104,7 @@ jobs:
           pipx install poetry
           poetry --version
       - name: Freeze Parsec
-        run: python freeze_program.py ../..
+        run: python freeze_program.py ../../resana_secure
         working-directory: packaging/windows/
       - name: 'Upload installer as artifact'
         uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # pin v3.1.0
