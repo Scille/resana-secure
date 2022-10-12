@@ -9,16 +9,8 @@ packages = []
 python = "~3.9.0"
 
 parsec-cloud = { version = "^2.13.0rc2" }
-antivirus_connector = { path = "./antivirus_connector", optional = true }
-resana_secure = { path = "./resana_secure", optional = true }
-
-[tool.poetry.extras]
-server = [
-    "antivirus_connector",
-]
-client = [
-    "resana_secure",
-]
+antivirus_connector = { path = "./antivirus_connector" }
+resana_secure = { path = "./resana_secure" }
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.0"

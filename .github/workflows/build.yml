@@ -39,7 +39,7 @@ jobs:
           pipx install poetry
           poetry --version
       - name: 'Install project'
-        run: poetry install -E server -E client
+        run: poetry install
       - name: 'Run tests'
         run: poetry run py.test tests
         timeout-minutes: 10

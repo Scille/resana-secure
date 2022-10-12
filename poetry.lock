@@ -3,7 +3,7 @@ name = "aiofiles"
 version = "22.1.0"
 description = "File support for asyncio."
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.7,<4.0"
 
 [[package]]
@@ -11,7 +11,7 @@ name = "antivirus-connector"
 version = "0.11.0"
 description = ""
 category = "main"
-optional = true
+optional = false
 python-versions = "~3.9.0"
 develop = false
 
@@ -56,7 +56,7 @@ name = "asyncpg"
 version = "0.26.0"
 description = "An asyncio PostgreSQL driver"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6.0"
 
 [package.extras]
@@ -76,7 +76,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 dev = ["cloudpickle", "coverage[toml] (>=5.0.2)", "furo", "hypothesis", "mypy", "pre-commit", "pympler", "pytest (>=4.3.0)", "pytest-mypy-plugins", "six", "sphinx", "sphinx-notfound-page", "zope.interface"]
 docs = ["furo", "sphinx", "sphinx-notfound-page", "zope.interface"]
 tests = ["cloudpickle", "coverage[toml] (>=5.0.2)", "hypothesis", "mypy", "pympler", "pytest (>=4.3.0)", "pytest-mypy-plugins", "six", "zope.interface"]
-tests-no-zope = ["cloudpickle", "coverage[toml] (>=5.0.2)", "hypothesis", "mypy", "pympler", "pytest (>=4.3.0)", "pytest-mypy-plugins", "six"]
+tests_no_zope = ["cloudpickle", "coverage[toml] (>=5.0.2)", "hypothesis", "mypy", "pympler", "pytest (>=4.3.0)", "pytest-mypy-plugins", "six"]
 
 [[package]]
 name = "black"
@@ -105,7 +105,7 @@ name = "blinker"
 version = "1.5"
 description = "Fast, simple object-to-object and broadcast signaling"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 
 [[package]]
@@ -113,7 +113,7 @@ name = "boto3"
 version = "1.24.89"
 description = "The AWS SDK for Python"
 category = "main"
-optional = true
+optional = false
 python-versions = ">= 3.7"
 
 [package.dependencies]
@@ -129,7 +129,7 @@ name = "botocore"
 version = "1.27.89"
 description = "Low-level, data-driven core of boto 3."
 category = "main"
-optional = true
+optional = false
 python-versions = ">= 3.7"
 
 [package.dependencies]
@@ -164,11 +164,11 @@ name = "charset-normalizer"
 version = "2.1.1"
 description = "The Real First Universal Charset Detector. Open, modern and actively maintained alternative to Chardet."
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6.0"
 
 [package.extras]
-unicode-backport = ["unicodedata2"]
+unicode_backport = ["unicodedata2"]
 
 [[package]]
 name = "click"
@@ -194,7 +194,7 @@ name = "decorator"
 version = "5.1.1"
 description = "Decorators for Humans"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.5"
 
 [[package]]
@@ -202,7 +202,7 @@ name = "dukpy"
 version = "0.2.3"
 description = "Simple JavaScript interpreter for Python"
 category = "main"
-optional = true
+optional = false
 python-versions = "*"
 
 [package.extras]
@@ -214,7 +214,7 @@ name = "filelock"
 version = "3.8.0"
 description = "A platform independent file lock."
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.7"
 
 [package.extras]
@@ -226,7 +226,7 @@ name = "fusepy"
 version = "3.0.1"
 description = "Simple ctypes bindings for FUSE"
 category = "main"
-optional = true
+optional = false
 python-versions = "*"
 
 [[package]]
@@ -242,7 +242,7 @@ name = "h2"
 version = "4.1.0"
 description = "HTTP/2 State-Machine based protocol implementation"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6.1"
 
 [package.dependencies]
@@ -254,7 +254,7 @@ name = "hpack"
 version = "4.0.0"
 description = "Pure-Python HPACK header compression"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6.1"
 
 [[package]]
@@ -262,7 +262,7 @@ name = "httpcore"
 version = "0.12.3"
 description = "A minimal low-level HTTP client."
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
@@ -277,7 +277,7 @@ name = "httpx"
 version = "0.16.0"
 description = "The next generation HTTP client."
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
@@ -295,7 +295,7 @@ name = "hypercorn"
 version = "0.13.2"
 description = "A ASGI Server based on Hyper libraries and inspired by Gunicorn"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.7"
 
 [package.dependencies]
@@ -316,7 +316,7 @@ name = "hyperframe"
 version = "6.0.1"
 description = "HTTP/2 framing layer for Python"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6.1"
 
 [[package]]
@@ -340,7 +340,7 @@ name = "itsdangerous"
 version = "2.1.2"
 description = "Safely pass data to untrusted environments and back."
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.7"
 
 [[package]]
@@ -348,7 +348,7 @@ name = "jinja2"
 version = "3.1.2"
 description = "A very fast and expressive template engine."
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.7"
 
 [package.dependencies]
@@ -362,7 +362,7 @@ name = "jmespath"
 version = "1.0.1"
 description = "JSON Matching Expressions"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.7"
 
 [[package]]
@@ -370,7 +370,7 @@ name = "markupsafe"
 version = "2.1.1"
 description = "Safely add untrusted strings to HTML/XML markup."
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.7"
 
 [[package]]
@@ -484,7 +484,7 @@ name = "pbr"
 version = "5.10.0"
 description = "Python Build Reasonableness"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=2.6"
 
 [[package]]
@@ -516,7 +516,7 @@ name = "priority"
 version = "2.0.0"
 description = "A pure-Python implementation of the HTTP/2 priority tree"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6.1"
 
 [[package]]
@@ -524,7 +524,7 @@ name = "psutil"
 version = "5.9.2"
 description = "Cross-platform lib for process and system monitoring in Python."
 category = "main"
-optional = true
+optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [package.extras]
@@ -566,7 +566,7 @@ name = "pyobjc-core"
 version = "8.5.1"
 description = "Python<->ObjC Interoperability Module"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6"
 
 [[package]]
@@ -574,7 +574,7 @@ name = "pyobjc-framework-cocoa"
 version = "8.5.1"
 description = "Wrappers for the Cocoa frameworks on macOS"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
@@ -585,7 +585,7 @@ name = "pyobjc-framework-systemconfiguration"
 version = "8.5.1"
 description = "Wrappers for the framework SystemConfiguration on macOS"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
@@ -597,7 +597,7 @@ name = "pypac"
 version = "0.16.0"
 description = "Proxy auto-config and auto-discovery for Python."
 category = "main"
-optional = true
+optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7"
 
 [package.dependencies]
@@ -626,7 +626,7 @@ name = "pyqt5"
 version = "5.15.7"
 description = "Python bindings for the Qt cross platform application toolkit"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.7"
 
 [package.dependencies]
@@ -638,7 +638,7 @@ name = "pyqt5-qt5"
 version = "5.15.2"
 description = "The subset of a Qt installation needed by PyQt5."
 category = "main"
-optional = true
+optional = false
 python-versions = "*"
 
 [[package]]
@@ -646,7 +646,7 @@ name = "pyqt5-sip"
 version = "12.11.0"
 description = "The sip module support for PyQt5"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.7"
 
 [[package]]
@@ -688,7 +688,7 @@ name = "python-dateutil"
 version = "2.8.2"
 description = "Extensions to the standard Python datetime module"
 category = "main"
-optional = true
+optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
 
 [package.dependencies]
@@ -699,7 +699,7 @@ name = "python-swiftclient"
 version = "4.1.0"
 description = "OpenStack Object Storage API Client Library"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
@@ -714,7 +714,7 @@ name = "qrcode"
 version = "7.3.1"
 description = "QR Code image generator"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
@@ -732,7 +732,7 @@ name = "qtrio"
 version = "0.5.0"
 description = "a library bringing Qt GUIs together with ``async`` and ``await`` via Trio"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
@@ -747,15 +747,15 @@ trio-typing = ">=0.5.0,<0.6.0"
 [package.extras]
 cli = ["click (>=7.0,<8.0)"]
 examples = ["click (>=7.0,<8.0)", "httpcore (>=0.13.6,<0.14.0)", "httpx (>=0.18.2,<0.19.0)", "hyperlink (>=21.0.0,<21.1.0)"]
-p-checks = ["black (==20.8b1)", "check-manifest (>=0.46.0,<0.47.0)", "click (>=7.0,<8.0)", "flake8 (>=3.8,<4.0)", "httpcore (>=0.13.6,<0.14.0)", "httpx (>=0.18.2,<0.19.0)", "hyperlink (>=21.0.0,<21.1.0)", "mypy (==0.790)", "pytest (>=6.2,<7.0)", "quart-trio (>=0.7.0,<0.8.0)", "towncrier (>=21.3.0)"]
-p-docs = ["sphinx (>=4.0,<5.0)", "sphinx-autodoc-typehints (>=1.11,<2.0)", "sphinx-qt-documentation (>=0.3.0,<0.4.0)", "sphinx-rtd-theme (>=0.5.0,<0.6.0)", "sphinxcontrib-trio (>=1.1,<2.0)", "towncrier (>=21.3.0)"]
-p-tests = ["click (>=7.0,<8.0)", "coverage (>=5.3,<6.0)", "httpcore (>=0.13.6,<0.14.0)", "httpx (>=0.18.2,<0.19.0)", "hyperlink (>=21.0.0,<21.1.0)", "pytest (>=6.0,<7.0)", "pytest-cov (>=2.10,<3.0)", "pytest-faulthandler (>=2.0,<3.0)", "pytest-qt (>=3.3,<4.0)", "pytest-trio (>=0.7.0)", "pytest-xdist[psutil] (>=2.2,<3.0)", "pytest-xvfb (>=2.0,<3.0)", "quart-trio"]
+p_checks = ["black (==20.8b1)", "check-manifest (>=0.46.0,<0.47.0)", "click (>=7.0,<8.0)", "flake8 (>=3.8,<4.0)", "httpcore (>=0.13.6,<0.14.0)", "httpx (>=0.18.2,<0.19.0)", "hyperlink (>=21.0.0,<21.1.0)", "mypy (==0.790)", "pytest (>=6.2,<7.0)", "quart-trio (>=0.7.0,<0.8.0)", "towncrier (>=21.3.0)"]
+p_docs = ["sphinx (>=4.0,<5.0)", "sphinx-autodoc-typehints (>=1.11,<2.0)", "sphinx-qt-documentation (>=0.3.0,<0.4.0)", "sphinx-rtd-theme (>=0.5.0,<0.6.0)", "sphinxcontrib-trio (>=1.1,<2.0)", "towncrier (>=21.3.0)"]
+p_tests = ["click (>=7.0,<8.0)", "coverage (>=5.3,<6.0)", "httpcore (>=0.13.6,<0.14.0)", "httpx (>=0.18.2,<0.19.0)", "hyperlink (>=21.0.0,<21.1.0)", "pytest (>=6.0,<7.0)", "pytest-cov (>=2.10,<3.0)", "pytest-faulthandler (>=2.0,<3.0)", "pytest-qt (>=3.3,<4.0)", "pytest-trio (>=0.7.0)", "pytest-xdist[psutil] (>=2.2,<3.0)", "pytest-xvfb (>=2.0,<3.0)", "quart-trio"]
 pyqt5 = ["pyqt5 (>=5.15.1,<5.16.0)", "pyqt5-stubs (>=5.15.2,<5.16.0)"]
 pyside2 = ["pyside2 (>=5.15,!=5.15.2,<6.0)"]
-s-pytest = ["pytest (>=6.0,<7.0)"]
-s-pytest-trio = ["pytest-trio (>=0.7.0)"]
-s-quart-trio = ["quart-trio"]
-s-towncrier = ["towncrier (>=21.3.0)"]
+s_pytest = ["pytest (>=6.0,<7.0)"]
+s_pytest_trio = ["pytest-trio (>=0.7.0)"]
+s_quart_trio = ["quart-trio"]
+s_towncrier = ["towncrier (>=21.3.0)"]
 testing = ["pytest-trio (>=0.7.0)"]
 
 [[package]]
@@ -763,7 +763,7 @@ name = "qts"
 version = "0.2"
 description = "a thin compatibility layer for Python code to use Qt through various wrappers"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
@@ -772,22 +772,22 @@ typing-extensions = ">=3.10,<4.0"
 
 [package.extras]
 cli = ["click (>=8.0,<9.0)"]
-p-checks = ["black (==21.5b2)", "check-manifest (>=0.46.0,<0.47.0)", "flake8 (>=3.8,<4.0)", "mypy (==0.901)", "pytest (>=6.2,<7.0)", "towncrier (>=21.3,<22.0)"]
-p-docs = ["importlib-metadata (>=4.5,<5.0)", "pyside2 (>=5.15,<6.0)", "sphinx (>=4.0,<5.0)", "sphinx-autodoc-typehints (>=1.11,<2.0)", "sphinx-click (>=3.0,<4.0)", "sphinx-inline-tabs (>=2020.10.19b4,<2020.11.0)", "sphinx-qt-documentation (>=0.3.0,<0.4.0)", "sphinx-rtd-theme (>=0.5.0,<0.6.0)", "towncrier (>=21.3,<22.0)"]
-p-tests = ["click (>=8.0,<9.0)", "coverage (>=5.5,<6.0)", "pytest (>=6.2,<7.0)", "pytest-cov (>=2.12,<3.0)", "pytest-xvfb (>=2.0,<3.0)"]
+p_checks = ["black (==21.5b2)", "check-manifest (>=0.46.0,<0.47.0)", "flake8 (>=3.8,<4.0)", "mypy (==0.901)", "pytest (>=6.2,<7.0)", "towncrier (>=21.3,<22.0)"]
+p_docs = ["importlib-metadata (>=4.5,<5.0)", "pyside2 (>=5.15,<6.0)", "sphinx (>=4.0,<5.0)", "sphinx-autodoc-typehints (>=1.11,<2.0)", "sphinx-click (>=3.0,<4.0)", "sphinx-inline-tabs (>=2020.10.19b4,<2020.11.0)", "sphinx-qt-documentation (>=0.3.0,<0.4.0)", "sphinx-rtd-theme (>=0.5.0,<0.6.0)", "towncrier (>=21.3,<22.0)"]
+p_tests = ["click (>=8.0,<9.0)", "coverage (>=5.5,<6.0)", "pytest (>=6.2,<7.0)", "pytest-cov (>=2.12,<3.0)", "pytest-xvfb (>=2.0,<3.0)"]
 pyqt5 = ["pyqt5 (>=5.15,<6.0)"]
 pyqt6 = ["pyqt6 (>=6.0,<7.0)"]
 pyside2 = ["pyside2 (>=5.15,<6.0)"]
 pyside6 = ["pyside6 (>=6.0,<7.0)"]
-s-pytest = ["pytest (>=6.2,<7.0)"]
-s-towncrier = ["towncrier (>=21.3,<22.0)"]
+s_pytest = ["pytest (>=6.2,<7.0)"]
+s_towncrier = ["towncrier (>=21.3,<22.0)"]
 
 [[package]]
 name = "quart"
 version = "0.17.0"
 description = "A Python ASGI web microframework with the same API as Flask"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.7"
 
 [package.dependencies]
@@ -809,7 +809,7 @@ name = "quart-cors"
 version = "0.5.0"
 description = "A Quart extension to provide Cross Origin Resource Sharing, access control, support."
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.7.0"
 
 [package.dependencies]
@@ -820,7 +820,7 @@ name = "quart-trio"
 version = "0.9.1"
 description = "A Quart extension to provide trio support"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.7"
 
 [package.dependencies]
@@ -833,7 +833,7 @@ name = "requests"
 version = "2.28.1"
 description = "Python HTTP for Humans."
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.7, <4"
 
 [package.dependencies]
@@ -844,14 +844,14 @@ urllib3 = ">=1.21.1,<1.27"
 
 [package.extras]
 socks = ["PySocks (>=1.5.6,!=1.5.7)"]
-use-chardet-on-py3 = ["chardet (>=3.0.2,<6)"]
+use_chardet_on_py3 = ["chardet (>=3.0.2,<6)"]
 
 [[package]]
 name = "requests-file"
 version = "1.5.1"
 description = "File transport adapter for Requests"
 category = "main"
-optional = true
+optional = false
 python-versions = "*"
 
 [package.dependencies]
@@ -863,7 +863,7 @@ name = "resana-secure"
 version = "0.11.0"
 description = ""
 category = "main"
-optional = true
+optional = false
 python-versions = "~3.9.0"
 develop = false
 
@@ -883,7 +883,7 @@ name = "rfc3986"
 version = "1.5.0"
 description = "Validating URI References per RFC 3986"
 category = "main"
-optional = true
+optional = false
 python-versions = "*"
 
 [package.dependencies]
@@ -897,7 +897,7 @@ name = "s3transfer"
 version = "0.6.0"
 description = "An Amazon S3 Transfer Manager"
 category = "main"
-optional = true
+optional = false
 python-versions = ">= 3.7"
 
 [package.dependencies]
@@ -929,7 +929,7 @@ falcon = ["falcon (>=1.4)"]
 fastapi = ["fastapi (>=0.79.0)"]
 flask = ["blinker (>=1.1)", "flask (>=0.11)"]
 httpx = ["httpx (>=0.16.0)"]
-pure-eval = ["asttokens", "executing", "pure-eval"]
+pure_eval = ["asttokens", "executing", "pure-eval"]
 pyspark = ["pyspark (>=2.4.4)"]
 quart = ["blinker (>=1.1)", "quart (>=0.16.1)"]
 rq = ["rq (>=0.6)"]
@@ -943,7 +943,7 @@ name = "six"
 version = "1.16.0"
 description = "Python 2 and 3 compatibility utilities"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
 
 [[package]]
@@ -980,7 +980,7 @@ name = "tldextract"
 version = "3.4.0"
 description = "Accurately separates a URL's subdomain, domain, and public suffix, using the Public Suffix List (PSL). By default, this includes the public ICANN TLDs and their exceptions. You can optionally support the Public Suffix List's private domains as well."
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.7"
 
 [package.dependencies]
@@ -1008,7 +1008,7 @@ name = "toml"
 version = "0.10.2"
 description = "Python Library for Tom's Obvious, Minimal Language"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
 
 [[package]]
@@ -1041,7 +1041,7 @@ name = "trio-asyncio"
 version = "0.12.0"
 description = "A re-implementation of the asyncio mainloop on top of Trio"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
@@ -1070,7 +1070,7 @@ name = "triopg"
 version = "0.6.0"
 description = "PostgreSQL client for Trio based on asyncpg"
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
@@ -1104,7 +1104,7 @@ name = "werkzeug"
 version = "2.2.2"
 description = "The comprehensive WSGI web application library."
 category = "main"
-optional = true
+optional = false
 python-versions = ">=3.7"
 
 [package.dependencies]
@@ -1118,7 +1118,7 @@ name = "winfspy"
 version = "0.8.3"
 description = "CFFI bindings for WinFSP"
 category = "main"
-optional = true
+optional = false
 python-versions = "*"
 
 [package.dependencies]
@@ -1145,17 +1145,13 @@ name = "zxcvbn"
 version = "4.4.28"
 description = ""
 category = "main"
-optional = true
+optional = false
 python-versions = "*"
-
-[extras]
-client = ["resana_secure"]
-server = ["antivirus_connector"]
 
 [metadata]
 lock-version = "1.1"
 python-versions = "~3.9.0"
-content-hash = "378d99e2abd6b241e68c1f612132f6beeacb8c759d41cf950a39c2d573f73aaa"
+content-hash = "d5358bb918cde061ed5aa007c1aca585a2e40e55b8c9a9a8d5ae5fae27941549"
 
 [metadata.files]
 aiofiles = [
