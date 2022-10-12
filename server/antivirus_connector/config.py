@@ -1,11 +1,14 @@
-from pathlib import Path
+from typing import Dict
 from dataclasses import dataclass
+import oscrypto
+
+from parsec.api.protocol import OrganizationID
 from parsec.backend.config import BaseBlockStoreConfig
 
 
 @dataclass
 class AppConfig:
-    sequester_service_decryption_key: bytes
+    sequester_services_decryption_key: Dict[OrganizationID, oscrypto.asymmetric.PrivateKey]
     antivirus_api_url: str
     antivirus_api_key: str
     blockstore_config: BaseBlockStoreConfig

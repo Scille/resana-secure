@@ -2,17 +2,44 @@ import pytest
 from io import BytesIO
 from unittest.mock import AsyncMock, MagicMock
 import httpx
+import oscrypto
+from dataclasses import dataclass
 
+from parsec.api.protocol import OrganizationID, SequesterServiceID
 from parsec.backend.config import MockedBlockStoreConfig
 
 from antivirus_connector.app import app_factory, AppConfig
 from antivirus_connector.routes import ManifestError, ReassemblyError
 
 
+@dataclass
+class SequesterServiceFullData:
+    service_id: SequesterServiceID
+    encryption_key: oscrypto.asymmetric.PublicKey
+    decryption_key: oscrypto.asymmetric.PrivateKey
+
+
 @pytest.fixture
-async def antivirus_test_app():
+async def sequester_service():
+    encryption_key, decryption_key = oscrypto.asymmetric.generate_pair("rsa", bit_size=1024)
+    return SequesterServiceFullData(
+        service_id=SequesterServiceID.new(),
+        encryption_key=encryption_key,
+        decryption_key=decryption_key,
+    )
+
+
+@pytest.fixture
+async def orgid():
+    return OrganizationID("OrgID")
+
+
+@pytest.fixture
+async def antivirus_test_app(sequester_service, orgid):
     config = AppConfig(
-        sequester_service_decryption_key=b"\x00" * 32,
+        sequester_services_decryption_key={
+            orgid: sequester_service.decryption_key
+        },
         antivirus_api_url="http://antivirus.localhost",
         antivirus_api_key="1234",
         blockstore_config=MockedBlockStoreConfig(),
@@ -75,7 +102,7 @@ async def test_submit(antivirus_test_app, monkeypatch, is_malware):
     monkeypatch.setattr("httpx.AsyncClient.get", fake_antivirus_http_get)
 
     response = await test_client.post(
-        "/submit/Org",
+        "/submit/OrgID",
         data=b"a",
     )
     if is_malware:
@@ -109,7 +136,7 @@ async def test_submit_invalid_args(antivirus_test_app):
     assert response.status_code == 404
 
     # Missing sequester blob
-    response = await test_client.post("/submit/Org", data=b"")
+    response = await test_client.post("/submit/OrgID", data=b"")
     assert response.status_code == 400
     body = await response.get_json()
     assert body == {"reason": "Vlob decryption failed: "}
@@ -150,3 +177,17 @@ async def test_submit_reassembly_failure(antivirus_test_app, monkeypatch):
     assert response.status_code == 400
     body = await response.get_json()
     assert body == {"reason": "The file cannot be reassembled: cannot decrypt block"}
+
+
+@pytest.mark.trio
+async def test_submit_unknwon_organization_id(antivirus_test_app):
+    test_client = antivirus_test_app.test_client()
+
+    # Invalid org id
+    response = await test_client.post(
+        "/submit/UnknownID",
+        data=b"a",
+    )
+    assert response.status_code == 400
+    body = await response.get_json()
+    assert body == {"reason": "No key available for provided sequester service"}

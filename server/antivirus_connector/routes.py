@@ -1,6 +1,7 @@
 from typing import Optional
 from io import BytesIO
 import structlog
+import oscrypto
 from quart import Blueprint, request, current_app
 from werkzeug.exceptions import RequestEntityTooLarge
 
@@ -10,6 +11,7 @@ from parsec.api.data.manifest import manifest_unverified_load
 from parsec.api.protocol import OrganizationID
 
 from .antivirus import check_for_malwares, AntivirusError
+from .config import AppConfig
 
 
 logger = structlog.get_logger()
@@ -26,11 +28,9 @@ class ReassemblyError(Exception):
     pass
 
 
-async def load_manifest(vlob: bytes) -> Optional[FileManifest]:
+async def load_manifest(key: oscrypto.asymmetric.PrivateKey, vlob: bytes) -> Optional[FileManifest]:
     try:
-        decrypted_vlob = sequester_service_decrypt(
-            current_app.config["APP_CONFIG"].sequester_service_decryption_key, vlob
-        )
+        decrypted_vlob = sequester_service_decrypt(key, vlob)
         # Connector does not care if data is signed or not
         manifest = manifest_unverified_load(decrypted_vlob)
         if not isinstance(manifest, FileManifest):
@@ -88,9 +88,16 @@ async def submit(organization_id):
         logger.warning("Failed to parse the arguments", exc_info=exc)
         return {"error": f"Failed to parse arguments: {exc}"}, 422
 
+    config: AppConfig = current_app.config["APP_CONFIG"]
+    try:
+        key = config.sequester_services_decryption_key[organization_id]
+    except KeyError as exc:
+        logger.warning("No key available for provided sequester service", organization_id=organization_id.str, exc_info=exc)
+        return {"reason": "No key available for provided sequester service"}, 400
+
     try:
         # Decrypt and deserialize the manifest
-        manifest = await load_manifest(vlob)
+        manifest = await load_manifest(key, vlob)
         if not manifest:
             # Not a file manifest
             return {}, 200
