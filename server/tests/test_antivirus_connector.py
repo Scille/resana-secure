@@ -35,10 +35,10 @@ async def orgid():
 
 
 @pytest.fixture
-async def antivirus_test_app(sequester_service, orgid):
+async def antivirus_test_app(sequester_service):
     config = AppConfig(
         sequester_services_decryption_key={
-            orgid: sequester_service.decryption_key
+            sequester_service.service_id: sequester_service.decryption_key
         },
         antivirus_api_url="http://antivirus.localhost",
         antivirus_api_key="1234",
@@ -58,13 +58,13 @@ async def antivirus_test_app(sequester_service, orgid):
 async def test_submit_methods(antivirus_test_app, method):
     test_client = antivirus_test_app.test_client()
 
-    response = await getattr(test_client, method.lower())("/submit/OrgID")
+    response = await getattr(test_client, method.lower())("/submit?organization_id=a&service_id=b")
     assert response.status_code == 405
 
 
 @pytest.mark.trio
 @pytest.mark.parametrize("is_malware", (False, True))
-async def test_submit(antivirus_test_app, monkeypatch, is_malware):
+async def test_submit(antivirus_test_app, monkeypatch, sequester_service, orgid, is_malware):
     test_client = antivirus_test_app.test_client()
 
     antivirus_state = "stalled"
@@ -102,7 +102,7 @@ async def test_submit(antivirus_test_app, monkeypatch, is_malware):
     monkeypatch.setattr("httpx.AsyncClient.get", fake_antivirus_http_get)
 
     response = await test_client.post(
-        "/submit/OrgID",
+        f"/submit?organization_id={orgid.str}&service_id={sequester_service.service_id.str}",
         data=b"a",
     )
     if is_malware:
@@ -116,42 +116,73 @@ async def test_submit(antivirus_test_app, monkeypatch, is_malware):
 
 
 @pytest.mark.trio
-async def test_submit_invalid_args(antivirus_test_app):
+async def test_submit_invalid_args(antivirus_test_app, sequester_service, orgid):
     test_client = antivirus_test_app.test_client()
 
     # Invalid org id
     response = await test_client.post(
-        "/submit/a38^#'",
+        f"/submit?service_id={sequester_service.service_id.str}&organization_id=1-2+^",
         data=b"a",
     )
     assert response.status_code == 422
     body = await response.get_json()
     assert body == {"error": "Failed to parse arguments: Invalid OrganizationID"}
 
+    # Invalid service id
+    response = await test_client.post(
+        f"/submit?service_id=3-3^29382#&organization_id={orgid.str}",
+        data=b"a",
+    )
+    assert response.status_code == 422
+    body = await response.get_json()
+    assert body == {"error": "Failed to parse arguments: Invalid SequesterServiceID"}
+
     # Missing org id
+    response = await test_client.post(
+        f"/submit?service_id={sequester_service.service_id.str}",
+        data=b"a",
+    )
+    assert response.status_code == 422
+    body = await response.get_json()
+    assert body == {"error": "Failed to parse arguments: Invalid OrganizationID"}
+
+    # Missing service id
+    response = await test_client.post(
+        f"/submit?organization_id={orgid.str}",
+        data=b"a",
+    )
+    assert response.status_code == 422
+    body = await response.get_json()
+    assert body == {"error": "Failed to parse arguments: Invalid SequesterServiceID"}
+
+    # Missing both org id and service id
     response = await test_client.post(
         "/submit",
         data=b"a",
     )
-    assert response.status_code == 404
+    assert response.status_code == 422
+    body = await response.get_json()
+    assert body == {"error": "Failed to parse arguments: Invalid OrganizationID"}
 
     # Missing sequester blob
-    response = await test_client.post("/submit/OrgID", data=b"")
+    response = await test_client.post(f"/submit?service_id={sequester_service.service_id.str}&organization_id={orgid.str}", data=b"")
     assert response.status_code == 400
     body = await response.get_json()
     assert body == {"reason": "Vlob decryption failed: "}
 
 
 @pytest.mark.trio
-async def test_submit_deserialization_failure(antivirus_test_app, monkeypatch):
+async def test_submit_deserialization_failure(antivirus_test_app, sequester_service, orgid, monkeypatch):
     monkeypatch.setattr(
         "antivirus_connector.routes.load_manifest",
         AsyncMock(side_effect=ManifestError("invalid key")),
     )
     test_client = antivirus_test_app.test_client()
 
+    print(sequester_service.service_id.str)
+
     response = await test_client.post(
-        "/submit/OrgID",
+        f"/submit?service_id={sequester_service.service_id.str}&organization_id={orgid.str}",
         data=b"a",
     )
     assert response.status_code == 400
@@ -160,7 +191,7 @@ async def test_submit_deserialization_failure(antivirus_test_app, monkeypatch):
 
 
 @pytest.mark.trio
-async def test_submit_reassembly_failure(antivirus_test_app, monkeypatch):
+async def test_submit_reassembly_failure(antivirus_test_app, monkeypatch, sequester_service, orgid):
     monkeypatch.setattr(
         "antivirus_connector.routes.load_manifest", AsyncMock(return_value=MagicMock())
     )
@@ -171,7 +202,7 @@ async def test_submit_reassembly_failure(antivirus_test_app, monkeypatch):
     test_client = antivirus_test_app.test_client()
 
     response = await test_client.post(
-        "/submit/OrgID",
+        f"/submit?service_id={sequester_service.service_id.str}&organization_id={orgid.str}",
         data=b"a",
     )
     assert response.status_code == 400
@@ -180,12 +211,12 @@ async def test_submit_reassembly_failure(antivirus_test_app, monkeypatch):
 
 
 @pytest.mark.trio
-async def test_submit_unknwon_organization_id(antivirus_test_app):
+async def test_submit_unknwon_service_id(antivirus_test_app, orgid):
     test_client = antivirus_test_app.test_client()
 
     # Invalid org id
     response = await test_client.post(
-        "/submit/UnknownID",
+        f"/submit?service_id={SequesterServiceID.new().str}&organization_id={orgid.str}",
         data=b"a",
     )
     assert response.status_code == 400

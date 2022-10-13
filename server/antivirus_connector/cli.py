@@ -9,7 +9,7 @@ import structlog
 import trio_asyncio
 import oscrypto.asymmetric
 
-from parsec.api.protocol import OrganizationID
+from parsec.api.protocol import OrganizationID, SequesterServiceID
 from parsec.backend.config import BaseBlockStoreConfig
 from parsec.backend.blockstore import PostgreSQLBlockStoreConfig
 from parsec.backend.cli.utils import _parse_blockstore_params
@@ -55,13 +55,13 @@ def _setup_logging(log_level: str, log_file: Optional[Path]) -> None:
         logging.basicConfig(format=format, datefmt=datefmt, stream=sys.stdout, level=level)
 
 
-def _parse_sequester_service_private_key_param(param: str) -> Tuple[OrganizationID, oscrypto.asymmetric.PrivateKey]:
+def _parse_sequester_service_private_key_param(param: str) -> Tuple[SequesterServiceID, oscrypto.asymmetric.PrivateKey]:
     try:
         raw_id, raw_pem = param.split(":", 1)
-        organization_id = OrganizationID(raw_id)
+        service_id = SequesterServiceID(raw_id)
     except ValueError:
         # We absolutely want to avoid leaking the key with a potentially uncatched exception
-        raise SystemExit("Invalid --sequester-service-private-key, expected format `<sequester_id>:<pem_key>`")
+        raise SystemExit("Invalid --sequester-service-private-key, expected format `<sequester_service_id>:<pem_key>`")
 
     # Good enough check to make sure that the key is a RSA key in a PEM format
     if "-----BEGIN RSA PRIVATE KEY-----" not in raw_pem:
@@ -75,7 +75,7 @@ def _parse_sequester_service_private_key_param(param: str) -> Tuple[Organization
         # We absolutely want to avoid leaking the key with a potentially uncatched exception
         raise SystemExit("Invalid --sequester-service-private-key, failed to load key part")
 
-    return organization_id, service_private_key
+    return service_id, service_private_key
 
 
 @click.command(short_help="Runs the antivirus connector")
@@ -99,7 +99,7 @@ def _parse_sequester_service_private_key_param(param: str) -> Tuple[Organization
     "--sequester-service-private-key",
     type=_parse_sequester_service_private_key_param,
     multiple=True,
-    help="Sequester service's private RSA key (encoded in PEM format) used to decrypt the incoming data\nShould be passed as `<organization_id>:<pem_key>`",
+    help="Sequester service's private RSA key (encoded in PEM format) used to decrypt the incoming data\nShould be passed as `<sequester_service_id>:<pem_key>`",
 )
 @click.option("--antivirus-api-url", envvar="ANTIVIRUS_CONNECTOR_API_URL", type=str, required=True)
 @click.option("--antivirus-api-key", envvar="ANTIVIRUS_CONNECTOR_API_KEY", type=str, required=True)
@@ -134,7 +134,7 @@ def run_cli(
     client_origin: str,
     log_level: str,
     log_file: str,
-    sequester_service_private_key: List[Tuple[OrganizationID, oscrypto.asymmetric.PrivateKey]],
+    sequester_service_private_key: List[Tuple[SequesterServiceID, oscrypto.asymmetric.PrivateKey]],
     antivirus_api_url: str,
     antivirus_api_key: str,
     db: str,
