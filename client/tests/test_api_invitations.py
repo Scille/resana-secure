@@ -1,9 +1,12 @@
 import pytest
 from unittest.mock import ANY
+from quart.typing import TestClientProtocol
+
+from tests.conftest import LocalDeviceTestbed
 
 
 @pytest.mark.trio
-async def test_create_list_delete_users_invitations(authenticated_client):
+async def test_create_list_delete_users_invitations(authenticated_client: TestClientProtocol):
     async def _check_invitations(expected_users):
         response = await authenticated_client.get("/invitations")
         body = await response.get_json()
@@ -89,7 +92,7 @@ async def test_create_list_delete_users_invitations(authenticated_client):
 
 
 @pytest.mark.trio
-async def test_create_list_delete_device_invitation(authenticated_client):
+async def test_create_list_delete_device_invitation(authenticated_client: TestClientProtocol):
     async def _check_invitations(expected_device):
         response = await authenticated_client.get("/invitations")
         body = await response.get_json()
@@ -135,7 +138,7 @@ async def test_create_list_delete_device_invitation(authenticated_client):
 
 
 @pytest.mark.trio
-async def test_create_invalid_type(authenticated_client):
+async def test_create_invalid_type(authenticated_client: TestClientProtocol):
     # Delete user invitation
     response = await authenticated_client.post("/invitations", json={"type": "dummy"})
     body = await response.get_json()
@@ -144,7 +147,9 @@ async def test_create_invalid_type(authenticated_client):
 
 
 @pytest.mark.trio
-async def test_invite_already_existing_user(authenticated_client, local_device):
+async def test_invite_already_existing_user(
+    authenticated_client: TestClientProtocol, local_device: LocalDeviceTestbed
+):
     # Delete user invitation
     response = await authenticated_client.post(
         "/invitations", json={"type": "user", "claimer_email": local_device.email}
@@ -155,7 +160,7 @@ async def test_invite_already_existing_user(authenticated_client, local_device):
 
 
 @pytest.mark.trio
-async def test_delete_invalid_invitation_token(authenticated_client):
+async def test_delete_invalid_invitation_token(authenticated_client: TestClientProtocol):
     # Delete user invitation
     response = await authenticated_client.delete("/invitations/not_a_valid_uuid")
     body = await response.get_json()

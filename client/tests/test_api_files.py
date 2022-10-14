@@ -1,9 +1,10 @@
 import pytest
 from unittest.mock import ANY
+from quart.typing import TestClientProtocol
 
 
 class FilesTestBed:
-    def __init__(self, authenticated_client, wid, root_entry_id):
+    def __init__(self, authenticated_client: TestClientProtocol, wid: str, root_entry_id: str):
         self.authenticated_client = authenticated_client
         self.wid = wid
         self.root_entry_id = root_entry_id
@@ -99,7 +100,7 @@ class FilesTestBed:
 
 
 @pytest.fixture()
-async def testbed(authenticated_client):
+async def testbed(authenticated_client: TestClientProtocol):
     # Create workspace
     response = await authenticated_client.post("/workspaces", json={"name": "foo"})
     assert response.status_code == 201
@@ -115,7 +116,7 @@ async def testbed(authenticated_client):
 
 
 @pytest.mark.trio
-async def test_get_folders_tree_ignore_files(testbed):
+async def test_get_folders_tree_ignore_files(testbed: FilesTestBed):
     # Populate with folder&files
     foo_entry_id = await testbed.create_folder("foo", parent=testbed.root_entry_id)
     bar_entry_id = await testbed.create_folder("bar", parent=foo_entry_id)
@@ -148,7 +149,7 @@ async def test_get_folders_tree_ignore_files(testbed):
 
 
 @pytest.mark.trio
-async def test_folder_operations(testbed):
+async def test_folder_operations(testbed: FilesTestBed):
     # Folder should be empty at first
     assert await testbed.get_folders_tree() == {
         "id": testbed.root_entry_id,
@@ -214,7 +215,7 @@ async def test_folder_operations(testbed):
 
 
 @pytest.mark.trio
-async def test_file_operations(testbed):
+async def test_file_operations(testbed: FilesTestBed):
     # Create a files
     foo_id = await testbed.create_file("foo.tar.gz", parent=testbed.root_entry_id)
     assert isinstance(foo_id, str)
@@ -286,7 +287,7 @@ async def test_file_operations(testbed):
 
 @pytest.mark.trio
 @pytest.mark.parametrize("bad_wid", ["c0f0b18ee7634d01bd7ae9533d1222ef", "<not_an_uuid>"])
-async def test_bad_workspace(testbed, bad_wid):
+async def test_bad_workspace(testbed: FilesTestBed, bad_wid: str):
     other_id = "c3acdcb2ede6437f89fb94da11d733f2"
     expected_body = {"error": "unknown_workspace"}
 
@@ -323,7 +324,7 @@ async def test_bad_workspace(testbed, bad_wid):
 
 
 @pytest.mark.trio
-async def test_create_folder_already_exists(testbed):
+async def test_create_folder_already_exists(testbed: FilesTestBed):
     await testbed.create_folder("foo", parent=testbed.root_entry_id)
 
     expected_body = {"error": "unexpected_error", "detail": "File exists: /foo"}
