@@ -2,7 +2,7 @@ import sys
 import os
 import trio
 import subprocess
-from quart import Blueprint
+from quart import Blueprint, request
 from base64 import b64decode
 from typing import Optional
 
@@ -80,7 +80,35 @@ async def get_workspace_folders_tree(core, workspace_id):
 @files_bp.route("/workspaces/<string:workspace_id>/folders", methods=["POST"])
 @authenticated
 async def create_workspace_folder(core, workspace_id):
-    return await _create_workspace_entry(core, workspace_id, type="folder")
+    try:
+        workspace_id = EntryID.from_hex(workspace_id)
+    except ValueError:
+        raise APIException(404, {"error": "unknown_workspace"})
+
+    async with check_data() as (data, bad_fields):
+        name = data.get("name")
+        try:
+            name = EntryName(name)
+        except (TypeError, ValueError):
+            bad_fields.add("name")
+        parent_entry_id = data.get("parent")
+        try:
+            parent_entry_id = EntryID.from_hex(parent_entry_id)
+        except (TypeError, ValueError):
+            bad_fields.add("parent")
+
+    with backend_errors_to_api_exceptions():
+        workspace = core.user_fs.get_workspace(workspace_id)
+
+        result = await entry_id_to_path(workspace, parent_entry_id)
+        if not result:
+            raise APIException(404, {"error": "unknown_parent"})
+        parent_path, _ = result
+        path = parent_path / name
+
+        entry_id = await workspace.transactions.folder_create(path)
+
+    return {"id": entry_id.hex}, 201
 
 
 async def _create_workspace_entry(core, workspace_id, type):
@@ -293,7 +321,87 @@ async def get_workspace_folder_content(core, workspace_id, folder_id):
 @files_bp.route("/workspaces/<string:workspace_id>/files", methods=["POST"])
 @authenticated
 async def create_workspace_file(core, workspace_id):
-    return await _create_workspace_entry(core, workspace_id, type="file")
+    try:
+        workspace_id = EntryID.from_hex(workspace_id)
+    except ValueError:
+        raise APIException(404, {"error": "unknown_workspace"})
+
+    # First we consider the file has been sent as multipart
+    if request.content_type.startswith("multipart/form-data"):
+        form = await request.form
+        files = await request.files
+        file = files.get("file")
+        if not file:
+            raise APIException(400, {"error": "bad_data", "fields": ["file"]})
+
+        bad_fields = []
+
+        name = file.filename
+        try:
+            name = EntryName(name)
+        except (TypeError, ValueError):
+            bad_fields.append("name")
+
+        form = await request.form
+        parent_entry_id = form.get("parent")
+        try:
+            parent_entry_id = EntryID.from_hex(parent_entry_id)
+        except (TypeError, ValueError):
+            bad_fields.append("parent")
+
+        content = file.stream
+
+        if bad_fields:
+            raise APIException(400, {"error": "bad_data", "fields": bad_fields})
+
+    else:
+        # Otherwise consider is has been sent as json
+        async with check_data() as (data, bad_fields):
+            name = data.get("name")
+            try:
+                name = EntryName(name)
+            except (TypeError, ValueError):
+                bad_fields.add("name")
+            parent_entry_id = data.get("parent")
+            try:
+                parent_entry_id = EntryID.from_hex(parent_entry_id)
+            except (TypeError, ValueError):
+                bad_fields.add("parent")
+
+            content = data.get("content")
+            try:
+                content = b64decode(content)
+            except (TypeError, ValueError):
+                bad_fields.add("content")
+
+    with backend_errors_to_api_exceptions():
+        workspace = core.user_fs.get_workspace(workspace_id)
+
+        result = await entry_id_to_path(workspace, parent_entry_id)
+        if not result:
+            raise APIException(404, {"error": "unknown_parent"})
+        parent_path, _ = result
+        path = parent_path / name
+
+        entry_id, fd = await workspace.transactions.file_create(path, open=True)
+        try:
+            if isinstance(content, bytes):
+                await workspace.transactions.fd_write(fd, content=content, offset=0)
+
+            else:
+                buffsize = 512 * 1024
+                offset = 0
+                while True:
+                    buff = content.read(buffsize)
+                    if not buff:
+                        break
+                    await workspace.transactions.fd_write(fd, content=buff, offset=offset)
+                    offset += len(buff)
+
+        finally:
+            await workspace.transactions.fd_close(fd)
+
+    return {"id": entry_id.hex}, 201
 
 
 @files_bp.route("/workspaces/<string:workspace_id>/files/rename", methods=["POST"])

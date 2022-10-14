@@ -1,5 +1,6 @@
 import re
 import secrets
+import trio
 import logging
 from typing import List
 from contextlib import asynccontextmanager
@@ -28,6 +29,8 @@ from .ltcm import LTCM
 async def app_factory(config: CoreConfig, client_allowed_origins: List[str]):
     app = QuartTrio(__name__, static_folder=None)
     app.config.from_mapping(
+        # We need a big max content length to accept file upload !
+        MAX_CONTENT_LENGTH=2**30,  # 1Go limit
         # Secret key changes each time the application is started, this is
         # fine as long as we only use it for session cookies.
         # The reason for doing this is we serve the api on localhost, so
@@ -91,7 +94,13 @@ async def app_factory(config: CoreConfig, client_allowed_origins: List[str]):
         yield app
 
 
-async def serve_app(host: str, port: int, config: CoreConfig, client_allowed_origins: List[str]):
+async def serve_app(
+    host: str,
+    port: int,
+    config: CoreConfig,
+    client_allowed_origins: List[str],
+    task_status: trio._core._run._TaskStatus = trio.TASK_STATUS_IGNORED,
+):
     hyper_config = HyperConfig.from_mapping(
         {
             "bind": [f"{host}:{port}"],
@@ -101,4 +110,4 @@ async def serve_app(host: str, port: int, config: CoreConfig, client_allowed_ori
     )
 
     async with app_factory(config=config, client_allowed_origins=client_allowed_origins) as app:
-        await serve(app, hyper_config)
+        await serve(app, hyper_config, task_status=task_status)
