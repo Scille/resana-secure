@@ -63,7 +63,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 dev = ["cloudpickle", "coverage[toml] (>=5.0.2)", "furo", "hypothesis", "mypy", "pre-commit", "pympler", "pytest (>=4.3.0)", "pytest-mypy-plugins", "six", "sphinx", "sphinx-notfound-page", "zope.interface"]
 docs = ["furo", "sphinx", "sphinx-notfound-page", "zope.interface"]
 tests = ["cloudpickle", "coverage[toml] (>=5.0.2)", "hypothesis", "mypy", "pympler", "pytest (>=4.3.0)", "pytest-mypy-plugins", "six", "zope.interface"]
-tests_no_zope = ["cloudpickle", "coverage[toml] (>=5.0.2)", "hypothesis", "mypy", "pympler", "pytest (>=4.3.0)", "pytest-mypy-plugins", "six"]
+tests-no-zope = ["cloudpickle", "coverage[toml] (>=5.0.2)", "hypothesis", "mypy", "pympler", "pytest (>=4.3.0)", "pytest-mypy-plugins", "six"]
 
 [[package]]
 name = "black"
@@ -155,7 +155,7 @@ optional = false
 python-versions = ">=3.6.0"
 
 [package.extras]
-unicode_backport = ["unicodedata2"]
+unicode-backport = ["unicodedata2"]
 
 [[package]]
 name = "click"
@@ -251,6 +251,39 @@ description = "Pure-Python HPACK header compression"
 category = "main"
 optional = false
 python-versions = ">=3.6.1"
+
+[[package]]
+name = "httpcore"
+version = "0.12.3"
+description = "A minimal low-level HTTP client."
+category = "dev"
+optional = false
+python-versions = ">=3.6"
+
+[package.dependencies]
+h11 = "<1.0.0"
+sniffio = ">=1.0.0,<2.0.0"
+
+[package.extras]
+http2 = ["h2 (>=3,<5)"]
+
+[[package]]
+name = "httpx"
+version = "0.16.0"
+description = "The next generation HTTP client."
+category = "dev"
+optional = false
+python-versions = ">=3.6"
+
+[package.dependencies]
+certifi = "*"
+httpcore = ">=0.12.0,<0.13.0"
+rfc3986 = {version = ">=1.3,<2", extras = ["idna2008"]}
+sniffio = "*"
+
+[package.extras]
+brotli = ["brotlipy (>=0.7.0,<0.8.0)"]
+http2 = ["h2 (>=3.0.0,<4.0.0)"]
 
 [[package]]
 name = "hypercorn"
@@ -553,7 +586,7 @@ setuptools = "*"
 
 [package.extras]
 encryption = ["tinyaes (>=1.0.0)"]
-hook_testing = ["execnet (>=1.5.0)", "psutil", "pytest (>=2.7.3)"]
+hook-testing = ["execnet (>=1.5.0)", "psutil", "pytest (>=2.7.3)"]
 
 [[package]]
 name = "pyinstaller-hooks-contrib"
@@ -772,15 +805,15 @@ trio-typing = ">=0.5.0,<0.6.0"
 [package.extras]
 cli = ["click (>=7.0,<8.0)"]
 examples = ["click (>=7.0,<8.0)", "httpcore (>=0.13.6,<0.14.0)", "httpx (>=0.18.2,<0.19.0)", "hyperlink (>=21.0.0,<21.1.0)"]
-p_checks = ["black (==20.8b1)", "check-manifest (>=0.46.0,<0.47.0)", "click (>=7.0,<8.0)", "flake8 (>=3.8,<4.0)", "httpcore (>=0.13.6,<0.14.0)", "httpx (>=0.18.2,<0.19.0)", "hyperlink (>=21.0.0,<21.1.0)", "mypy (==0.790)", "pytest (>=6.2,<7.0)", "quart-trio (>=0.7.0,<0.8.0)", "towncrier (>=21.3.0)"]
-p_docs = ["sphinx (>=4.0,<5.0)", "sphinx-autodoc-typehints (>=1.11,<2.0)", "sphinx-qt-documentation (>=0.3.0,<0.4.0)", "sphinx-rtd-theme (>=0.5.0,<0.6.0)", "sphinxcontrib-trio (>=1.1,<2.0)", "towncrier (>=21.3.0)"]
-p_tests = ["click (>=7.0,<8.0)", "coverage (>=5.3,<6.0)", "httpcore (>=0.13.6,<0.14.0)", "httpx (>=0.18.2,<0.19.0)", "hyperlink (>=21.0.0,<21.1.0)", "pytest (>=6.0,<7.0)", "pytest-cov (>=2.10,<3.0)", "pytest-faulthandler (>=2.0,<3.0)", "pytest-qt (>=3.3,<4.0)", "pytest-trio (>=0.7.0)", "pytest-xdist[psutil] (>=2.2,<3.0)", "pytest-xvfb (>=2.0,<3.0)", "quart-trio"]
+p-checks = ["black (==20.8b1)", "check-manifest (>=0.46.0,<0.47.0)", "click (>=7.0,<8.0)", "flake8 (>=3.8,<4.0)", "httpcore (>=0.13.6,<0.14.0)", "httpx (>=0.18.2,<0.19.0)", "hyperlink (>=21.0.0,<21.1.0)", "mypy (==0.790)", "pytest (>=6.2,<7.0)", "quart-trio (>=0.7.0,<0.8.0)", "towncrier (>=21.3.0)"]
+p-docs = ["sphinx (>=4.0,<5.0)", "sphinx-autodoc-typehints (>=1.11,<2.0)", "sphinx-qt-documentation (>=0.3.0,<0.4.0)", "sphinx-rtd-theme (>=0.5.0,<0.6.0)", "sphinxcontrib-trio (>=1.1,<2.0)", "towncrier (>=21.3.0)"]
+p-tests = ["click (>=7.0,<8.0)", "coverage (>=5.3,<6.0)", "httpcore (>=0.13.6,<0.14.0)", "httpx (>=0.18.2,<0.19.0)", "hyperlink (>=21.0.0,<21.1.0)", "pytest (>=6.0,<7.0)", "pytest-cov (>=2.10,<3.0)", "pytest-faulthandler (>=2.0,<3.0)", "pytest-qt (>=3.3,<4.0)", "pytest-trio (>=0.7.0)", "pytest-xdist[psutil] (>=2.2,<3.0)", "pytest-xvfb (>=2.0,<3.0)", "quart-trio"]
 pyqt5 = ["pyqt5 (>=5.15.1,<5.16.0)", "pyqt5-stubs (>=5.15.2,<5.16.0)"]
 pyside2 = ["pyside2 (>=5.15,!=5.15.2,<6.0)"]
-s_pytest = ["pytest (>=6.0,<7.0)"]
-s_pytest_trio = ["pytest-trio (>=0.7.0)"]
-s_quart_trio = ["quart-trio"]
-s_towncrier = ["towncrier (>=21.3.0)"]
+s-pytest = ["pytest (>=6.0,<7.0)"]
+s-pytest-trio = ["pytest-trio (>=0.7.0)"]
+s-quart-trio = ["quart-trio"]
+s-towncrier = ["towncrier (>=21.3.0)"]
 testing = ["pytest-trio (>=0.7.0)"]
 
 [[package]]
@@ -797,15 +830,15 @@ typing-extensions = ">=3.10,<4.0"
 
 [package.extras]
 cli = ["click (>=8.0,<9.0)"]
-p_checks = ["black (==21.5b2)", "check-manifest (>=0.46.0,<0.47.0)", "flake8 (>=3.8,<4.0)", "mypy (==0.901)", "pytest (>=6.2,<7.0)", "towncrier (>=21.3,<22.0)"]
-p_docs = ["importlib-metadata (>=4.5,<5.0)", "pyside2 (>=5.15,<6.0)", "sphinx (>=4.0,<5.0)", "sphinx-autodoc-typehints (>=1.11,<2.0)", "sphinx-click (>=3.0,<4.0)", "sphinx-inline-tabs (>=2020.10.19b4,<2020.11.0)", "sphinx-qt-documentation (>=0.3.0,<0.4.0)", "sphinx-rtd-theme (>=0.5.0,<0.6.0)", "towncrier (>=21.3,<22.0)"]
-p_tests = ["click (>=8.0,<9.0)", "coverage (>=5.5,<6.0)", "pytest (>=6.2,<7.0)", "pytest-cov (>=2.12,<3.0)", "pytest-xvfb (>=2.0,<3.0)"]
+p-checks = ["black (==21.5b2)", "check-manifest (>=0.46.0,<0.47.0)", "flake8 (>=3.8,<4.0)", "mypy (==0.901)", "pytest (>=6.2,<7.0)", "towncrier (>=21.3,<22.0)"]
+p-docs = ["importlib-metadata (>=4.5,<5.0)", "pyside2 (>=5.15,<6.0)", "sphinx (>=4.0,<5.0)", "sphinx-autodoc-typehints (>=1.11,<2.0)", "sphinx-click (>=3.0,<4.0)", "sphinx-inline-tabs (>=2020.10.19b4,<2020.11.0)", "sphinx-qt-documentation (>=0.3.0,<0.4.0)", "sphinx-rtd-theme (>=0.5.0,<0.6.0)", "towncrier (>=21.3,<22.0)"]
+p-tests = ["click (>=8.0,<9.0)", "coverage (>=5.5,<6.0)", "pytest (>=6.2,<7.0)", "pytest-cov (>=2.12,<3.0)", "pytest-xvfb (>=2.0,<3.0)"]
 pyqt5 = ["pyqt5 (>=5.15,<6.0)"]
 pyqt6 = ["pyqt6 (>=6.0,<7.0)"]
 pyside2 = ["pyside2 (>=5.15,<6.0)"]
 pyside6 = ["pyside6 (>=6.0,<7.0)"]
-s_pytest = ["pytest (>=6.2,<7.0)"]
-s_towncrier = ["towncrier (>=21.3,<22.0)"]
+s-pytest = ["pytest (>=6.2,<7.0)"]
+s-towncrier = ["towncrier (>=21.3,<22.0)"]
 
 [[package]]
 name = "quart"
@@ -869,7 +902,7 @@ urllib3 = ">=1.21.1,<1.27"
 
 [package.extras]
 socks = ["PySocks (>=1.5.6,!=1.5.7)"]
-use_chardet_on_py3 = ["chardet (>=3.0.2,<6)"]
+use-chardet-on-py3 = ["chardet (>=3.0.2,<6)"]
 
 [[package]]
 name = "requests-file"
@@ -882,6 +915,20 @@ python-versions = "*"
 [package.dependencies]
 requests = ">=1.0.0"
 six = "*"
+
+[[package]]
+name = "rfc3986"
+version = "1.5.0"
+description = "Validating URI References per RFC 3986"
+category = "dev"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+idna = {version = "*", optional = true, markers = "extra == \"idna2008\""}
+
+[package.extras]
+idna2008 = ["idna"]
 
 [[package]]
 name = "s3transfer"
@@ -920,7 +967,7 @@ falcon = ["falcon (>=1.4)"]
 fastapi = ["fastapi (>=0.79.0)"]
 flask = ["blinker (>=1.1)", "flask (>=0.11)"]
 httpx = ["httpx (>=0.16.0)"]
-pure_eval = ["asttokens", "executing", "pure-eval"]
+pure-eval = ["asttokens", "executing", "pure-eval"]
 pyspark = ["pyspark (>=2.4.4)"]
 quart = ["blinker (>=1.1)", "quart (>=0.16.1)"]
 rq = ["rq (>=0.6)"]
@@ -1155,7 +1202,7 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = "~3.9.0"
-content-hash = "f6f8ae8d18a362a30a17dcf1ec54cddb7f10485c985ae61a912b110f1330d60d"
+content-hash = "43b8d6f5890592fb7ee329cc3bcbc1b0a6328a8de23917fd22b6189ea492c4ed"
 
 [metadata.files]
 aiofiles = [
@@ -1377,6 +1424,14 @@ h2 = [
 hpack = [
     {file = "hpack-4.0.0-py3-none-any.whl", hash = "sha256:84a076fad3dc9a9f8063ccb8041ef100867b1878b25ef0ee63847a5d53818a6c"},
     {file = "hpack-4.0.0.tar.gz", hash = "sha256:fc41de0c63e687ebffde81187a948221294896f6bdc0ae2312708df339430095"},
+]
+httpcore = [
+    {file = "httpcore-0.12.3-py3-none-any.whl", hash = "sha256:93e822cd16c32016b414b789aeff4e855d0ccbfc51df563ee34d4dbadbb3bcdc"},
+    {file = "httpcore-0.12.3.tar.gz", hash = "sha256:37ae835fb370049b2030c3290e12ed298bf1473c41bb72ca4aa78681eba9b7c9"},
+]
+httpx = [
+    {file = "httpx-0.16.0-py3-none-any.whl", hash = "sha256:824325d2dfb42ee6e3be31e072199a33e5a98dc2bda76fd6c9a844871948eb73"},
+    {file = "httpx-0.16.0.tar.gz", hash = "sha256:032c624c703cfa3aafe2d3a766150b48bcf8df71e833c1440fa74151da9df143"},
 ]
 hypercorn = [
     {file = "Hypercorn-0.13.2-py3-none-any.whl", hash = "sha256:ca18f91ab3fa823cbe9e949738f9f2cc07027cd647c80d8f93e4b1a2a175f112"},
@@ -1730,6 +1785,10 @@ requests = [
 requests-file = [
     {file = "requests-file-1.5.1.tar.gz", hash = "sha256:07d74208d3389d01c38ab89ef403af0cfec63957d53a0081d8eca738d0247d8e"},
     {file = "requests_file-1.5.1-py2.py3-none-any.whl", hash = "sha256:dfe5dae75c12481f68ba353183c53a65e6044c923e64c24b2209f6c7570ca953"},
+]
+rfc3986 = [
+    {file = "rfc3986-1.5.0-py2.py3-none-any.whl", hash = "sha256:a86d6e1f5b1dc238b218b012df0aa79409667bb209e58da56d0b94704e712a97"},
+    {file = "rfc3986-1.5.0.tar.gz", hash = "sha256:270aaf10d87d0d4e095063c65bf3ddbc6ee3d0b226328ce21e036f946e421835"},
 ]
 s3transfer = [
     {file = "s3transfer-0.6.0-py3-none-any.whl", hash = "sha256:06176b74f3a15f61f1b4f25a1fc29a4429040b7647133a463da8fa5bd28d5ecd"},
