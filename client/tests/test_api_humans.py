@@ -2,10 +2,11 @@ from typing import Optional
 import pytest
 from unittest.mock import ANY
 import trio
+from quart.typing import TestAppProtocol, TestClientProtocol
 
 
 class HumansTestBed:
-    def __init__(self, test_app, authenticated_client):
+    def __init__(self, test_app: TestAppProtocol, authenticated_client: TestClientProtocol):
         self.test_app = test_app
         self.authenticated_client = authenticated_client
 
@@ -117,12 +118,14 @@ class HumansTestBed:
 
 
 @pytest.fixture()
-async def testbed(test_app, authenticated_client):
+async def testbed(test_app: TestAppProtocol, authenticated_client: TestClientProtocol):
     return HumansTestBed(test_app, authenticated_client)
 
 
 @pytest.mark.trio
-async def test_find_and_revoke_humans(testbed, authenticated_client):
+async def test_find_and_revoke_humans(
+    testbed: HumansTestBed, authenticated_client: TestClientProtocol
+):
     await testbed.new_user(email="bob@example.com", key="P@ssw0rd.")
     await testbed.new_user(email="bob2@example.com", key="P@ssw0rd.")
     await testbed.new_user(email="mallory@example.com", key="P@ssw0rd.")
@@ -272,7 +275,7 @@ async def test_find_and_revoke_humans(testbed, authenticated_client):
 @pytest.mark.parametrize(
     "bad_param", ["page=dummy", "page=", "per_page=dummy", "per_page=", "omit_revoked=dummy"]
 )
-async def test_bad_find_humans(authenticated_client, bad_param):
+async def test_bad_find_humans(authenticated_client: TestClientProtocol, bad_param: str):
     response = await authenticated_client.get(f"/humans?{bad_param}")
     body = await response.get_json()
     assert response.status_code == 400
@@ -280,7 +283,7 @@ async def test_bad_find_humans(authenticated_client, bad_param):
 
 
 @pytest.mark.trio
-async def test_revoke_unknown(authenticated_client):
+async def test_revoke_unknown(authenticated_client: TestClientProtocol):
     response = await authenticated_client.post("/humans/unknown@example.com/revoke", json={})
     body = await response.get_json()
     assert response.status_code == 404

@@ -1,24 +1,61 @@
 import pytest
-from unittest.mock import ANY
+import trio
+import httpx
+import random
+from base64 import b64encode
+from unittest.mock import ANY, Mock
+from quart.typing import TestAppProtocol, TestClientProtocol
+from hypercorn.config import Config as HyperConfig
+from hypercorn.trio import serve
+
+from parsec.core.config import CoreConfig
 
 
 class FilesTestBed:
-    def __init__(self, authenticated_client, wid, root_entry_id):
+    def __init__(self, authenticated_client: TestClientProtocol, wid: str, root_entry_id: str):
         self.authenticated_client = authenticated_client
         self.wid = wid
         self.root_entry_id = root_entry_id
 
-    async def create_file(self, name, parent, content="", wid=None, expected_status_code=201):
+    async def create_file(
+        self,
+        name: str,
+        parent: str,
+        content: bytes = b"",
+        wid=None,
+        expected_status_code: int = 201,
+        mode: str = "json",
+    ):
         wid = wid if wid is not None else self.wid
-        response = await self.authenticated_client.post(
-            f"/workspaces/{wid}/files", json={"name": name, "parent": parent, "content": content}
-        )
-        body = await response.get_json()
-        assert response.status_code == expected_status_code
-        if expected_status_code == 201:
-            return body["id"]
+        if mode == "json":
+            response = await self.authenticated_client.post(
+                f"/workspaces/{wid}/files",
+                json={"name": name, "parent": parent, "content": b64encode(content).decode()},
+            )
+            body = await response.get_json()
+            assert response.status_code == expected_status_code
+            if expected_status_code == 201:
+                return body["id"]
+            else:
+                return body
+
         else:
-            return body
+            assert mode == "multipart"
+            async with httpx.AsyncClient(
+                app=self.authenticated_client.app, base_url="http://localhost:99999"
+            ) as client:
+                response = await client.post(
+                    url=f"/workspaces/{wid}/files",
+                    cookies={"session": list(self.authenticated_client.cookie_jar)[0].value},
+                    data={"parent": parent},
+                    files={"file": (name, content, "application/text")},
+                )
+            body = response.json()
+            assert response.status_code == expected_status_code
+            if expected_status_code == 201:
+                return body["id"]
+            else:
+                return body
 
     async def create_folder(self, name, parent, wid=None, expected_status_code=201):
         wid = wid if wid is not None else self.wid
@@ -99,7 +136,7 @@ class FilesTestBed:
 
 
 @pytest.fixture()
-async def testbed(authenticated_client):
+async def testbed(authenticated_client: TestClientProtocol):
     # Create workspace
     response = await authenticated_client.post("/workspaces", json={"name": "foo"})
     assert response.status_code == 201
@@ -115,7 +152,7 @@ async def testbed(authenticated_client):
 
 
 @pytest.mark.trio
-async def test_get_folders_tree_ignore_files(testbed):
+async def test_get_folders_tree_ignore_files(testbed: FilesTestBed):
     # Populate with folder&files
     foo_entry_id = await testbed.create_folder("foo", parent=testbed.root_entry_id)
     bar_entry_id = await testbed.create_folder("bar", parent=foo_entry_id)
@@ -148,7 +185,7 @@ async def test_get_folders_tree_ignore_files(testbed):
 
 
 @pytest.mark.trio
-async def test_folder_operations(testbed):
+async def test_folder_operations(testbed: FilesTestBed):
     # Folder should be empty at first
     assert await testbed.get_folders_tree() == {
         "id": testbed.root_entry_id,
@@ -214,14 +251,19 @@ async def test_folder_operations(testbed):
 
 
 @pytest.mark.trio
-async def test_file_operations(testbed):
+@pytest.mark.parametrize("file_create_mode", ("json", "multipart"))
+async def test_file_operations(testbed: FilesTestBed, file_create_mode: str):
     # Create a files
-    foo_id = await testbed.create_file("foo.tar.gz", parent=testbed.root_entry_id)
+    foo_id = await testbed.create_file(
+        "foo.tar.gz", parent=testbed.root_entry_id, mode=file_create_mode
+    )
     assert isinstance(foo_id, str)
-    bar_id = await testbed.create_file("bar.txt", parent=testbed.root_entry_id)
+    bar_id = await testbed.create_file(
+        "bar.txt", parent=testbed.root_entry_id, mode=file_create_mode
+    )
 
     subfolder_id = await testbed.create_folder("spam", parent=testbed.root_entry_id)
-    await testbed.create_file("foo", parent=subfolder_id)
+    await testbed.create_file("foo", parent=subfolder_id, mode=file_create_mode)
 
     # Check files in a given folder
     assert await testbed.get_files(folder_id=testbed.root_entry_id) == {
@@ -285,8 +327,135 @@ async def test_file_operations(testbed):
 
 
 @pytest.mark.trio
+async def test_bad_create_file(
+    testbed: FilesTestBed,
+    core_config: CoreConfig,
+    test_app: TestAppProtocol,
+    authenticated_client: TestClientProtocol,
+):
+    good_params = {
+        "url": f"/workspaces/{testbed.wid}/files",
+        "cookies": {"session": list(authenticated_client.cookie_jar)[0].value},
+        "data": {"parent": testbed.root_entry_id},
+        "files": {"file": ("file1.txt", b"\x00" * 100, "application/text")},
+    }
+
+    async with httpx.AsyncClient(
+        app=authenticated_client.app, base_url="http://localhost:99999"
+    ) as client:
+
+        # Missing parent
+        response = await client.post(**{**good_params, "data": {}})  # type: ignore
+        assert response.status_code == 400
+        assert response.json() == {"error": "bad_data", "fields": ["parent"]}
+
+        # Empty parent
+        response = await client.post(**{**good_params, "data": {"parent": ""}})  # type: ignore
+        assert response.status_code == 400
+        assert response.json() == {"error": "bad_data", "fields": ["parent"]}
+
+        # Missing file
+        response = await client.post(**{**good_params, "files": {}})  # type: ignore
+        assert response.status_code == 400
+        # Without file, content-type is a `application/x-www-form-urlencoded`
+        assert response.json() == {"error": "json_body_expected"}
+
+        # No name for file
+        response = await client.post(
+            **{**good_params, "files": {"file": ("", b"\x00" * 100, "application/text")}}  # type: ignore
+        )
+        assert response.status_code == 400
+        # Without file, content-type is a `application/x-www-form-urlencoded`
+        assert response.json() == {"error": "bad_data", "fields": ["file"]}
+
+        # No `file` entry in the files
+        response = await client.post(
+            **{**good_params, "files": {"dummy": ("file1.txt", b"\x00" * 100, "application/text")}}  # type: ignore
+        )
+        assert response.status_code == 400
+        # Without file, content-type is a `application/x-www-form-urlencoded`
+        assert response.json() == {"error": "bad_data", "fields": ["file"]}
+
+
+@pytest.mark.trio
+@pytest.mark.parametrize("mode", ("json", "multipart"))
+async def test_big_file(
+    testbed: FilesTestBed,
+    core_config: CoreConfig,
+    test_app: TestAppProtocol,
+    authenticated_client: TestClientProtocol,
+    mode: str,
+    monkeypatch,
+):
+    # Must test against a real web server to make sure the hypercorn part doesn't limit us
+    hyper_config = HyperConfig.from_mapping(
+        {
+            "bind": ["127.0.0.1:0"],
+        }
+    )
+
+    async with trio.open_nursery() as nursery:
+        binds = await nursery.start(
+            serve,
+            test_app.app,
+            hyper_config,
+        )
+        port = int(binds[0].rsplit(":", 1)[1])
+
+        # 32MB, takes about 12 seconds to write with parsec non-release builds
+        # Those tests take about 20 seconds each (with the read back)
+        # Using a release build for parsec makes those tests much faster
+        size = 2**25
+        file_content = random.randbytes(size)
+
+        async with httpx.AsyncClient() as client:
+
+            if mode == "json":
+                response = await client.post(
+                    url=f"http://127.0.0.1:{port}/workspaces/{testbed.wid}/files",
+                    cookies={"session": list(authenticated_client.cookie_jar)[0].value},
+                    json={
+                        "name": "file1.txt",
+                        "parent": testbed.root_entry_id,
+                        "content": b64encode(file_content).decode(),
+                    },
+                    timeout=20.0,
+                )
+
+            else:
+                assert mode == "multipart"
+                response = await client.post(
+                    url=f"http://127.0.0.1:{port}/workspaces/{testbed.wid}/files",
+                    cookies={"session": list(authenticated_client.cookie_jar)[0].value},
+                    data={"parent": testbed.root_entry_id},
+                    files={"file": ("file1.txt", file_content, "application/text")},
+                    timeout=20.0,
+                )
+
+            # Check reply
+            assert response.status_code == 201
+            assert response.json() == {"id": ANY}
+            file_id = response.json()["id"]
+
+            mock = Mock()
+            monkeypatch.setattr("resana_secure.routes.files._open_item", mock)
+            response = await client.post(
+                url=f"http://127.0.0.1:{port}/workspaces/{testbed.wid}/open/{file_id}",
+                cookies={"session": list(authenticated_client.cookie_jar)[0].value},
+            )
+            assert response.status_code == 200
+            assert response.json() == {}
+            mock.assert_called_once()
+            file_path = trio.Path(mock.call_args.args[0])
+            assert await file_path.exists()
+            assert await file_path.read_bytes() == file_content
+
+        nursery.cancel_scope.cancel()
+
+
+@pytest.mark.trio
 @pytest.mark.parametrize("bad_wid", ["c0f0b18ee7634d01bd7ae9533d1222ef", "<not_an_uuid>"])
-async def test_bad_workspace(testbed, bad_wid):
+async def test_bad_workspace(testbed: FilesTestBed, bad_wid: str):
     other_id = "c3acdcb2ede6437f89fb94da11d733f2"
     expected_body = {"error": "unknown_workspace"}
 
@@ -297,7 +466,15 @@ async def test_bad_workspace(testbed, bad_wid):
         == expected_body
     )
     assert (
-        await testbed.create_file("foo", parent=other_id, wid=bad_wid, expected_status_code=404)
+        await testbed.create_file(
+            "foo", parent=other_id, wid=bad_wid, expected_status_code=404, mode="json"
+        )
+        == expected_body
+    )
+    assert (
+        await testbed.create_file(
+            "foo", parent=other_id, wid=bad_wid, expected_status_code=404, mode="multipart"
+        )
         == expected_body
     )
     assert (
@@ -323,7 +500,7 @@ async def test_bad_workspace(testbed, bad_wid):
 
 
 @pytest.mark.trio
-async def test_create_folder_already_exists(testbed):
+async def test_create_folder_already_exists(testbed: FilesTestBed):
     await testbed.create_folder("foo", parent=testbed.root_entry_id)
 
     expected_body = {"error": "unexpected_error", "detail": "File exists: /foo"}

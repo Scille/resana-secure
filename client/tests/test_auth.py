@@ -1,13 +1,18 @@
 import pytest
 import re
+from typing import List, Tuple
 from unittest.mock import ANY
+from quart.typing import TestAppProtocol
 
-from parsec.core.types import BackendOrganizationBootstrapAddr
 from parsec.api.protocol import OrganizationID
+from parsec.backend import BackendApp
+from parsec.core.types import BackendAddr, BackendOrganizationBootstrapAddr
+
+from tests.conftest import LocalDeviceTestbed
 
 
 @pytest.mark.trio
-async def test_authentication(test_app, local_device):
+async def test_authentication(test_app: TestAppProtocol, local_device: LocalDeviceTestbed):
     test_client = test_app.test_client()
 
     # Test authenticated route without session token
@@ -55,21 +60,17 @@ async def test_authentication(test_app, local_device):
     assert response.status_code == 200
 
     # Invalid token should be rejected
-    response = await test_client.get(
-        "/workspaces", headers={"Authorization": "Bearer dummy"}
-    )
+    response = await test_client.get("/workspaces", headers={"Authorization": "Bearer dummy"})
     assert response.status_code == 401
 
     dummy_session_cookie = "eyJsb2dnZWRfaW4iOiI1ODU5NWY1OTI1OTA0NGMyYTE1ODg4NGFlYzY5NGJkOCJ9.YDeKyQ.46LVu1VFkoZISHp-5xaXDK-sjDk"
-    test_client.set_cookie(
-        server_name="127.0.0.1", key="session", value=dummy_session_cookie
-    )
+    test_client.set_cookie(server_name="127.0.0.1", key="session", value=dummy_session_cookie)
     response = await test_client.get("/workspaces")
     assert response.status_code == 401
 
 
 @pytest.mark.trio
-async def test_multi_authentication(test_app, local_device):
+async def test_multi_authentication(test_app: TestAppProtocol, local_device: LocalDeviceTestbed):
     test_client = test_app.test_client()
 
     # First auth
@@ -123,7 +124,7 @@ async def test_multi_authentication(test_app, local_device):
 
 
 @pytest.mark.trio
-async def test_logout_without_auth(test_app):
+async def test_logout_without_auth(test_app: TestAppProtocol):
     test_client = test_app.test_client()
 
     response = await test_client.delete("/auth")
@@ -133,7 +134,9 @@ async def test_logout_without_auth(test_app):
 
 
 @pytest.mark.trio
-async def test_logout_without_session_cookie(test_app, local_device):
+async def test_logout_without_session_cookie(
+    test_app: TestAppProtocol, local_device: LocalDeviceTestbed
+):
     # This client will contain the session cookie as soon as the auth query is done
     test_client_with_cookie = test_app.test_client()
     response = await test_client_with_cookie.post(
@@ -167,7 +170,9 @@ async def test_logout_without_session_cookie(test_app, local_device):
 
 
 @pytest.mark.trio
-async def test_authentication_unknown_email(test_app, local_device):
+async def test_authentication_unknown_email(
+    test_app: TestAppProtocol, local_device: LocalDeviceTestbed
+):
     test_client = test_app.test_client()
     response = await test_client.post(
         "/auth",
@@ -183,7 +188,7 @@ async def test_authentication_unknown_email(test_app, local_device):
 
 
 @pytest.mark.trio
-async def test_authentication_bad_key(test_app, local_device):
+async def test_authentication_bad_key(test_app: TestAppProtocol, local_device: LocalDeviceTestbed):
     test_client = test_app.test_client()
     response = await test_client.post(
         "/auth",
@@ -199,7 +204,9 @@ async def test_authentication_bad_key(test_app, local_device):
 
 
 @pytest.mark.trio
-async def test_authentication_missing_organization_id(test_app, local_device):
+async def test_authentication_missing_organization_id(
+    test_app: TestAppProtocol, local_device: LocalDeviceTestbed
+):
     # OrgID is not mandatory for now, so this should work
     test_client = test_app.test_client()
     response = await test_client.post(
@@ -214,7 +221,11 @@ async def test_authentication_missing_organization_id(test_app, local_device):
     # Try with the org
     response = await test_client.post(
         "/auth",
-        json={"email": local_device.email, "key": local_device.key, "organization": local_device.organization.str},
+        json={
+            "email": local_device.email,
+            "key": local_device.key,
+            "organization": local_device.organization.str,
+        },
     )
     body = await response.get_json()
     assert response.status_code == 200
@@ -225,7 +236,9 @@ async def test_authentication_missing_organization_id(test_app, local_device):
 
 
 @pytest.mark.trio
-async def test_authentication_bad_organization_id(test_app, local_device):
+async def test_authentication_bad_organization_id(
+    test_app: TestAppProtocol, local_device: LocalDeviceTestbed
+):
     test_client = test_app.test_client()
     response = await test_client.post(
         "/auth",
@@ -237,7 +250,11 @@ async def test_authentication_bad_organization_id(test_app, local_device):
 
     response = await test_client.post(
         "/auth",
-        json={"email": local_device.email, "key": local_device.key, "organization": "Not a valid org id"},
+        json={
+            "email": local_device.email,
+            "key": local_device.key,
+            "organization": "Not a valid org id",
+        },
     )
     body = await response.get_json()
     assert response.status_code == 400
@@ -245,7 +262,9 @@ async def test_authentication_bad_organization_id(test_app, local_device):
 
 
 @pytest.mark.trio
-async def test_authentication_unknown_organization_id(test_app, local_device):
+async def test_authentication_unknown_organization_id(
+    test_app: TestAppProtocol, local_device: LocalDeviceTestbed
+):
     test_client = test_app.test_client()
     response = await test_client.post(
         "/auth",
@@ -261,10 +280,8 @@ async def test_authentication_unknown_organization_id(test_app, local_device):
 
 
 @pytest.mark.trio
-@pytest.mark.parametrize(
-    "kind", ["missing_header", "bad_header", "bad_body", "missing_body"]
-)
-async def test_authentication_body_not_json(test_app, kind):
+@pytest.mark.parametrize("kind", ["missing_header", "bad_header", "bad_body", "missing_body"])
+async def test_authentication_body_not_json(test_app: TestAppProtocol, kind: str):
     test_client = test_app.test_client()
     if kind == "missing_body":
         data = None
@@ -285,7 +302,7 @@ async def test_authentication_body_not_json(test_app, kind):
 
 
 @pytest.fixture
-def routes_samples(test_app):
+def routes_samples(test_app: TestAppProtocol):
     default_args_values = {
         "workspace_id": "c3acdcb2ede6437f89fb94da11d733f2",
         "file_id": "c0f0b18ee7634d01bd7ae9533d1222ef",
@@ -305,7 +322,9 @@ def routes_samples(test_app):
 
 
 @pytest.mark.trio
-async def test_authenticated_routes(test_app, routes_samples):
+async def test_authenticated_routes(
+    test_app: TestAppProtocol, routes_samples: List[Tuple[str, str]]
+):
     for method, route in routes_samples:
         if method == "OPTIONS":
             continue
@@ -328,7 +347,9 @@ async def test_authenticated_routes(test_app, routes_samples):
 
 
 @pytest.mark.trio
-async def test_cors_routes(test_app, client_origin, routes_samples):
+async def test_cors_routes(
+    test_app: TestAppProtocol, client_origin: str, routes_samples: List[Tuple[str, str]]
+):
     test_client = test_app.test_client()
     for method, route in routes_samples:
         if method == "OPTIONS":
@@ -358,17 +379,16 @@ async def test_cors_routes(test_app, client_origin, routes_samples):
 
 
 @pytest.mark.trio
-async def test_multi_org_authentication(test_app, backend_addr, running_backend):
+async def test_multi_org_authentication(
+    test_app: TestAppProtocol, backend_addr: BackendAddr, running_backend: BackendApp
+):
     test_client = test_app.test_client()
 
     ORG_IDS = [OrganizationID("Org1"), OrganizationID("Org2"), OrganizationID("Org3")]
     EMAIL = "gordon.freeman@blackmesa.nm"
     PASSWORD = "abcd"
 
-    addrs = [
-        BackendOrganizationBootstrapAddr.build(backend_addr, org_id)
-        for org_id in ORG_IDS
-    ]
+    addrs = [BackendOrganizationBootstrapAddr.build(backend_addr, org_id) for org_id in ORG_IDS]
 
     # Create 3 different orgs using the same email
     for backend_addr in addrs:

@@ -1,26 +1,36 @@
-
 import pytest
 import trio
 from functools import partial
 from collections import namedtuple
+from quart.typing import TestAppProtocol
 from hypercorn.config import Config as HyperConfig
 from hypercorn.trio.run import worker_serve
+from pathlib import Path
 
 from parsec._parsec import DateTime
-
 from parsec.crypto import PrivateKey, SigningKey
 from parsec.api.data import UserCertificate, DeviceCertificate
-from parsec.api.protocol import OrganizationID, HumanHandle, DeviceID, DeviceName, DeviceLabel, UserProfile
+from parsec.api.protocol import (
+    OrganizationID,
+    HumanHandle,
+    DeviceID,
+    DeviceName,
+    DeviceLabel,
+    UserProfile,
+)
 from parsec.core.types import BackendOrganizationBootstrapAddr, BackendAddr
 from parsec.core.invite import bootstrap_organization
 from parsec.core.local_device import save_device_with_password_in_config
-from parsec.backend import backend_app_factory
+from parsec.backend import backend_app_factory, BackendApp
 from parsec.backend.asgi import app_factory as backend_asgi_app_factory
 from parsec.backend.user import User as BackendUser, Device as BackendDevice
 from parsec.backend.config import BackendConfig, MockedBlockStoreConfig
 
 from resana_secure.app import app_factory
 from resana_secure.cli import CoreConfig
+
+
+LocalDeviceTestbed = namedtuple("LocalDeviceTestbed", "device,email,key,organization")
 
 
 @pytest.fixture(scope="session")
@@ -33,11 +43,11 @@ class BackendAddrRegisterer:
         self.backend_addr_defined = trio.Event()
         self.backend_addr = None
 
-    def register(self, backend_addr):
+    def register(self, backend_addr: BackendAddr) -> None:
         self.backend_addr = backend_addr
         self.backend_addr_defined.set()
 
-    async def get(self):
+    async def get(self) -> BackendAddr:
         await self.backend_addr_defined.wait()
         return self.backend_addr
 
@@ -59,17 +69,17 @@ async def backend_addr(_backend_addr_register):
 
 
 @pytest.fixture
-def core_config_dir(tmp_path):
+def core_config_dir(tmp_path: Path):
     return tmp_path / "core_config_dir"
 
 
 @pytest.fixture
-def core_config(tmp_path, core_config_dir):
+def core_config(tmp_path: Path, core_config_dir: Path):
     return CoreConfig(
         config_dir=core_config_dir,
         data_base_dir=tmp_path / "data",
         mountpoint_base_dir=tmp_path / "mountpoint",
-        mountpoint_enabled=False,
+        mountpoint_enabled=True,
         ipc_win32_mutex_name="resana-secure",
         ipc_socket_file=tmp_path / "resana-secure.lock",
         preferred_org_creation_backend_addr=None,
@@ -77,14 +87,14 @@ def core_config(tmp_path, core_config_dir):
 
 
 @pytest.fixture
-async def test_app(core_config, client_origin):
+async def test_app(core_config: CoreConfig, client_origin: str):
     async with app_factory(config=core_config, client_allowed_origins=[client_origin]) as app:
         async with app.test_app() as test_app:
             yield test_app
 
 
 @pytest.fixture
-async def authenticated_client(test_app, local_device):
+async def authenticated_client(test_app: TestAppProtocol, local_device: LocalDeviceTestbed):
     test_client = test_app.test_client()
 
     response = await test_client.post(
@@ -132,11 +142,10 @@ async def running_backend(_backend_addr_register):
             nursery.cancel_scope.cancel()
 
 
-LocalDeviceTestbed = namedtuple("LocalDeviceTestbed", "device,email,key,organization")
-
-
 @pytest.fixture
-async def local_device(running_backend, backend_addr, core_config_dir):
+async def local_device(
+    running_backend: BackendApp, backend_addr: BackendAddr, core_config_dir: Path
+):
     organization_id = OrganizationID("CoolOrg")
     device_label = DeviceLabel("alice's desktop")
     password = "P@ssw0rd."
@@ -160,7 +169,7 @@ RemoteDeviceTestbed = namedtuple("RemoteDeviceTestbed", "device_id,email")
 
 
 @pytest.fixture
-async def other_device(running_backend, local_device):
+async def other_device(running_backend: BackendApp, local_device: LocalDeviceTestbed):
     organization_id = OrganizationID("CoolOrg")
     now = DateTime.now()
     author = local_device.device.device_id
@@ -189,7 +198,7 @@ async def other_device(running_backend, local_device):
 
 
 @pytest.fixture
-async def other_user(running_backend, local_device):
+async def other_user(running_backend: BackendApp, local_device: LocalDeviceTestbed):
     organization_id = OrganizationID("CoolOrg")
     now = DateTime.now()
     author = local_device.device.device_id
