@@ -111,52 +111,6 @@ async def create_workspace_folder(core, workspace_id):
     return {"id": entry_id.hex}, 201
 
 
-async def _create_workspace_entry(core, workspace_id, type):
-    try:
-        workspace_id = EntryID.from_hex(workspace_id)
-    except ValueError:
-        raise APIException(404, {"error": "unknown_workspace"})
-
-    async with check_data() as (data, bad_fields):
-        name = data.get("name")
-        try:
-            name = EntryName(name)
-        except (TypeError, ValueError):
-            bad_fields.add("name")
-        parent_entry_id = data.get("parent")
-        try:
-            parent_entry_id = EntryID.from_hex(parent_entry_id)
-        except (TypeError, ValueError):
-            bad_fields.add("parent")
-        if type == "file":
-            content = data.get("content")
-            try:
-                content = b64decode(content)
-            except (TypeError, ValueError):
-                bad_fields.add("content")
-
-    with backend_errors_to_api_exceptions():
-        workspace = core.user_fs.get_workspace(workspace_id)
-
-        result = await entry_id_to_path(workspace, parent_entry_id)
-        if not result:
-            raise APIException(404, {"error": "unknown_parent"})
-        parent_path, _ = result
-        path = parent_path / name
-
-        if type == "folder":
-            entry_id = await workspace.transactions.folder_create(path)
-        else:
-            entry_id, fd = await workspace.transactions.file_create(path, open=True)
-            try:
-                await workspace.transactions.fd_write(fd, content=content, offset=0)
-
-            finally:
-                await workspace.transactions.fd_close(fd)
-
-    return {"id": entry_id.hex}, 201
-
-
 @files_bp.route("/workspaces/<string:workspace_id>/folders/rename", methods=["POST"])
 @authenticated
 async def rename_workspace_folder(core, workspace_id):
