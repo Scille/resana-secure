@@ -1,11 +1,12 @@
 import argparse
+import random
 from unittest.mock import ANY
 import logging
 import requests
 import base64
 import concurrent.futures
 import time
-import urllib
+import urllib.parse
 
 
 logger = logging.getLogger("test-resana")
@@ -17,13 +18,13 @@ DEFAULT_PASSWORD = "P@ssw0rd"
 DEFAULT_WORKSPACE = "Resonance Cascade Incident"
 
 
-def make_request(method, url, auth_token=None, headers=None, data=None):
+def make_request(method, url, auth_token=None, headers=None, data=None, files=None, json=None):
     logger.debug(f"[Making request {method} {url}")
 
     headers = headers or {}
     if auth_token:
         # Might as well see if it works with no auth while we're at it
-        r = getattr(requests, method.lower())(url, headers=headers, json=data)
+        r = requests.request(method, url, headers=headers, data=data, files=files, json=json)
         # Should be 401 Auth required, else the route is not secure
         if r.status_code != 401:
             logger.error(f"{method} f{url} does not requires authentication.")
@@ -31,10 +32,10 @@ def make_request(method, url, auth_token=None, headers=None, data=None):
         # Now that we checked that auth token was required, we can perform the real request
         headers["Authorization"] = f"Bearer {auth_token}"
     try:
-        r = getattr(requests, method.lower())(url, headers=headers, json=data)
-        return r
+        return requests.request(method, url, headers=headers, data=data, files=files, json=json)
     except Exception as exc:
         logger.error(f"Failed to make request: {type(exc)} {exc}")
+        return
 
 
 def test_workspaces(auth_token, resana_addr):
@@ -56,7 +57,7 @@ def test_workspaces(auth_token, resana_addr):
         "POST",
         f"{resana_addr}/workspaces",
         auth_token=auth_token,
-        data={"name": "Resonance Cascade Incident"},
+        json={"name": "Resonance Cascade Incident"},
     )
     try:
         assert r.status_code == 201
@@ -72,9 +73,7 @@ def test_workspaces(auth_token, resana_addr):
     r = make_request("GET", f"{resana_addr}/workspaces", auth_token=auth_token)
     try:
         assert r.status_code == 200
-        assert r.json() == {
-            "workspaces": [{"id": ANY, "name": DEFAULT_WORKSPACE, "role": "OWNER"}]
-        }
+        assert r.json() == {"workspaces": [{"id": ANY, "name": DEFAULT_WORKSPACE, "role": "OWNER"}]}
     except AssertionError:
         logger.exception("[KO] List workspace to check that we have one")
         logger.debug(r.json())
@@ -86,7 +85,7 @@ def test_workspaces(auth_token, resana_addr):
         "PATCH",
         f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}",
         auth_token=auth_token,
-        data={
+        json={
             "old_name": DEFAULT_WORKSPACE,
             "new_name": f"{DEFAULT_WORKSPACE}_RENAMED",
         },
@@ -104,9 +103,7 @@ def test_workspaces(auth_token, resana_addr):
     try:
         assert r.status_code == 200
         assert r.json() == {
-            "workspaces": [
-                {"id": ANY, "name": f"{DEFAULT_WORKSPACE}_RENAMED", "role": "OWNER"}
-            ]
+            "workspaces": [{"id": ANY, "name": f"{DEFAULT_WORKSPACE}_RENAMED", "role": "OWNER"}]
         }
     except AssertionError:
         logger.exception("[KO] Check that the workspace was renamed")
@@ -134,7 +131,7 @@ def test_workspaces(auth_token, resana_addr):
         "PATCH",
         f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/share",
         auth_token=auth_token,
-        data={"email": INVITEE_EMAIL, "role": "MANAGER"},
+        json={"email": INVITEE_EMAIL, "role": "MANAGER"},
     )
     try:
         assert r.status_code == 200
@@ -164,7 +161,7 @@ def test_workspaces(auth_token, resana_addr):
         "PATCH",
         f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/share",
         auth_token=auth_token,
-        data={"email": INVITEE_EMAIL, "role": "READER"},
+        json={"email": INVITEE_EMAIL, "role": "READER"},
     )
     try:
         assert r.status_code == 200
@@ -194,7 +191,7 @@ def test_workspaces(auth_token, resana_addr):
         "PATCH",
         f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/share",
         auth_token=auth_token,
-        data={"email": INVITEE_EMAIL, "role": None},
+        json={"email": INVITEE_EMAIL, "role": None},
     )
     try:
         assert r.status_code == 200
@@ -214,9 +211,7 @@ def test_workspaces(auth_token, resana_addr):
         assert r.status_code == 200
         assert r.json() == {"roles": {DEFAULT_EMAIL: "OWNER"}}
     except AssertionError:
-        logger.exception(
-            "[KO] Make sure that the workspace is no longer shared with bob"
-        )
+        logger.exception("[KO] Make sure that the workspace is no longer shared with bob")
         logger.debug(r.json())
     else:
         logger.info("[OK] Make sure that the workspace is no longer shared with bob")
@@ -236,9 +231,7 @@ def test_humans(auth_token, resana_addr):
         logger.info("[OK] List users")
 
     # Revoking second user
-    r = make_request(
-        "POST", f"{resana_addr}/humans/{INVITEE_EMAIL}/revoke", auth_token=auth_token
-    )
+    r = make_request("POST", f"{resana_addr}/humans/{INVITEE_EMAIL}/revoke", auth_token=auth_token)
     try:
         assert r.status_code == 200
     except AssertionError:
@@ -262,7 +255,7 @@ def test_humans(auth_token, resana_addr):
         logger.info("[OK] Make sure that user was revoked")
 
 
-def test_files(auth_token, resana_addr):
+def test_files(auth_token, resana_addr, file_size=1024):
     VARIABLES = {}
 
     # Get a workspace id
@@ -303,7 +296,7 @@ def test_files(auth_token, resana_addr):
         "POST",
         f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/folders",
         auth_token=auth_token,
-        data={
+        json={
             "name": "Folder",
             "parent": VARIABLES["root_folder_id"],
         },
@@ -348,14 +341,15 @@ def test_files(auth_token, resana_addr):
         logger.info("[OK] Check new folder created")
 
     # Post a file
+    file1_content = random.randbytes(file_size)
     r = make_request(
         "POST",
         f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/files",
         auth_token=auth_token,
-        data={
+        json={
             "name": "test.txt",
             "parent": VARIABLES["sub_folder_id"],
-            "content": base64.b64encode(b"test").decode(),
+            "content": base64.b64encode(file1_content).decode(),
         },
     )
     try:
@@ -363,10 +357,29 @@ def test_files(auth_token, resana_addr):
         assert r.json() == {"id": ANY}
         VARIABLES["file1_id"] = r.json()["id"]
     except AssertionError:
-        logger.exception("[KO] Upload a new file")
+        logger.exception("[KO] Upload a new file using base64")
         logger.debug(r.json())
     else:
-        logger.info("[OK] Upload a new file")
+        logger.info("[OK] Upload a new file using base64")
+
+    # Post a file
+    file2_content = random.randbytes(file_size)
+    r = make_request(
+        "POST",
+        f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/files",
+        auth_token=auth_token,
+        data={"parent": VARIABLES["sub_folder_id"]},
+        files={"file": ("test2.txt", file2_content)},
+    )
+    try:
+        assert r.status_code == 201
+        assert r.json() == {"id": ANY}
+        VARIABLES["file2_id"] = r.json()["id"]
+    except AssertionError:
+        logger.exception("[KO] Upload a new file using multipart")
+        logger.debug(r.json())
+    else:
+        logger.info("[OK] Upload a new file using multipart")
 
     # Check if the file was created
     r = make_request(
@@ -383,9 +396,17 @@ def test_files(auth_token, resana_addr):
                     "extension": "txt",
                     "id": VARIABLES["file1_id"],
                     "name": "test.txt",
-                    "size": 4,
+                    "size": file_size,
                     "updated": ANY,
-                }
+                },
+                {
+                    "created": ANY,
+                    "extension": "txt",
+                    "id": VARIABLES["file2_id"],
+                    "name": "test2.txt",
+                    "size": file_size,
+                    "updated": ANY,
+                },
             ]
         }
     except AssertionError:
@@ -399,7 +420,7 @@ def test_files(auth_token, resana_addr):
         "POST",
         f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/files/rename",
         auth_token=auth_token,
-        data={"id": VARIABLES["file1_id"], "new_name": "test_renamed.txt"},
+        json={"id": VARIABLES["file1_id"], "new_name": "test_renamed.txt"},
     )
     try:
         assert r.status_code == 200
@@ -422,11 +443,19 @@ def test_files(auth_token, resana_addr):
                 {
                     "created": ANY,
                     "extension": "txt",
+                    "id": VARIABLES["file2_id"],
+                    "name": "test2.txt",
+                    "size": file_size,
+                    "updated": ANY,
+                },
+                {
+                    "created": ANY,
+                    "extension": "txt",
                     "id": VARIABLES["file1_id"],
                     "name": "test_renamed.txt",
-                    "size": 4,
+                    "size": file_size,
                     "updated": ANY,
-                }
+                },
             ]
         }
     except AssertionError:
@@ -456,7 +485,18 @@ def test_files(auth_token, resana_addr):
     )
     try:
         assert r.status_code == 200
-        assert r.json() == {"files": []}
+        assert r.json() == {
+            "files": [
+                {
+                    "created": ANY,
+                    "extension": "txt",
+                    "id": VARIABLES["file2_id"],
+                    "name": "test2.txt",
+                    "size": file_size,
+                    "updated": ANY,
+                }
+            ]
+        }
     except AssertionError:
         logger.exception("[KO] Make sure the file was deleted")
         logger.debug(r.json())
@@ -491,7 +531,7 @@ def test_user_invitations(auth_token, resana_addr, org_id):
         return make_request(
             "POST",
             f"{resana_addr}/invitations/{VARIABLES['token']}/claimer/2-check-trust",
-            data={"greeter_sas": VARIABLES["greeter_sas"]},
+            json={"greeter_sas": VARIABLES["greeter_sas"]},
         )
 
     def _claimer_wait_peer_trust():
@@ -505,7 +545,7 @@ def test_user_invitations(auth_token, resana_addr, org_id):
             "POST",
             f"{resana_addr}/invitations/{VARIABLES['token']}/greeter/3-check-trust",
             auth_token=auth_token,
-            data={"claimer_sas": VARIABLES["claimer_sas"]},
+            json={"claimer_sas": VARIABLES["claimer_sas"]},
         )
 
     def _greeter_finalize():
@@ -513,14 +553,14 @@ def test_user_invitations(auth_token, resana_addr, org_id):
             "POST",
             f"{resana_addr}/invitations/{VARIABLES['token']}/greeter/4-finalize",
             auth_token=auth_token,
-            data={"claimer_email": INVITEE_EMAIL, "granted_profile": "STANDARD"},
+            json={"claimer_email": INVITEE_EMAIL, "granted_profile": "STANDARD"},
         )
 
     def _claimer_finalize(password):
         return make_request(
             "POST",
             f"{resana_addr}/invitations/{VARIABLES['token']}/claimer/4-finalize",
-            data={"key": password},
+            json={"key": password},
         )
 
     def _invite_user():
@@ -529,7 +569,7 @@ def test_user_invitations(auth_token, resana_addr, org_id):
             "POST",
             f"{resana_addr}/invitations",
             auth_token=auth_token,
-            data={"type": "user", "claimer_email": INVITEE_EMAIL},
+            json={"type": "user", "claimer_email": INVITEE_EMAIL},
         )
         try:
             assert r.status_code == 200
@@ -625,10 +665,7 @@ def test_user_invitations(auth_token, resana_addr, org_id):
     try:
         assert claimer_ret.status_code == 200
         assert claimer_ret.json() == {"candidate_greeter_sas": [ANY, ANY, ANY, ANY]}
-        assert (
-            greeter_ret.json()["greeter_sas"]
-            in claimer_ret.json()["candidate_greeter_sas"]
-        )
+        assert greeter_ret.json()["greeter_sas"] in claimer_ret.json()["candidate_greeter_sas"]
         VARIABLES["greeter_sas"] = greeter_ret.json()["greeter_sas"]
     except AssertionError:
         logger.exception("[KO] Invite user claimer wait")
@@ -655,10 +692,7 @@ def test_user_invitations(auth_token, resana_addr, org_id):
     try:
         assert claimer_ret.status_code == 200
         claimer_ret.json() == {"claimer_sas": ANY}
-        assert (
-            claimer_ret.json()["claimer_sas"]
-            in greeter_ret.json()["candidate_claimer_sas"]
-        )
+        assert claimer_ret.json()["claimer_sas"] in greeter_ret.json()["candidate_claimer_sas"]
         VARIABLES["claimer_sas"] = claimer_ret.json()["claimer_sas"]
     except AssertionError:
         logger.exception("[KO] Invite user claimer check trust")
@@ -690,9 +724,7 @@ def test_user_invitations(auth_token, resana_addr, org_id):
         logger.info("[OK] Invite user claimer wait peer trust")
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        claimer_future = executor.submit(
-            _claimer_finalize, password="ClaimUserNewP@ssw0rd"
-        )
+        claimer_future = executor.submit(_claimer_finalize, password="ClaimUserNewP@ssw0rd")
         time.sleep(1.0)
         greeter_future = executor.submit(_greeter_finalize)
         greeter_ret = greeter_future.result()
@@ -718,9 +750,7 @@ def test_user_invitations(auth_token, resana_addr, org_id):
     try:
         assert r.status_code == 200
         assert r.json()["total"] == 2
-        assert any(
-            u["human_handle"]["email"] == INVITEE_EMAIL for u in r.json()["users"]
-        )
+        assert any(u["human_handle"]["email"] == INVITEE_EMAIL for u in r.json()["users"])
     except AssertionError:
         logger.exception("[KO] List users to see new user")
         logger.debug(r.json())
@@ -731,7 +761,7 @@ def test_user_invitations(auth_token, resana_addr, org_id):
     r = make_request(
         "POST",
         f"{resana_addr}/auth",
-        data={
+        json={
             "email": INVITEE_EMAIL,
             "key": "ClaimUserNewP@ssw0rd",
             "organization": org_id,
@@ -774,7 +804,7 @@ def test_device_invitations(auth_token, resana_addr, org_id):
         return make_request(
             "POST",
             f"{resana_addr}/invitations/{VARIABLES['token']}/claimer/2-check-trust",
-            data={"greeter_sas": VARIABLES["greeter_sas"]},
+            json={"greeter_sas": VARIABLES["greeter_sas"]},
         )
 
     def _claimer_wait_peer_trust():
@@ -788,7 +818,7 @@ def test_device_invitations(auth_token, resana_addr, org_id):
             "POST",
             f"{resana_addr}/invitations/{VARIABLES['token']}/greeter/3-check-trust",
             auth_token=auth_token,
-            data={"claimer_sas": VARIABLES["claimer_sas"]},
+            json={"claimer_sas": VARIABLES["claimer_sas"]},
         )
 
     def _greeter_finalize():
@@ -796,14 +826,14 @@ def test_device_invitations(auth_token, resana_addr, org_id):
             "POST",
             f"{resana_addr}/invitations/{VARIABLES['token']}/greeter/4-finalize",
             auth_token=auth_token,
-            data={"claimer_email": INVITEE_EMAIL, "granted_profile": "STANDARD"},
+            json={"claimer_email": INVITEE_EMAIL, "granted_profile": "STANDARD"},
         )
 
     def _claimer_finalize(password):
         return make_request(
             "POST",
             f"{resana_addr}/invitations/{VARIABLES['token']}/claimer/4-finalize",
-            data={"key": password},
+            json={"key": password},
         )
 
     def _invite_device():
@@ -814,7 +844,7 @@ def test_device_invitations(auth_token, resana_addr, org_id):
             "POST",
             f"{resana_addr}/invitations",
             auth_token=auth_token,
-            data={"type": "device"},
+            json={"type": "device"},
         )
         try:
             assert r.status_code == 200
@@ -908,10 +938,7 @@ def test_device_invitations(auth_token, resana_addr, org_id):
     try:
         assert claimer_ret.status_code == 200
         assert claimer_ret.json() == {"candidate_greeter_sas": [ANY, ANY, ANY, ANY]}
-        assert (
-            greeter_ret.json()["greeter_sas"]
-            in claimer_ret.json()["candidate_greeter_sas"]
-        )
+        assert greeter_ret.json()["greeter_sas"] in claimer_ret.json()["candidate_greeter_sas"]
         VARIABLES["greeter_sas"] = greeter_ret.json()["greeter_sas"]
     except AssertionError:
         logger.exception("[KO] Invite device claimer wait")
@@ -938,10 +965,7 @@ def test_device_invitations(auth_token, resana_addr, org_id):
     try:
         assert claimer_ret.status_code == 200
         claimer_ret.json() == {"claimer_sas": ANY}
-        assert (
-            claimer_ret.json()["claimer_sas"]
-            in greeter_ret.json()["candidate_claimer_sas"]
-        )
+        assert claimer_ret.json()["claimer_sas"] in greeter_ret.json()["candidate_claimer_sas"]
         VARIABLES["claimer_sas"] = claimer_ret.json()["claimer_sas"]
     except AssertionError:
         logger.exception("[KO] Invite device claimer check trust")
@@ -973,9 +997,7 @@ def test_device_invitations(auth_token, resana_addr, org_id):
         logger.info("[OK] Invite device claimer wait peer trust")
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        claimer_future = executor.submit(
-            _claimer_finalize, password="ClaimDeviceNewP@ssw0rd"
-        )
+        claimer_future = executor.submit(_claimer_finalize, password="ClaimDeviceNewP@ssw0rd")
         time.sleep(1.0)
         greeter_future = executor.submit(_greeter_finalize)
         greeter_ret = greeter_future.result()
@@ -1001,7 +1023,7 @@ def test_device_invitations(auth_token, resana_addr, org_id):
     r = make_request(
         "POST",
         f"{resana_addr}/auth",
-        data={
+        json={
             "email": DEFAULT_EMAIL,
             "key": "ClaimDeviceNewP@ssw0rd",
             "organization": org_id,
@@ -1021,15 +1043,11 @@ def test_recovery(auth_token, resana_addr, org_id):
     VARIABLES = {}
 
     # Create a recovery device
-    r = make_request(
-        "POST", f"{resana_addr}/recovery/export", auth_token=auth_token, data={}
-    )
+    r = make_request("POST", f"{resana_addr}/recovery/export", auth_token=auth_token, json={})
     try:
         assert r.status_code == 200
         assert r.json() == {"file_content": ANY, "file_name": ANY, "passphrase": ANY}
-        VARIABLES["recovery_device"] = base64.b64decode(
-            r.json()["file_content"].encode()
-        )
+        VARIABLES["recovery_device"] = base64.b64decode(r.json()["file_content"].encode())
         VARIABLES["passphrase"] = r.json()["passphrase"]
     except AssertionError:
         print(r.raw)
@@ -1042,10 +1060,8 @@ def test_recovery(auth_token, resana_addr, org_id):
     r = make_request(
         "POST",
         f"{resana_addr}/recovery/import",
-        data={
-            "recovery_device_file_content": base64.b64encode(
-                VARIABLES["recovery_device"]
-            ).decode(),
+        json={
+            "recovery_device_file_content": base64.b64encode(VARIABLES["recovery_device"]).decode(),
             "recovery_device_passphrase": VARIABLES["passphrase"],
             "new_device_key": "RecoveryNewP@ssw0rd",
         },
@@ -1062,7 +1078,7 @@ def test_recovery(auth_token, resana_addr, org_id):
     r = make_request(
         "POST",
         f"{resana_addr}/auth",
-        data={
+        json={
             "email": DEFAULT_EMAIL,
             "key": "RecoveryNewP@ssw0rd",
             "organization": org_id,
@@ -1089,6 +1105,7 @@ def main(
     skip_user_invite=False,
     skip_device_invite=False,
     skip_recovery=False,
+    file_size=1024,
 ):
     """Test all Resana routes.
 
@@ -1101,7 +1118,7 @@ def main(
         r = make_request(
             "POST",
             f"{resana_addr}/organization/bootstrap",
-            data={
+            json={
                 "organization_url": bootstrap_addr,
                 "email": DEFAULT_EMAIL,
                 "key": DEFAULT_PASSWORD,
@@ -1113,7 +1130,7 @@ def main(
     r = make_request(
         "POST",
         f"{resana_addr}/auth",
-        data={
+        json={
             "email": DEFAULT_EMAIL,
             "key": DEFAULT_PASSWORD,
             "organization": org_id,
@@ -1132,7 +1149,7 @@ def main(
         test_workspaces(auth_token, resana_addr)
     # Upload, rename, delete files
     if not skip_files:
-        test_files(auth_token, resana_addr)
+        test_files(auth_token, resana_addr, file_size)
     # Humans to test the revoke
     if not skip_humans:
         test_humans(auth_token, resana_addr)
@@ -1172,9 +1189,7 @@ if __name__ == "__main__":
         required=True,
         help="Organization ID",
     )
-    parser.add_argument(
-        "-d", "--debug", action="store_true", help="Adds extra debugging info"
-    )
+    parser.add_argument("-d", "--debug", action="store_true", help="Adds extra debugging info")
     parser.add_argument(
         "--skip-bootstrap",
         action="store_true",
@@ -1205,8 +1220,12 @@ if __name__ == "__main__":
         action="store_true",
         help="Skip device invite API (this may have an impact on other APIs)",
     )
+    parser.add_argument("--skip-recovery", action="store_true", help="Skip the recovery API")
     parser.add_argument(
-        "--skip-recovery", action="store_true", help="Skip the recovery API"
+        "--file-size",
+        type=int,
+        default=1024,
+        help="Size for files to create",
     )
 
     args = parser.parse_args()
@@ -1219,7 +1238,9 @@ if __name__ == "__main__":
     logging.getLogger("urllib3").setLevel(logging.WARNING)
 
     parsed = urllib.parse.urlparse(args.parsec)
-    bootstrap_addr = f"{parsed.scheme}://{parsed.netloc}/{args.org}?{parsed.query}&action=bootstrap_organization"
+    bootstrap_addr = (
+        f"{parsed.scheme}://{parsed.netloc}/{args.org}?{parsed.query}&action=bootstrap_organization"
+    )
 
     main(
         args.resana,
@@ -1232,4 +1253,5 @@ if __name__ == "__main__":
         skip_user_invite=args.skip_user_invite,
         skip_device_invite=args.skip_device_invite,
         skip_recovery=args.skip_recovery,
+        file_size=args.file_size,
     )
