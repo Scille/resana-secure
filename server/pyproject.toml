@@ -12,7 +12,7 @@ quart-cors = "^0.5"
 hypercorn = "^0.13.2"
 httpx = "0.16.0"
 # install parsec from pypi
-parsec-cloud = { version = "^2.13.0rc2", extras = ["backend"] }
+parsec-cloud = { version = "^2.13.0rc4", extras = ["backend"] }
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.0"
