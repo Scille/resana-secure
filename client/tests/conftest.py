@@ -79,7 +79,7 @@ def core_config(tmp_path: Path, core_config_dir: Path):
         config_dir=core_config_dir,
         data_base_dir=tmp_path / "data",
         mountpoint_base_dir=tmp_path / "mountpoint",
-        mountpoint_enabled=False,
+        mountpoint_enabled=True,
         ipc_win32_mutex_name="resana-secure",
         ipc_socket_file=tmp_path / "resana-secure.lock",
         preferred_org_creation_backend_addr=None,

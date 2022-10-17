@@ -1,8 +1,9 @@
 import pytest
 import trio
 import httpx
+import random
 from base64 import b64encode
-from unittest.mock import ANY
+from unittest.mock import ANY, Mock
 from quart.typing import TestAppProtocol, TestClientProtocol
 from hypercorn.config import Config as HyperConfig
 from hypercorn.trio import serve
@@ -384,6 +385,7 @@ async def test_big_file(
     test_app: TestAppProtocol,
     authenticated_client: TestClientProtocol,
     mode: str,
+    monkeypatch,
 ):
     # Must test against a real web server to make sure the hypercorn part doesn't limit us
     hyper_config = HyperConfig.from_mapping(
@@ -400,7 +402,11 @@ async def test_big_file(
         )
         port = int(binds[0].rsplit(":", 1)[1])
 
-        file_content = b"\x00" * 2**27  # 128Mo
+        # 32MB, takes about 12 seconds to write with parsec non-release builds
+        # Those tests take about 20 seconds each (with the read back)
+        # Using a release build for parsec makes those tests much faster
+        size = 2**25
+        file_content = random.randbytes(size)
 
         async with httpx.AsyncClient() as client:
 
@@ -413,9 +419,8 @@ async def test_big_file(
                         "parent": testbed.root_entry_id,
                         "content": b64encode(file_content).decode(),
                     },
+                    timeout=20.0,
                 )
-                assert response.status_code == 201
-                assert response.json() == {"id": ANY}
 
             else:
                 assert mode == "multipart"
@@ -423,10 +428,27 @@ async def test_big_file(
                     url=f"http://127.0.0.1:{port}/workspaces/{testbed.wid}/files",
                     cookies={"session": list(authenticated_client.cookie_jar)[0].value},
                     data={"parent": testbed.root_entry_id},
-                    files={"file": ("file2.txt", file_content, "application/text")},
+                    files={"file": ("file1.txt", file_content, "application/text")},
+                    timeout=20.0,
                 )
-                assert response.status_code == 201
-                assert response.json() == {"id": ANY}
+
+            # Check reply
+            assert response.status_code == 201
+            assert response.json() == {"id": ANY}
+            file_id = response.json()["id"]
+
+            mock = Mock()
+            monkeypatch.setattr("resana_secure.routes.files._open_item", mock)
+            response = await client.post(
+                url=f"http://127.0.0.1:{port}/workspaces/{testbed.wid}/open/{file_id}",
+                cookies={"session": list(authenticated_client.cookie_jar)[0].value},
+            )
+            assert response.status_code == 200
+            assert response.json() == {}
+            mock.assert_called_once()
+            file_path = trio.Path(mock.call_args.args[0])
+            assert await file_path.exists()
+            assert await file_path.read_bytes() == file_content
 
         nursery.cancel_scope.cancel()
 
