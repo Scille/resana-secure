@@ -98,8 +98,8 @@ async def submit():
     try:
         # Decrypt and deserialize the manifest
         manifest = await load_manifest(key, vlob)
-        if not manifest:
-            # Not a file manifest
+        if not manifest or manifest.size == 0:
+            # Not a file manifest or empty
             return {}, 200
 
         # Download the blocks and recombine into a file

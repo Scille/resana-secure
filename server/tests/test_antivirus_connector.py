@@ -179,8 +179,6 @@ async def test_submit_deserialization_failure(antivirus_test_app, sequester_serv
     )
     test_client = antivirus_test_app.test_client()
 
-    print(sequester_service.service_id.str)
-
     response = await test_client.post(
         f"/submit?service_id={sequester_service.service_id.str}&organization_id={orgid.str}",
         data=b"a",

@@ -58,7 +58,7 @@ def _setup_logging(log_level: str, log_file: Optional[Path]) -> None:
 def _parse_sequester_service_private_key_param(param: str) -> Tuple[SequesterServiceID, oscrypto.asymmetric.PrivateKey]:
     try:
         raw_id, raw_pem = param.split(":", 1)
-        service_id = SequesterServiceID(raw_id)
+        service_id = SequesterServiceID.from_hex(raw_id)
     except ValueError:
         # We absolutely want to avoid leaking the key with a potentially uncatched exception
         raise SystemExit("Invalid --sequester-service-private-key, expected format `<sequester_service_id>:<pem_key>`")
@@ -159,6 +159,7 @@ def run_cli(
     # but the antivirus API does not.
     if antivirus_api_url.endswith("/"):
         antivirus_api_url = antivirus_api_url[:-1]
+
 
     config = AppConfig(
         sequester_services_decryption_key=dict(sequester_service_private_key),
