@@ -12,6 +12,7 @@ on:
 env:
   PYTHON_VERSION: "3.9"
   WINFSP_VERSION: "1.8.20304"
+  FORCE_MATURIN_RELEASE: 1
 
 jobs:
 
@@ -40,14 +41,14 @@ jobs:
           pipx install poetry
           poetry --version
       - name: '[Client] Install Project'
-        run: poetry install
+        run: poetry install -v
         working-directory: client
       - name: '[Client] Run Tests'
         run: poetry run py.test tests
         timeout-minutes: 10
         working-directory: client
       - name: '[Server] Install Project'
-        run: poetry install
+        run: poetry install -v
         working-directory: server
       - name: '[Server] Run Tests'
         run: poetry run py.test tests
@@ -86,7 +87,7 @@ jobs:
           choco install -y --limit-output winfsp --version=${{ env.WINFSP_VERSION }}
         working-directory: client
       - name: 'Install project'
-        run: poetry install
+        run: poetry install -v
         working-directory: client
       - name: 'Run tests'
         run: poetry run py.test tests
