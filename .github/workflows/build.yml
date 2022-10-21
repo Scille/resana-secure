@@ -44,14 +44,14 @@ jobs:
         run: poetry install -v
         working-directory: client
       - name: '[Client] Run Tests'
-        run: poetry run py.test tests
+        run: poetry run py.test client_tests
         timeout-minutes: 10
         working-directory: client
       - name: '[Server] Install Project'
         run: poetry install -v
         working-directory: server
       - name: '[Server] Run Tests'
-        run: poetry run py.test tests
+        run: poetry run py.test server_tests
         timeout-minutes: 10
         working-directory: server
 
@@ -90,7 +90,7 @@ jobs:
         run: poetry install -v
         working-directory: client
       - name: 'Run tests'
-        run: poetry run py.test tests
+        run: poetry run py.test client_tests
         timeout-minutes: 10
         working-directory: client
 

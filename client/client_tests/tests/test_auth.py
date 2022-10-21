@@ -8,7 +8,7 @@ from parsec.api.protocol import OrganizationID
 from parsec.backend import BackendApp
 from parsec.core.types import BackendAddr, BackendOrganizationBootstrapAddr
 
-from tests.conftest import LocalDeviceTestbed
+from .conftest import LocalDeviceTestbed
 
 
 @pytest.mark.trio
@@ -314,7 +314,7 @@ def routes_samples(test_app: TrioTestApp):
         "email": "bob@example.com",
     }
     routes = []
-    for rule in test_app.app.url_map.iter_rules():  # type: ignore[attr-defined]
+    for rule in test_app.app.url_map.iter_rules():
         args = {key: default_args_values[key] for key in rule.arguments}
         url = rule.build(args)
         assert url is not None

@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import ANY
 from quart.typing import TestClientProtocol
 
-from tests.conftest import LocalDeviceTestbed
+from .conftest import LocalDeviceTestbed
 
 
 @pytest.mark.trio

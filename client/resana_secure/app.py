@@ -37,7 +37,7 @@ class ResanaApp(QuartTrio):
 
     def app_context(self) -> ctx.AppContext:
         app_context = super().app_context()
-        app_context.g.backend = self.ltcm
+        app_context.g.ltcm = self.ltcm
         app_context.g.cores_manager = self.cores_manager
         app_context.g.greeters_manager = self.greeters_manager
         app_context.g.claimers_manager = self.claimers_manager

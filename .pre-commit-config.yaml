@@ -39,4 +39,9 @@ repos:
         "quart_trio==0.9.1",
         "trio-typing==0.7.0",
         "structlog==22.1.0",
+        "httpx==0.16.0",
+        "PyQt5-stubs==5.15.6.0",
+        "qtrio==0.5.1",
+        "Quart-CORS==0.5.0",
       ]
+      args: ["--scripts-are-modules"]  # Remove "--ignore-missing-imports"

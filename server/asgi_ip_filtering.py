@@ -126,7 +126,7 @@ def patch_hypercorn_trio_serve() -> None:
         return
 
     @wraps(serve)
-    async def patched_serve(app: ASGI3Framework, *args, **kwargs) -> None:  # type: ignore[misc, no-untyped-def]
+    async def patched_serve(app: ASGI3Framework, *args, **kwargs) -> None:
         return await serve(AsgiIpFilteringMiddleware(app), *args, **kwargs)
 
     hypercorn.trio.serve = patched_serve  # type: ignore[assignment]
@@ -145,7 +145,7 @@ else:
         app = QuartTrio(__name__)
 
         @app.route("/")
-        async def hello() -> str:  # type: ignore[misc]
+        async def hello() -> str:
             return "Hello World"
 
         app.asgi_app = AsgiIpFilteringMiddleware(app.asgi_app, "127.0.0.0/24 128.0.0.0/24")  # type: ignore[assignment]
