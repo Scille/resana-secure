@@ -34,7 +34,9 @@ repos:
       additional_dependencies: [
         "typing_extensions",
         "types-requests",
+        "pytest_trio",
         "hypercorn==0.13.2",
         "quart_trio==0.9.1",
-        "pytest_trio"
+        "trio-typing==0.7.0",
+        "structlog==22.1.0",
       ]
