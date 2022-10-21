@@ -11,9 +11,7 @@ import subprocess
 import threading
 
 
-NOTIFICATION_BASE_MSG = (
-    f"Application `{os.environ.get('APP', '<unknown app>')}` (container `{os.environ.get('CONTAINER', '<unknown container>')}`) got error/warning log:\n> "
-)
+NOTIFICATION_BASE_MSG = f"Application `{os.environ.get('APP', '<unknown app>')}` (container `{os.environ.get('CONTAINER', '<unknown container>')}`) got error/warning log:\n> "
 
 
 def notify_webhook(line: str) -> None:
@@ -73,12 +71,11 @@ if __name__ == "__main__":
 
     # If Webhook is not configured, do nothing
     if not args.webhook_url:
+
         def noop(line: str) -> None:
             pass
 
         globals()["notify_webhook"] = noop
-        print(
-            "WARNING: Missing `webhook_url` param or `WEBHOOK_ON_LOGS_URL` environ variable !"
-        )
+        print("WARNING: Missing `webhook_url` param or `WEBHOOK_ON_LOGS_URL` environ variable !")
 
     main(cmd=args.cmd)

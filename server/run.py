@@ -13,9 +13,7 @@ import signal
 import queue
 
 
-NOTIFICATION_BASE_MSG = (
-    f"Application `{os.environ.get('APP', '<unknown app>')}` (container `{os.environ.get('CONTAINER', '<unknown container>')}`) got error/warning log:\n> "
-)
+NOTIFICATION_BASE_MSG = f"Application `{os.environ.get('APP', '<unknown app>')}` (container `{os.environ.get('CONTAINER', '<unknown container>')}`) got error/warning log:\n> "
 
 
 def notify_webhook(line: str) -> None:
@@ -70,23 +68,26 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if not args.webhook_url:
+
         def noop(line: str) -> None:
             pass
+
         globals()["notify_webhook"] = noop
-        print(
-            "WARNING: Missing `webhook_url` param or `WEBHOOK_ON_LOGS_URL` environ variable !"
-        )
+        print("WARNING: Missing `webhook_url` param or `WEBHOOK_ON_LOGS_URL` environ variable !")
 
     # SIGTERM is triggered when the app needs to stop, so we give it the same
     # behavior as SIGINT (i.e. raising a KeyboardInterrupt)
     def sigterm_handler(_signo, _stack_frame):
         raise KeyboardInterrupt
+
     signal.signal(signal.SIGTERM, sigterm_handler)
 
     # Run the services
 
     parsec_proc = run_cmd_with_log_scan(["parsec", "backend", "run"])
-    antivirus_proc = run_cmd_with_log_scan(["python", "-m", "antivirus_connector", "--port", "5775"])
+    antivirus_proc = run_cmd_with_log_scan(
+        ["python", "-m", "antivirus_connector", "--port", "5775"]
+    )
 
     # Run threads to monitor the service...
 
@@ -100,7 +101,7 @@ if __name__ == "__main__":
     for proc in procs:
         threading.Thread(
             target=_watch_process,
-            args=(proc, ),
+            args=(proc,),
             daemon=True,
         ).start()
 
