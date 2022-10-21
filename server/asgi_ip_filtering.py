@@ -119,14 +119,12 @@ class AsgiIpFilteringMiddleware:
 
 
 def patch_hypercorn_trio_serve() -> None:
-    """
-    Monkeypatch `hypercorn.trio.serve`
-    """
+    """Monkeypatch `hypercorn.trio.serve`"""
     if hypercorn.trio.serve != serve:
         return
 
     @wraps(serve)
-    async def patched_serve(app: ASGI3Framework, *args, **kwargs) -> None:
+    async def patched_serve(app: ASGI3Framework, *args, **kwargs) -> None:  # type: ignore[no-untyped-def, misc]
         return await serve(AsgiIpFilteringMiddleware(app), *args, **kwargs)
 
     hypercorn.trio.serve = patched_serve  # type: ignore[assignment]
@@ -145,7 +143,7 @@ else:
         app = QuartTrio(__name__)
 
         @app.route("/")
-        async def hello() -> str:
+        async def hello() -> str:  # type: ignore[misc]
             return "Hello World"
 
         app.asgi_app = AsgiIpFilteringMiddleware(app.asgi_app, "127.0.0.0/24 128.0.0.0/24")  # type: ignore[assignment]

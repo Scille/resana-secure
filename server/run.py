@@ -84,7 +84,7 @@ if __name__ == "__main__":
 
     # Run the services
 
-    parsec_proc = run_cmd_with_log_scan(["parsec", "backend", "run"])
+    parsec_proc = run_cmd_with_log_scan(["python", "-m", "resana_backend_run"])
     antivirus_proc = run_cmd_with_log_scan(
         ["python", "-m", "antivirus_connector", "--port", "5775"]
     )

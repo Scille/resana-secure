@@ -36,6 +36,7 @@ repos:
         "types-requests",
         "pytest_trio",
         "hypercorn==0.13.2",
+        "quart==0.17.0",
         "quart_trio==0.9.1",
         "trio-typing==0.7.0",
         "structlog==22.1.0",
