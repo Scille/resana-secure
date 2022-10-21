@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import random
 from unittest.mock import ANY
@@ -25,7 +27,7 @@ TESTS_STATUS: dict[str, bool] = {}
 def run_test(test_name: str):
     @dataclass
     class TestContext:
-        request: requests.Request
+        request: requests.Response | None
 
     logger.debug(f"Running --{test_name}--")
     context = TestContext(None)
@@ -33,7 +35,8 @@ def run_test(test_name: str):
         yield context
     except Exception:
         logger.exception(f"[KO] {test_name}")
-        logger.debug(context.request.content)
+        if context.request is not None:
+            logger.debug(context.request.content)
         TESTS_STATUS[test_name] = False
     else:
         logger.info(f"[OK] {test_name}")

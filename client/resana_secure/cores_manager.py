@@ -2,7 +2,7 @@ import trio
 from uuid import uuid4
 from typing import AsyncIterator, Callable, Dict, Optional, Tuple
 from functools import partial
-from quart import current_app
+from quart import current_app, g
 from pathlib import Path
 from contextlib import asynccontextmanager
 import structlog
@@ -145,7 +145,7 @@ class CoresManager:
                 self._email_to_auth_token.pop((organization_id, email), None)
 
             auth_token = uuid4().hex
-            component_handle = await current_app.ltcm.register_component(
+            component_handle = await g.ltcm.register_component(
                 partial(start_core, config=config, device=device, on_stopped=_on_stopped)
             )
             self._auth_token_to_component_handle[auth_token] = component_handle
@@ -167,7 +167,7 @@ class CoresManager:
             raise CoreNotLoggedError
 
         try:
-            await current_app.ltcm.unregister_component(component_handle)
+            await g.ltcm.unregister_component(component_handle)
 
         except ComponentNotRegistered as exc:
             raise CoreNotLoggedError from exc
@@ -185,7 +185,7 @@ class CoresManager:
             raise CoreNotLoggedError
 
         try:
-            async with current_app.ltcm.acquire_component(component_handle) as component:
+            async with g.ltcm.acquire_component(component_handle) as component:
                 yield component
 
         except ComponentNotRegistered as exc:

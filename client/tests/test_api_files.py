@@ -4,11 +4,19 @@ import httpx
 import random
 from base64 import b64encode
 from unittest.mock import ANY, Mock
-from quart.typing import TestAppProtocol, TestClientProtocol
+from quart.typing import TestClientProtocol
 from hypercorn.config import Config as HyperConfig
 from hypercorn.trio import serve
+from quart_trio.testing import TrioTestApp
 
 from parsec.core.config import CoreConfig
+
+
+def get_session_cookie(authenticated_client: TestClientProtocol) -> str:
+    assert authenticated_client.cookie_jar is not None
+    session_cookie = list(authenticated_client.cookie_jar)[0].value
+    assert session_cookie is not None
+    return session_cookie
 
 
 class FilesTestBed:
@@ -44,14 +52,14 @@ class FilesTestBed:
             async with httpx.AsyncClient(
                 app=self.authenticated_client.app, base_url="http://localhost:99999"
             ) as client:
-                response = await client.post(
+                httpx_response = await client.post(
                     url=f"/workspaces/{wid}/files",
-                    cookies={"session": list(self.authenticated_client.cookie_jar)[0].value},
+                    cookies={"session": get_session_cookie(self.authenticated_client)},
                     data={"parent": parent},
                     files={"file": (name, content, "application/text")},
                 )
-            body = response.json()
-            assert response.status_code == expected_status_code
+            body = httpx_response.json()
+            assert httpx_response.status_code == expected_status_code
             if expected_status_code == 201:
                 return body["id"]
             else:
@@ -330,12 +338,12 @@ async def test_file_operations(testbed: FilesTestBed, file_create_mode: str):
 async def test_bad_create_file(
     testbed: FilesTestBed,
     core_config: CoreConfig,
-    test_app: TestAppProtocol,
+    test_app: TrioTestApp,
     authenticated_client: TestClientProtocol,
 ):
     good_params = {
         "url": f"/workspaces/{testbed.wid}/files",
-        "cookies": {"session": list(authenticated_client.cookie_jar)[0].value},
+        "cookies": {"session": get_session_cookie(authenticated_client)},
         "data": {"parent": testbed.root_entry_id},
         "files": {"file": ("file1.txt", b"\x00" * 100, "application/text")},
     }
@@ -382,7 +390,7 @@ async def test_bad_create_file(
 async def test_big_file(
     testbed: FilesTestBed,
     core_config: CoreConfig,
-    test_app: TestAppProtocol,
+    test_app: TrioTestApp,
     authenticated_client: TestClientProtocol,
     mode: str,
     monkeypatch,
@@ -395,7 +403,7 @@ async def test_big_file(
     )
 
     async with trio.open_nursery() as nursery:
-        binds = await nursery.start(
+        binds: list[str] = await nursery.start(
             serve,
             test_app.app,
             hyper_config,
@@ -413,7 +421,7 @@ async def test_big_file(
             if mode == "json":
                 response = await client.post(
                     url=f"http://127.0.0.1:{port}/workspaces/{testbed.wid}/files",
-                    cookies={"session": list(authenticated_client.cookie_jar)[0].value},
+                    cookies={"session": get_session_cookie(authenticated_client)},
                     json={
                         "name": "file1.txt",
                         "parent": testbed.root_entry_id,
@@ -426,7 +434,7 @@ async def test_big_file(
                 assert mode == "multipart"
                 response = await client.post(
                     url=f"http://127.0.0.1:{port}/workspaces/{testbed.wid}/files",
-                    cookies={"session": list(authenticated_client.cookie_jar)[0].value},
+                    cookies={"session": get_session_cookie(authenticated_client)},
                     data={"parent": testbed.root_entry_id},
                     files={"file": ("file1.txt", file_content, "application/text")},
                     timeout=20.0,
@@ -441,7 +449,7 @@ async def test_big_file(
             monkeypatch.setattr("resana_secure.routes.files._open_item", mock)
             response = await client.post(
                 url=f"http://127.0.0.1:{port}/workspaces/{testbed.wid}/open/{file_id}",
-                cookies={"session": list(authenticated_client.cookie_jar)[0].value},
+                cookies={"session": get_session_cookie(authenticated_client)},
             )
             assert response.status_code == 200
             assert response.json() == {}

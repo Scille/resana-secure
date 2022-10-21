@@ -139,7 +139,7 @@ def run_cli(
     host: str,
     client_origin: str,
     log_level: str,
-    log_file: str,
+    log_file: Path,
     sequester_service_private_key: List[Tuple[OrganizationID, oscrypto.asymmetric.PrivateKey]],
     antivirus_api_url: str,
     antivirus_api_key: str,

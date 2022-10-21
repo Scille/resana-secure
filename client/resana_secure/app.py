@@ -1,10 +1,12 @@
 import re
 import secrets
-import trio
 import logging
-from typing import List
+from typing import AsyncIterator, List
 from contextlib import asynccontextmanager
-from quart import current_app
+
+import trio
+import trio_typing
+from quart import current_app, ctx
 from quart_cors import cors
 from quart_trio import QuartTrio
 from hypercorn.config import Config as HyperConfig
@@ -25,9 +27,28 @@ from .routes.organization import organization_bp
 from .ltcm import LTCM
 
 
+class ResanaApp(QuartTrio):
+    """A QuartTrio app that ensures that the backend is available in `g` global object."""
+
+    ltcm: LTCM
+    cores_manager: CoresManager
+    greeters_manager: GreetersManager
+    claimers_manager: ClaimersManager
+
+    def app_context(self) -> ctx.AppContext:
+        app_context = super().app_context()
+        app_context.g.backend = self.ltcm
+        app_context.g.cores_manager = self.cores_manager
+        app_context.g.greeters_manager = self.greeters_manager
+        app_context.g.claimers_manager = self.claimers_manager
+        return app_context
+
+
 @asynccontextmanager
-async def app_factory(config: CoreConfig, client_allowed_origins: List[str]):
-    app = QuartTrio(__name__, static_folder=None)
+async def app_factory(
+    config: CoreConfig, client_allowed_origins: List[str]
+) -> AsyncIterator[ResanaApp]:
+    app = ResanaApp(__name__, static_folder=None)
     app.config.from_mapping(
         # We need a big max content length to accept file upload !
         MAX_CONTENT_LENGTH=2**30,  # 1Go limit
@@ -87,10 +108,10 @@ async def app_factory(config: CoreConfig, client_allowed_origins: List[str]):
         )
 
     async with LTCM.run() as ltcm:
-        app.ltcm = ltcm  # type: ignore
-        app.cores_manager = CoresManager()  # type: ignore
-        app.greeters_manager = GreetersManager()  # type: ignore
-        app.claimers_manager = ClaimersManager()  # type: ignore
+        app.ltcm = ltcm
+        app.cores_manager = CoresManager()
+        app.greeters_manager = GreetersManager()
+        app.claimers_manager = ClaimersManager()
         yield app
 
 
@@ -99,7 +120,7 @@ async def serve_app(
     port: int,
     config: CoreConfig,
     client_allowed_origins: List[str],
-    task_status: trio._core._run._TaskStatus = trio.TASK_STATUS_IGNORED,
+    task_status: trio_typing.TaskStatus = trio.TASK_STATUS_IGNORED,
 ):
     hyper_config = HyperConfig.from_mapping(
         {

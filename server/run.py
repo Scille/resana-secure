@@ -92,9 +92,9 @@ if __name__ == "__main__":
     # Run threads to monitor the service...
 
     procs = (parsec_proc, antivirus_proc)
-    proc_queue = queue.Queue()
+    proc_queue: queue.Queue[subprocess.Popen] = queue.Queue()
 
-    def _watch_process(proc):
+    def _watch_process(proc: subprocess.Popen) -> None:
         proc.wait()
         proc_queue.put(proc)
 
