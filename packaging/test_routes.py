@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import random
 from unittest.mock import ANY
@@ -20,11 +22,12 @@ DEFAULT_WORKSPACE = "Resonance Cascade Incident"
 
 TESTS_STATUS: dict[str, bool] = {}
 
+
 @contextlib.contextmanager
 def run_test(test_name: str):
     @dataclass
     class TestContext:
-        request: requests.Request
+        request: requests.Response | None
 
     logger.debug(f"Running --{test_name}--")
     context = TestContext(None)
@@ -32,12 +35,12 @@ def run_test(test_name: str):
         yield context
     except Exception:
         logger.exception(f"[KO] {test_name}")
-        logger.debug(context.request.content)
+        if context.request is not None:
+            logger.debug(context.request.content)
         TESTS_STATUS[test_name] = False
     else:
         logger.info(f"[OK] {test_name}")
         TESTS_STATUS[test_name] = True
-
 
 
 def make_request(method, url, auth_token=None, headers=None, data=None, files=None, json=None):
@@ -203,7 +206,9 @@ def test_humans(auth_token, resana_addr):
 
     # Revoking second user
     with run_test("Revoke second user") as context:
-        r = make_request("POST", f"{resana_addr}/humans/{INVITEE_EMAIL}/revoke", auth_token=auth_token)
+        r = make_request(
+            "POST", f"{resana_addr}/humans/{INVITEE_EMAIL}/revoke", auth_token=auth_token
+        )
         context.request = r
         assert r.status_code == 200
 
@@ -219,10 +224,11 @@ def test_humans(auth_token, resana_addr):
             for u in data["users"]
         )
 
+
 def test_files(auth_token, resana_addr):
     VARIABLES = {}
     SMALL_FILE_SIZE = 1024
-    LARGE_FILE_SIZE = 2**20 * 20 # 20mB
+    LARGE_FILE_SIZE = 2**20 * 20  # 20mB
 
     # Get a workspace id
     with run_test("Get workspace id") as context:
@@ -947,7 +953,9 @@ def test_recovery(auth_token, resana_addr, org_id):
             "POST",
             f"{resana_addr}/recovery/import",
             json={
-                "recovery_device_file_content": base64.b64encode(VARIABLES["recovery_device"]).decode(),
+                "recovery_device_file_content": base64.b64encode(
+                    VARIABLES["recovery_device"]
+                ).decode(),
                 "recovery_device_passphrase": VARIABLES["passphrase"],
                 "new_device_key": "RecoveryNewP@ssw0rd",
             },

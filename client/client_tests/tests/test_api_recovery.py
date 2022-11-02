@@ -4,7 +4,7 @@ from tempfile import mkstemp
 import pathlib
 from quart.typing import TestAppProtocol, TestClientProtocol
 
-from tests.conftest import LocalDeviceTestbed
+from .conftest import LocalDeviceTestbed
 
 
 @pytest.mark.trio

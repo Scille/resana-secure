@@ -1,4 +1,4 @@
-from typing import Awaitable, Callable, Optional
+from typing import Awaitable, Callable
 from importlib import resources
 from contextlib import asynccontextmanager
 import trio

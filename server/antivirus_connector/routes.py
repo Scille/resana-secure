@@ -92,7 +92,11 @@ async def submit(organization_id):
     try:
         key = config.sequester_services_decryption_key[organization_id]
     except KeyError as exc:
-        logger.warning("No key available for provided sequester service", organization_id=organization_id.str, exc_info=exc)
+        logger.warning(
+            "No key available for provided sequester service",
+            organization_id=organization_id.str,
+            exc_info=exc,
+        )
         return {"reason": "No key available for provided sequester service"}, 400
 
     try:

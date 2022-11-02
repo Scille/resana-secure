@@ -3,7 +3,7 @@ from unittest.mock import ANY
 from collections import namedtuple
 from quart.typing import TestClientProtocol
 
-from tests.conftest import RemoteDeviceTestbed
+from .conftest import RemoteDeviceTestbed
 
 
 WorkspaceInfo = namedtuple("WorkspaceInfo", "id,name")
