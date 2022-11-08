@@ -1,15 +1,19 @@
 import trio
 import pytest
+import trio.testing
 from base64 import b64encode
 from unittest.mock import ANY
 from collections import namedtuple
+from quart.typing import TestAppProtocol, TestClientProtocol
+
+from .conftest import LocalDeviceTestbed
 
 
 InvitationInfo = namedtuple("InvitationInfo", "type,claimer_email,token")
 
 
 @pytest.fixture
-async def user_invitation(authenticated_client):
+async def user_invitation(authenticated_client: TestClientProtocol):
     claimer_email = "bob@example.com"
     response = await authenticated_client.post(
         "/invitations", json={"type": "user", "claimer_email": claimer_email}
@@ -20,7 +24,7 @@ async def user_invitation(authenticated_client):
 
 
 @pytest.fixture
-async def device_invitation(authenticated_client):
+async def device_invitation(authenticated_client: TestClientProtocol):
     response = await authenticated_client.post("/invitations", json={"type": "device"})
     body = await response.get_json()
     assert response.status_code == 200
@@ -29,7 +33,12 @@ async def device_invitation(authenticated_client):
 
 @pytest.mark.trio
 @pytest.mark.parametrize("type", ["user", "device"])
-async def test_claim_ok(test_app, local_device, authenticated_client, type):
+async def test_claim_ok(
+    test_app: TestAppProtocol,
+    local_device: LocalDeviceTestbed,
+    authenticated_client: TestClientProtocol,
+    type: str,
+):
     claimer_client = test_app.test_client()
     greeter_sas_available = trio.Event()
     greeter_sas = None
@@ -203,7 +212,11 @@ async def test_claim_ok(test_app, local_device, authenticated_client, type):
 
 
 @pytest.mark.trio
-async def test_invalid_state(test_app, local_device, authenticated_client, device_invitation):
+async def test_invalid_state(
+    test_app: TestAppProtocol,
+    authenticated_client: TestClientProtocol,
+    device_invitation: InvitationInfo,
+):
     claimer_client = test_app.test_client()
     token = device_invitation.token
 
@@ -228,7 +241,11 @@ async def test_invalid_state(test_app, local_device, authenticated_client, devic
 
 
 @pytest.mark.trio
-async def test_claimer_step_1_before_0(test_app, authenticated_client, device_invitation):
+async def test_claimer_step_1_before_0(
+    test_app: TestAppProtocol,
+    authenticated_client: TestClientProtocol,
+    device_invitation: InvitationInfo,
+):
     claimer_client = test_app.test_client()
 
     async def _greeter():
@@ -262,7 +279,9 @@ async def test_claimer_step_1_before_0(test_app, authenticated_client, device_in
 
 @pytest.mark.trio
 async def test_claimer_concurrent_requests_on_step_1(
-    test_app, authenticated_client, device_invitation
+    test_app: TestAppProtocol,
+    authenticated_client: TestClientProtocol,
+    device_invitation: InvitationInfo,
 ):
     concurrency = 10
     claimer_results = []
@@ -302,7 +321,10 @@ async def test_claimer_concurrent_requests_on_step_1(
 @pytest.mark.trio
 @pytest.mark.parametrize("claimer_do_step0_before_final_step1", [False, True])
 async def test_cancel_step_request_then_retry(
-    test_app, authenticated_client, device_invitation, claimer_do_step0_before_final_step1
+    test_app: TestAppProtocol,
+    authenticated_client: TestClientProtocol,
+    device_invitation: InvitationInfo,
+    claimer_do_step0_before_final_step1: bool,
 ):
     claimer_client = test_app.test_client()
 
@@ -364,7 +386,10 @@ async def test_cancel_step_request_then_retry(
 @pytest.mark.trio
 @pytest.mark.parametrize("first", ["claimer", "greeter"])
 async def test_greeter_claimer_start_order(
-    test_app, authenticated_client, device_invitation, first
+    test_app: TestAppProtocol,
+    authenticated_client: TestClientProtocol,
+    device_invitation: InvitationInfo,
+    first: str,
 ):
     claimer_client = test_app.test_client()
 

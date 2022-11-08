@@ -2,7 +2,7 @@ import trio
 from uuid import uuid4
 from typing import AsyncIterator, Callable, Dict, Optional, Tuple
 from functools import partial
-from quart import current_app
+from quart import current_app, g
 from pathlib import Path
 from contextlib import asynccontextmanager
 import structlog
@@ -48,7 +48,11 @@ def load_device_or_error(
     found_email = False
     for available_device in list_available_devices(config_dir):
         if (
-            (not organization_id or organization_id and available_device.organization_id == organization_id)
+            (
+                not organization_id
+                or organization_id
+                and available_device.organization_id == organization_id
+            )
             and available_device.human_handle
             and available_device.human_handle.email == email
         ):
@@ -75,12 +79,14 @@ async def start_core(
     async with logged_core_factory(config, device) as core:
         try:
             core.event_bus.connect(
-                CoreEvent.FS_ENTRY_SYNC_REJECTED_BY_SEQUESTER_SERVICE, _on_fs_sync_refused_by_sequester_service
+                CoreEvent.FS_ENTRY_SYNC_REJECTED_BY_SEQUESTER_SERVICE,
+                _on_fs_sync_refused_by_sequester_service,
             )
             yield core
         finally:
             core.event_bus.disconnect(
-                CoreEvent.FS_ENTRY_SYNC_REJECTED_BY_SEQUESTER_SERVICE, _on_fs_sync_refused_by_sequester_service
+                CoreEvent.FS_ENTRY_SYNC_REJECTED_BY_SEQUESTER_SERVICE,
+                _on_fs_sync_refused_by_sequester_service,
             )
             on_stopped()
 
@@ -125,9 +131,7 @@ class CoresManager:
         # The lock is needed here to avoid concurrent logins with the same email
         async with self._login_lock:
             # Return existing auth_token if the login has already be done for this device
-            existing_auth_token = self._email_to_auth_token.get(
-                (organization_id, email)
-            )
+            existing_auth_token = self._email_to_auth_token.get((organization_id, email))
             if existing_auth_token:
                 # No need to check if the related component is still available
                 # given `_on_stopped` callback (see below) makes sure to
@@ -141,10 +145,8 @@ class CoresManager:
                 self._email_to_auth_token.pop((organization_id, email), None)
 
             auth_token = uuid4().hex
-            component_handle = await current_app.ltcm.register_component(
-                partial(
-                    start_core, config=config, device=device, on_stopped=_on_stopped
-                )
+            component_handle = await g.ltcm.register_component(
+                partial(start_core, config=config, device=device, on_stopped=_on_stopped)
             )
             self._auth_token_to_component_handle[auth_token] = component_handle
             self._email_to_auth_token[(organization_id, email)] = auth_token
@@ -165,7 +167,7 @@ class CoresManager:
             raise CoreNotLoggedError
 
         try:
-            await current_app.ltcm.unregister_component(component_handle)
+            await g.ltcm.unregister_component(component_handle)
 
         except ComponentNotRegistered as exc:
             raise CoreNotLoggedError from exc
@@ -183,9 +185,7 @@ class CoresManager:
             raise CoreNotLoggedError
 
         try:
-            async with current_app.ltcm.acquire_component(
-                component_handle
-            ) as component:
+            async with g.ltcm.acquire_component(component_handle) as component:
                 yield component
 
         except ComponentNotRegistered as exc:

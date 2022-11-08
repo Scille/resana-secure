@@ -1,12 +1,14 @@
 import pytest
-
 import oscrypto.asymmetric as crypto
 import base64
+from pathlib import Path
+from quart.typing import TestAppProtocol
 
 from parsec.api.protocol import OrganizationID
+from parsec.backend import BackendApp
 from parsec.backend.organization import generate_bootstrap_token
 from parsec.core.local_device import list_available_devices
-from parsec.core.types import BackendOrganizationBootstrapAddr
+from parsec.core.types import BackendAddr, BackendOrganizationBootstrapAddr
 from parsec.sequester_crypto import SequesterVerifyKeyDer
 
 
@@ -16,23 +18,27 @@ def default_org_id():
 
 
 @pytest.fixture
-async def created_org_token(test_app, running_backend, default_org_id):
+async def created_org_token(
+    test_app: TestAppProtocol, running_backend: BackendApp, default_org_id: OrganizationID
+):
     bootstrap_token = generate_bootstrap_token()
-    await running_backend.organization.create(
-        default_org_id, bootstrap_token=bootstrap_token
-    )
+    await running_backend.organization.create(default_org_id, bootstrap_token=bootstrap_token)
     return bootstrap_token
 
 
 @pytest.fixture
-async def org_bootstrap_addr(backend_addr, created_org_token, default_org_id):
-    return BackendOrganizationBootstrapAddr.build(
-        backend_addr, default_org_id, created_org_token
-    )
+async def org_bootstrap_addr(
+    backend_addr: BackendApp, created_org_token: str, default_org_id: OrganizationID
+):
+    return BackendOrganizationBootstrapAddr.build(backend_addr, default_org_id, created_org_token)
 
 
 @pytest.mark.trio
-async def test_bootstrap_organization(test_app, core_config_dir, org_bootstrap_addr):
+async def test_bootstrap_organization(
+    test_app: TestAppProtocol,
+    core_config_dir: Path,
+    org_bootstrap_addr: BackendOrganizationBootstrapAddr,
+):
     test_client = test_app.test_client()
 
     response = await test_client.post(
@@ -49,16 +55,13 @@ async def test_bootstrap_organization(test_app, core_config_dir, org_bootstrap_a
     assert body == {}
     available_devices = list_available_devices(core_config_dir)
     assert len(available_devices) == 1
-    assert (
-        available_devices[0].organization_id.str
-        == org_bootstrap_addr.organization_id.str
-    )
+    assert available_devices[0].organization_id.str == org_bootstrap_addr.organization_id.str
     assert available_devices[0].human_handle.email == "gordon.freeman@blackmesa.nm"
 
 
 @pytest.mark.trio
 async def test_bootstrap_organization_not_created(
-    test_app, running_backend, backend_addr
+    test_app: TestAppProtocol, running_backend: BackendApp, backend_addr: BackendAddr
 ):
     test_client = test_app.test_client()
 
@@ -81,7 +84,9 @@ async def test_bootstrap_organization_not_created(
 
 
 @pytest.mark.trio
-async def test_bootstrap_organization_backend_offline(test_app, backend_addr):
+async def test_bootstrap_organization_backend_offline(
+    test_app: TestAppProtocol, backend_addr: BackendAddr
+):
     test_client = test_app.test_client()
 
     org_bootstrap_addr = BackendOrganizationBootstrapAddr.build(
@@ -103,7 +108,9 @@ async def test_bootstrap_organization_backend_offline(test_app, backend_addr):
 
 
 @pytest.mark.trio
-async def test_organization_already_bootstrapped(test_app, org_bootstrap_addr):
+async def test_organization_already_bootstrapped(
+    test_app: TestAppProtocol, org_bootstrap_addr: BackendOrganizationBootstrapAddr
+):
     test_client = test_app.test_client()
 
     # Bootstrap
@@ -133,7 +140,9 @@ async def test_organization_already_bootstrapped(test_app, org_bootstrap_addr):
 
 
 @pytest.mark.trio
-async def test_bootstrap_organization_invalid_email(test_app, org_bootstrap_addr):
+async def test_bootstrap_organization_invalid_email(
+    test_app: TestAppProtocol, org_bootstrap_addr: BackendOrganizationBootstrapAddr
+):
     test_client = test_app.test_client()
 
     # Not str
@@ -166,7 +175,9 @@ async def test_bootstrap_organization_invalid_email(test_app, org_bootstrap_addr
 
 
 @pytest.mark.trio
-async def test_bootstrap_organization_invalid_key(test_app, org_bootstrap_addr):
+async def test_bootstrap_organization_invalid_key(
+    test_app: TestAppProtocol, org_bootstrap_addr: BackendOrganizationBootstrapAddr
+):
     test_client = test_app.test_client()
 
     # Not str
@@ -220,7 +231,7 @@ async def test_bootstrap_organization_invalid_url(test_app):
 @pytest.mark.trio
 @pytest.mark.parametrize("method", ["GET", "HEAD", "PUT", "DELETE", "PATCH"])
 async def test_bootstrap_organization_invalid_method(
-    test_app, org_bootstrap_addr, method
+    test_app: TestAppProtocol, org_bootstrap_addr: BackendOrganizationBootstrapAddr, method: str
 ):
     test_client = test_app.test_client()
 
@@ -239,10 +250,8 @@ async def test_bootstrap_organization_invalid_method(
 
 
 @pytest.mark.trio
-@pytest.mark.parametrize(
-    "kind", ["missing_header", "bad_header", "bad_body", "missing_body"]
-)
-async def test_bootstrap_body_not_json(test_app, org_bootstrap_addr, kind):
+@pytest.mark.parametrize("kind", ["missing_header", "bad_header", "bad_body", "missing_body"])
+async def test_bootstrap_body_not_json(test_app: TestAppProtocol, kind: str):
     test_client = test_app.test_client()
     if kind == "missing_body":
         data = None
@@ -257,9 +266,7 @@ async def test_bootstrap_body_not_json(test_app, org_bootstrap_addr, kind):
     else:
         headers = {"Content-Type": "application/json"}
 
-    response = await test_client.post(
-        "/organization/bootstrap", headers=headers, data=data
-    )
+    response = await test_client.post("/organization/bootstrap", headers=headers, data=data)
     body = await response.get_json()
     assert response.status_code == 400
     assert body == {"error": "json_body_expected"}
@@ -267,7 +274,10 @@ async def test_bootstrap_body_not_json(test_app, org_bootstrap_addr, kind):
 
 @pytest.mark.trio
 async def test_bootstrap_organization_with_sequester_key(
-    test_app, core_config_dir, org_bootstrap_addr, running_backend
+    test_app: TestAppProtocol,
+    core_config_dir: Path,
+    org_bootstrap_addr: BackendOrganizationBootstrapAddr,
+    running_backend: BackendApp,
 ):
     test_client = test_app.test_client()
     pub_key, _ = crypto.generate_pair("rsa", bit_size=1024)
@@ -288,24 +298,17 @@ async def test_bootstrap_organization_with_sequester_key(
     assert body == {}
     available_devices = list_available_devices(core_config_dir)
     assert len(available_devices) == 1
-    assert (
-        available_devices[0].organization_id.str
-        == org_bootstrap_addr.organization_id.str
-    )
+    assert available_devices[0].organization_id.str == org_bootstrap_addr.organization_id.str
     assert available_devices[0].human_handle.email == "gordon.freeman@blackmesa.nm"
 
-    organization = await running_backend.organization.get(
-        org_bootstrap_addr.organization_id
-    )
+    organization = await running_backend.organization.get(org_bootstrap_addr.organization_id)
     assert organization.sequester_authority is not None
-    assert (
-        organization.sequester_authority.verify_key_der.dump() == seq_verify_key.dump()
-    )
+    assert organization.sequester_authority.verify_key_der.dump() == seq_verify_key.dump()
 
 
 @pytest.mark.trio
 async def test_bootstrap_organization_invalid_sequester_key(
-    test_app, org_bootstrap_addr
+    test_app: TestAppProtocol, org_bootstrap_addr: BackendOrganizationBootstrapAddr
 ):
     test_client = test_app.test_client()
 

@@ -55,17 +55,23 @@ def _setup_logging(log_level: str, log_file: Optional[Path]) -> None:
         logging.basicConfig(format=format, datefmt=datefmt, stream=sys.stdout, level=level)
 
 
-def _parse_sequester_service_private_key_param(param: str) -> Tuple[SequesterServiceID, oscrypto.asymmetric.PrivateKey]:
+def _parse_sequester_service_private_key_param(
+    param: str,
+) -> Tuple[SequesterServiceID, oscrypto.asymmetric.PrivateKey]:
     try:
         raw_id, raw_pem = param.split(":", 1)
         service_id = SequesterServiceID.from_hex(raw_id)
     except ValueError:
         # We absolutely want to avoid leaking the key with a potentially uncatched exception
-        raise SystemExit("Invalid --sequester-service-private-key, expected format `<sequester_service_id>:<pem_key>`")
+        raise SystemExit(
+            "Invalid --sequester-service-private-key, expected format `<sequester_id>:<pem_key>`"
+        )
 
     # Good enough check to make sure that the key is a RSA key in a PEM format
     if "-----BEGIN RSA PRIVATE KEY-----" not in raw_pem:
-        raise SystemExit("Invalid --sequester-service-private-key, missing PEM RSA header for key part")
+        raise SystemExit(
+            "Invalid --sequester-service-private-key, missing PEM RSA header for key part"
+        )
 
     try:
         # `oscrypto.asymmetric.load_private_key` treats argument as a file if its type is str and
@@ -126,14 +132,14 @@ def _parse_sequester_service_private_key_param(param: str) -> Tuple[SequesterSer
     callback=lambda ctx, param, value: _parse_blockstore_params(value),
     envvar="ANTIVIRUS_CONNECTOR_BLOCKSTORE",
     metavar="CONFIG",
-    help="Blockstore configuration"
+    help="Blockstore configuration",
 )
 def run_cli(
     port: int,
     host: str,
     client_origin: str,
     log_level: str,
-    log_file: str,
+    log_file: Path,
     sequester_service_private_key: List[Tuple[SequesterServiceID, oscrypto.asymmetric.PrivateKey]],
     antivirus_api_url: str,
     antivirus_api_key: str,
@@ -145,7 +151,9 @@ def run_cli(
     if not sequester_service_private_key:
         var = os.environ.get("ANTIVIRUS_CONNECTOR_SEQUESTER_SERVICE_PRIVATE_KEY")
         if var:
-            sequester_service_private_key = [_parse_sequester_service_private_key_param(x) for x in var.split(";")]
+            sequester_service_private_key = [
+                _parse_sequester_service_private_key_param(x) for x in var.split(";")
+            ]
 
     _setup_logging(log_level, log_file)
     logger.debug("Starting antivirus-connector !", version=__version__)

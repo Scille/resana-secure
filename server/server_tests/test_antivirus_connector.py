@@ -84,7 +84,10 @@ async def test_submit(antivirus_test_app, monkeypatch, sequester_service, orgid,
         assert headers["X-Auth-Token"]
         assert files["file"]
         antivirus_state = "work_started"
-        return httpx.Response(200, json={"status": True, "uuid": "d8b5a554-04b8-4af6-9e08-524d76ec8d12"})
+        return httpx.Response(
+            200, json={"status": True, "uuid": "d8b5a554-04b8-4af6-9e08-524d76ec8d12"}
+        )
+
     monkeypatch.setattr("httpx.AsyncClient.post", fake_antivirus_http_post)
 
     async def fake_antivirus_http_get(self, url, headers):
@@ -98,7 +101,11 @@ async def test_submit(antivirus_test_app, monkeypatch, sequester_service, orgid,
         elif antivirus_state == "work_continued":
             antivirus_state = "finished"
             malwares = ["keylogger"] if is_malware else []
-            return httpx.Response(200, json={"status": True, "done": True, "is_malware": is_malware, "malwares": malwares})
+            return httpx.Response(
+                200,
+                json={"status": True, "done": True, "is_malware": is_malware, "malwares": malwares},
+            )
+
     monkeypatch.setattr("httpx.AsyncClient.get", fake_antivirus_http_get)
 
     response = await test_client.post(

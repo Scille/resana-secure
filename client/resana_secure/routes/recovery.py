@@ -34,9 +34,7 @@ async def export_device(core):
     finally:
         path.unlink()
 
-    file_name = get_recovery_device_file_name(core.device).replace(
-        "parsec-", "resana-secure-", 1
-    )
+    file_name = get_recovery_device_file_name(core.device).replace("parsec-", "resana-secure-", 1)
 
     return (
         {

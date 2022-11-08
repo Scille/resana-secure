@@ -2,7 +2,7 @@ from resana_secure.ltcm import ComponentNotRegistered
 import trio
 from typing import Dict, Type, AsyncIterator
 from functools import partial
-from quart import current_app
+from quart import current_app, g
 from contextlib import asynccontextmanager
 
 from parsec.api.protocol import InvitationType
@@ -52,7 +52,7 @@ class BaseInviteManager:
     async def start_ctx(
         self, addr: BackendInvitationAddr, **kwargs
     ) -> AsyncIterator[BaseLongTermCtx]:
-        component_handle = await current_app.ltcm.register_component(
+        component_handle = await g.ltcm.register_component(
             partial(
                 self._LONG_TERM_CTX_CLS.start,
                 config=current_app.config["CORE_CONFIG"],
@@ -68,7 +68,7 @@ class BaseInviteManager:
         self._addr_to_claim_ctx[addr] = component_handle
 
         try:
-            async with current_app.ltcm.acquire_component(component_handle) as component:
+            async with g.ltcm.acquire_component(component_handle) as component:
                 # LTCM allow concurrent access to the component, however our
                 # invitation components rely on a single backend transport
                 # connection so we need a lock here to avoid concurrent
@@ -85,7 +85,7 @@ class BaseInviteManager:
 
     async def _stop_ctx(self, addr, component_handle):
         try:
-            await current_app.ltcm.unregister_component(component_handle)
+            await g.ltcm.unregister_component(component_handle)
         except ComponentNotRegistered:
             pass
         removed_component_handle = self._addr_to_claim_ctx.pop(addr, None)
@@ -103,7 +103,7 @@ class BaseInviteManager:
             raise LongTermCtxNotStarted
 
         try:
-            async with current_app.ltcm.acquire_component(component_handle) as component:
+            async with g.ltcm.acquire_component(component_handle) as component:
                 # LTCM allow concurrent access to the component, however our
                 # invitation components rely on a single backend transport
                 # connection so we need a lock here to avoid concurrent
@@ -139,7 +139,7 @@ class ClaimersManager(BaseInviteManager):
 class GreetLongTermCtx(BaseLongTermCtx):
     @classmethod
     @asynccontextmanager
-    async def start(
+    async def start(  # type: ignore[override]
         cls, config: CoreConfig, device: LocalDevice, addr: BackendInvitationAddr
     ) -> AsyncIterator["GreetLongTermCtx"]:
         async with backend_authenticated_cmds_factory(

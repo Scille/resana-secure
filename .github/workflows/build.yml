@@ -12,8 +12,19 @@ on:
 env:
   PYTHON_VERSION: "3.9"
   WINFSP_VERSION: "1.8.20304"
+  FORCE_MATURIN_RELEASE: 1
 
 jobs:
+
+
+#################################################################################
+
+  Quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - uses: pre-commit/action@v2.0.0
 
 
 #################################################################################
@@ -31,7 +42,7 @@ jobs:
         uses: actions/setup-python@d09bd5e6005b175076f227b13d9730d56e9dcfcb  # pin@v4.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - name: 'Setup Client env'
+      - name: 'Install tools'
         working-directory: client
         run: |
           set -eux
@@ -39,26 +50,18 @@ jobs:
           python -m pip install --user pipx
           pipx install poetry
           poetry --version
-      - name: 'Install Client Project'
-        run: poetry install
+      - name: '[Client] Install Project'
+        run: poetry install -v
         working-directory: client
-      - name: 'Run Client Tests'
-        run: poetry run py.test tests
+      - name: '[Client] Run Tests'
+        run: poetry run py.test client_tests
         timeout-minutes: 10
         working-directory: client
-      - name: 'Setup Server env'
+      - name: '[Server] Install Project'
+        run: poetry install -v
         working-directory: server
-        run: |
-          set -eux
-          python --version
-          python -m pip install --user pipx
-          pipx install poetry
-          poetry --version
-      - name: 'Install Server Project'
-        run: poetry install
-        working-directory: server
-      - name: 'Run Server Tests'
-        run: poetry run py.test tests
+      - name: '[Server] Run Tests'
+        run: poetry run py.test server_tests
         timeout-minutes: 10
         working-directory: server
 
@@ -94,10 +97,10 @@ jobs:
           choco install -y --limit-output winfsp --version=${{ env.WINFSP_VERSION }}
         working-directory: client
       - name: 'Install project'
-        run: poetry install
+        run: poetry install -v
         working-directory: client
       - name: 'Run tests'
-        run: poetry run py.test tests
+        run: poetry run py.test client_tests
         timeout-minutes: 10
         working-directory: client
 

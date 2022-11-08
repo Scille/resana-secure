@@ -194,5 +194,6 @@ class LTCM:
             managed_component = self._components[handle]
         except KeyError:
             raise ComponentNotRegistered
+        component: ComponentTypeVar
         async with managed_component.acquire() as component:
             yield component
