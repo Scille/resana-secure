@@ -172,14 +172,19 @@ async def test_submit_invalid_args(antivirus_test_app, sequester_service, orgid)
     assert body == {"error": "Failed to parse arguments: Invalid OrganizationID"}
 
     # Missing sequester blob
-    response = await test_client.post(f"/submit?service_id={sequester_service.service_id.str}&organization_id={orgid.str}", data=b"")
+    response = await test_client.post(
+        f"/submit?service_id={sequester_service.service_id.str}&organization_id={orgid.str}",
+        data=b"",
+    )
     assert response.status_code == 400
     body = await response.get_json()
     assert body == {"reason": "Vlob decryption failed: "}
 
 
 @pytest.mark.trio
-async def test_submit_deserialization_failure(antivirus_test_app, sequester_service, orgid, monkeypatch):
+async def test_submit_deserialization_failure(
+    antivirus_test_app, sequester_service, orgid, monkeypatch
+):
     monkeypatch.setattr(
         "antivirus_connector.routes.load_manifest",
         AsyncMock(side_effect=ManifestError("invalid key")),

@@ -9,7 +9,7 @@ import structlog
 import trio_asyncio
 import oscrypto.asymmetric
 
-from parsec.api.protocol import OrganizationID, SequesterServiceID
+from parsec.api.protocol import SequesterServiceID
 from parsec.backend.config import BaseBlockStoreConfig
 from parsec.backend.blockstore import PostgreSQLBlockStoreConfig
 from parsec.backend.cli.utils import _parse_blockstore_params
@@ -167,7 +167,6 @@ def run_cli(
     # but the antivirus API does not.
     if antivirus_api_url.endswith("/"):
         antivirus_api_url = antivirus_api_url[:-1]
-
 
     config = AppConfig(
         sequester_services_decryption_key=dict(sequester_service_private_key),
