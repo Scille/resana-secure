@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from typing import Callable, TYPE_CHECKING
 from importlib import resources
+from functools import partial
+from pathlib import Path
 from contextlib import asynccontextmanager, AbstractAsyncContextManager
 import trio
 import os
 import qtrio
 import signal
+import multiprocessing
 from structlog import get_logger
 from PyQt5.QtWidgets import (
     QApplication,
@@ -31,6 +34,8 @@ from parsec.core.local_device import (
     AvailableDevice,
 )
 from parsec.core.config import CoreConfig
+from parsec.core.types import DEFAULT_BLOCK_SIZE
+from parsec.core.fs import FsPath, WorkspaceFS
 from parsec.core.ipcinterface import (
     run_ipc_server,
     send_to_ipc_server,
@@ -38,6 +43,7 @@ from parsec.core.ipcinterface import (
     IPCServerNotRunning,
     IPCCommand,
 )
+from parsec.core.gui.custom_dialogs import QDialogInProcess
 
 if TYPE_CHECKING:
     from .app import ResanaApp
@@ -107,6 +113,7 @@ class Systray(QSystemTrayIcon):
 
 class ResanaGuiApp(QApplication):
     message_requested = pyqtSignal(str, str)
+    save_file_requested = pyqtSignal(WorkspaceFS, FsPath)
 
     def __init__(
         self,
@@ -124,6 +131,7 @@ class ResanaGuiApp(QApplication):
         self.tray.close_clicked.connect(self.quit)
         self.tray.open_clicked.connect(self._on_open_clicked)
         self.tray.device_clicked.connect(self._on_device_clicked)
+        self.save_file_requested.connect(self._on_save_file_requested)
         self._cancel_scope: trio.CancelScope = cancel_scope
         self.quart_app = quart_app
         with resources.path("resana_secure", "icon.png") as icon_path:
@@ -189,6 +197,27 @@ class ResanaGuiApp(QApplication):
             )
             if ok and password:
                 self.nursery.start_soon(self._on_login_clicked, device, password)
+        self.save_file_requested.connect(self._on_save_file_requested)
+
+    def _on_save_file_requested(self, workspace_fs: WorkspaceFS, path: FsPath):
+
+        async def _save_file(save_path, workspace_fs, file_path):
+            try:
+                self.message_requested.emit("Téléchargement", f"Le fichier {file_path.name.str} est en cours de téléchargement.\nIl sera ouvert automatiquement.")
+                async with await trio.open_file(save_path, "wb") as dest_fd:
+                    async with await workspace_fs.open_file(file_path, "rb") as wk_fd:
+                        while (data := await wk_fd.read()):
+                            await dest_fd.write(data)
+            except Exception:
+                self.message_requested.emit("Erreur", f"Impossible de télécharger le fichier {file_path.name.str}.")
+                logger.exception("Failed to download the a outside of mountpoint")
+            else:
+                await trio.to_thread.run_sync(lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(save_path))))
+
+
+        dest, _ = QDialogInProcess.getSaveFileName(None, f"Sauvegarde du fichier {path.name.str}", str(Path.home() / path.name.str))
+        if dest:
+            self.nursery.start_soon(_save_file, dest, workspace_fs, path)
 
     def _on_open_clicked(self):
         QDesktopServices.openUrl(QUrl(self.resana_website_url))
@@ -306,4 +335,7 @@ def run_gui(
     #    Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     # )
 
-    qtrio.run(_qtrio_run, quart_app_context, config, resana_website_url)
+    multiprocessing.set_start_method("spawn")
+
+    with QDialogInProcess.manage_pools():
+        qtrio.run(_qtrio_run, quart_app_context, config, resana_website_url)

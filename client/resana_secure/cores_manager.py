@@ -8,7 +8,7 @@ import structlog
 from PyQt5.QtWidgets import QApplication
 
 from parsec.core.core_events import CoreEvent
-from parsec.core.types import LocalDevice
+from parsec.core.types import LocalDevice, BackendOrganizationAddr
 from parsec.core.logged_core import logged_core_factory, LoggedCore
 from parsec.core.config import CoreConfig
 from parsec.core.local_device import (
@@ -87,10 +87,19 @@ def device_has_encrypted_key(device: AvailableDevice) -> bool:
     return load_device_encrypted_key(device) is not None
 
 
+def is_org_hosted_on_rie(org_addr: BackendOrganizationAddr, rie_server_addrs: List[Tuple[str, Optional[int]]]) -> bool:
+    # `rie_server_addrs` contains a list of tuple of either (domain, port) or (domain, None)
+    # We check if our org addr matches either of those.
+    return any(netloc in rie_server_addrs for netloc in [(org_addr.hostname, None), (org_addr.hostname, org_addr.port)])
+
+
 @asynccontextmanager
 async def start_core(
-    core_config: CoreConfig, device: LocalDevice, on_stopped: Callable
+    core_config: CoreConfig, device: LocalDevice, on_stopped: Callable, rie_server_addrs: List[Tuple[str, Optional[int]]],
 ) -> AsyncIterator[LoggedCore]:
+
+    core_config = core_config.evolve(mountpoint_enabled=is_org_hosted_on_rie(device.organization_addr, rie_server_addrs))
+
     async with logged_core_factory(core_config, device) as core:
         try:
             core.event_bus.connect(
@@ -122,12 +131,13 @@ async def _on_fs_sync_refused_by_sequester_service(
 class CoresManager:
     _instance = None
 
-    def __init__(self, core_config: CoreConfig, ltcm: LTCM):
+    def __init__(self, core_config: CoreConfig, ltcm: LTCM, rie_server_addrs: List[Tuple[str, Optional[int]]]):
         self._email_to_auth_token: Dict[Tuple[OrganizationID, str], str] = {}
         self._auth_token_to_component_handle: Dict[str, int] = {}
         self._login_lock = trio.Lock()
         self.core_config = core_config
         self.ltcm = ltcm
+        self.rie_server_addrs = rie_server_addrs
 
     async def _authenticate(
         self,
@@ -184,6 +194,7 @@ class CoresManager:
                     core_config=self.core_config,
                     device=loaded_device,
                     on_stopped=_on_stopped,
+                    rie_server_addrs=self.rie_server_addrs,
                 )
             )
             self._auth_token_to_component_handle[auth_token] = component_handle

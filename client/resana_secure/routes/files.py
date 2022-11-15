@@ -5,7 +5,9 @@ import subprocess
 from pathlib import PurePath
 from quart import Blueprint, request
 from base64 import b64decode
-from typing import Optional
+from typing import Optional, cast, TYPE_CHECKING
+
+from PyQt5.QtWidgets import QApplication
 
 from parsec.api.data import EntryID, EntryName
 from parsec.core.mountpoint import MountpointNotMounted
@@ -19,6 +21,7 @@ from parsec.core.fs.exceptions import (
 
 from ..utils import APIException, authenticated, check_data, backend_errors_to_api_exceptions
 
+from resana_secure.gui import ResanaGuiApp
 
 files_bp = Blueprint("files_api", __name__)
 
@@ -394,12 +397,13 @@ async def open_workspace_item(core, workspace_id, entry_id):
 
         try:
             fspath = core.mountpoint_manager.get_path_in_mountpoint(workspace_id, path)
+            # Must run the open in a thread, otherwise we will block the current thread
+            # that is supposed to handle the actual open operation asked by the kernel !
+            await trio.to_thread.run_sync(_open_item, fspath)
         except MountpointNotMounted:
-            raise APIException(400, {"error": "workspace_not_mounted"})
-
-    # Must run the open in a thread, otherwise we will block the current thread
-    # that is suppossed to handle the actual open operation asked by the kernel !
-    await trio.to_thread.run_sync(_open_item, fspath)
+            # Not mounted, use the GUI to download the file
+            qt_app = cast(ResanaGuiApp, QApplication.instance())
+            await trio.to_thread.run_sync(qt_app.save_file_requested.emit, workspace, path)
 
     return {}, 200
 

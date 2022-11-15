@@ -1,4 +1,5 @@
 import argparse
+import trio
 from typing import Optional, Tuple
 from pathlib import Path
 from functools import partial
@@ -81,6 +82,20 @@ def get_default_dirs() -> Tuple[Path, Path, Path]:
     return mountpoint_base_dir, data_base_dir, config_dir
 
 
+def _parse_host(s: str) -> Tuple[str, Optional[int]]:
+    # urllib.parse.urlparse doesn't do well without a scheme
+    # For `domain.com` for example, it considers it to be the path,
+    # not the hostname.
+
+    # Server addr can be given either by just the hostname (`domain.com`), or by the combination of
+    # the hostname and the port (`domain.com:1337`).
+
+    if ":" in s:
+        host, port = s.split(":")
+        return (host, int(port))
+    return (s, None)
+
+
 def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Optional[Path] = None):
     parser = argparse.ArgumentParser(description="Process some integers.")
     parser.add_argument("--port", type=int, default=5775)
@@ -96,11 +111,15 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
     )
     parser.add_argument("--disable-gui", action="store_true")
     parser.add_argument("--disable-mountpoint", action="store_true")
+    parser.add_argument("--rie-server-addr", action="append", default=["resana-secure-interne.parsec.cloud"], type=_parse_host)
     parser.add_argument(
         "--log-level", choices=("DEBUG", "INFO", "WARNING", "ERROR"), default=default_log_level
     )
     parser.add_argument("--log-file", type=Path, default=default_log_file)
     args = parser.parse_args(args=args)
+
+    if os.environ.get("RESANA_RIE_SERVER_ADDR"):
+        args.rie_server_addr.extend([_parse_host(h) for h in os.environ.get("RESANA_RIE_SERVER_ADDR").split(";")])
 
     (mountpoint_base_dir, default_data_base_dir, default_config_dir) = get_default_dirs()
     config_dir = args.config or default_config_dir
@@ -141,6 +160,7 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
         port=args.port,
         config=config,
         client_allowed_origins=args.client_origin,
+        rie_server_addrs=args.rie_server_addr,
     )
 
     if args.disable_gui:
@@ -148,6 +168,8 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
         async def trio_main():
             async with quart_app_context() as app:
                 await app.serve()
+
+        trio.run(trio_main)
 
     else:
         # Inline import to avoid importing pyqt if gui is disabled
