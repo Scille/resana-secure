@@ -8,7 +8,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 from parsec.sequester_crypto import sequester_service_decrypt
 from parsec.api.data import FileManifest
 from parsec.api.data.manifest import manifest_unverified_load
-from parsec.api.protocol import OrganizationID
+from parsec.api.protocol import SequesterServiceID, OrganizationID
 
 from .antivirus import check_for_malwares, AntivirusError
 from .config import AppConfig
@@ -69,16 +69,16 @@ async def reassemble_file(manifest: FileManifest, organization_id: OrganizationI
     return out
 
 
-@bp.route("/submit/<string:organization_id>", methods=["POST"])
-async def submit(organization_id):
+@bp.route("/submit", methods=["POST"])
+async def submit():
     # 400 status should only used when detecting a malicious file, other 4xx/5xx should
     # be used in case bad arguments or temporary failure. This is because Parsec consider
     # 400 status as an indication to not save the vlob and other status as a "retry later"
     # indication
     try:
-        organization_id = OrganizationID(organization_id)
+        organization_id = OrganizationID(request.args.get("organization_id", ""))
+        service_id = SequesterServiceID.from_hex(request.args.get("service_id", ""))
         vlob = await request.get_data(cache=False)
-
     except RequestEntityTooLarge as exc:
         # Request body is too large
         logger.warning("Request too large", exc_info=exc)
@@ -90,10 +90,11 @@ async def submit(organization_id):
 
     config: AppConfig = current_app.config["APP_CONFIG"]
     try:
-        key = config.sequester_services_decryption_key[organization_id]
+        key = config.sequester_services_decryption_key[service_id]
     except KeyError as exc:
         logger.warning(
             "No key available for provided sequester service",
+            service_id=service_id,
             organization_id=organization_id.str,
             exc_info=exc,
         )
@@ -102,8 +103,8 @@ async def submit(organization_id):
     try:
         # Decrypt and deserialize the manifest
         manifest = await load_manifest(key, vlob)
-        if not manifest:
-            # Not a file manifest
+        if not manifest or manifest.size == 0:
+            # Not a file manifest or empty
             return {}, 200
 
         # Download the blocks and recombine into a file
