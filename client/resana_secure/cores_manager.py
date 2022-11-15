@@ -45,7 +45,7 @@ class CoreDeviceInvalidPasswordError(CoreManagerError):
 
 def iter_matching_devices(
     config_dir: Path, email: str, organization_id: Optional[OrganizationID] = None
-) -> Generator:
+) -> Generator[AvailableDevice]:
     for available_device in list_available_devices(config_dir):
         if (
             (
