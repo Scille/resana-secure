@@ -38,7 +38,7 @@ def _js_string_to_bytes(s: str) -> bytes:
     the format used by Resana to handle bytes.
     The string `"73,229,86"` is translated into a bytes object `bytes([73, 229, 86])`.
     """
-    return bytes([int(c) for c in s.split(",")])
+    return bytes([int(c) % 256 for c in s.split(",")])
 
 
 def _encrypt(key: bytes, data: bytes) -> tuple[bytes, bytes]:
