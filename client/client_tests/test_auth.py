@@ -15,6 +15,7 @@ from resana_secure.cores_manager import (
     CoresManager,
     CoreDeviceInvalidPasswordError,
     CoreDeviceNotFoundError,
+    CoreDeviceEncryptedKeyNotFoundError,
 )
 from resana_secure.app import ResanaApp
 from resana_secure.crypto import encrypt_parsec_key
@@ -241,8 +242,7 @@ async def test_authentication_missing_organization_id(
     assert response.status_code == 200
     assert body == {"token": ANY}
 
-    # Tokens should not be the same
-    assert body["token"] != token
+    assert body["token"] == token
 
 
 @pytest.mark.trio
@@ -508,7 +508,7 @@ async def test_encrypted_key_auth(
         )
 
     # Try to login while offline using only the user password
-    with pytest.raises(CoreDeviceInvalidPasswordError):
+    with pytest.raises(CoreDeviceEncryptedKeyNotFoundError):
         await cores_manager.login(email=EMAIL, organization_id=ORG_ID, user_password=USER_PASSWORD)
 
     # Auth using encrypted_key and user_password should work
@@ -535,3 +535,9 @@ async def test_encrypted_key_auth(
         email=EMAIL, organization_id=ORG_ID if use_org_id else None, user_password=USER_PASSWORD
     )
     assert token is not None
+
+    # Also try to login offline with an incorrect password for good measure
+    with pytest.raises(CoreDeviceInvalidPasswordError):
+        await cores_manager.login(
+            email=EMAIL, organization_id=ORG_ID, user_password="IncorrectPassword"
+        )

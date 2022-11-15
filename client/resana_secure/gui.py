@@ -23,6 +23,7 @@ from .cores_manager import (
     CoreNotLoggedError,
     CoreDeviceNotFoundError,
     CoreDeviceInvalidPasswordError,
+    CoreDeviceEncryptedKeyNotFoundError,
     CoresManager,
 )
 
@@ -152,6 +153,12 @@ class ResanaGuiApp(QApplication):
             QMessageBox.warning(None, "Erreur", "Mot de passe incorrect.")
         except CoreDeviceNotFoundError:
             QMessageBox.warning(None, "Erreur", "Impossible de se connecter.")
+        except CoreDeviceEncryptedKeyNotFoundError:
+            QMessageBox.warning(
+                None,
+                "Erreur",
+                "Vous devez vous connecter au moins une fois au serveur Resana pour utiliser l'authentification hors-ligne.",
+            )
 
     async def _on_logout_clicked(self, token):
         try:

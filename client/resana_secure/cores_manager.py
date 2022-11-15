@@ -1,6 +1,6 @@
 import trio
 from uuid import uuid4
-from typing import AsyncIterator, Callable, Dict, Optional, Tuple, Generator
+from typing import AsyncIterator, Callable, Dict, Optional, Tuple, List
 from functools import partial
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -43,20 +43,22 @@ class CoreDeviceInvalidPasswordError(CoreManagerError):
     pass
 
 
-def iter_matching_devices(
+class CoreDeviceEncryptedKeyNotFoundError(CoreManagerError):
+    pass
+
+
+def find_matching_devices(
     config_dir: Path, email: str, organization_id: Optional[OrganizationID] = None
-) -> Generator[AvailableDevice]:
-    for available_device in list_available_devices(config_dir):
+) -> List[AvailableDevice]:
+    return [
+        d
+        for d in list_available_devices(config_dir)
         if (
-            (
-                not organization_id
-                or organization_id
-                and available_device.organization_id == organization_id
-            )
-            and available_device.human_handle
-            and available_device.human_handle.email == email
-        ):
-            yield available_device
+            (not organization_id or organization_id and d.organization_id == organization_id)
+            and d.human_handle
+            and d.human_handle.email == email
+        )
+    ]
 
 
 def load_device_or_error(available_device: AvailableDevice, password: str) -> Optional[LocalDevice]:
@@ -77,7 +79,8 @@ def save_device_encrypted_key(device: AvailableDevice, encrypted_key: str) -> No
     try:
         (device.key_file_path.parent / f"{device.slughash}.enc_key").write_text(encrypted_key)
     except OSError:
-        pass
+        # Not using the exception in the log to make sure the encrypted key isn't leaked
+        logger.warning("Failed to write the encrypted key to the disk.")
 
 
 def device_has_encrypted_key(device: AvailableDevice) -> bool:
@@ -126,71 +129,42 @@ class CoresManager:
         self.core_config = core_config
         self.ltcm = ltcm
 
-    async def login(
+    async def _authenticate(
         self,
-        email: str,
+        device: AvailableDevice,
         key: Optional[str] = None,
         user_password: Optional[str] = None,
         encrypted_key: Optional[str] = None,
-        organization_id: Optional[OrganizationID] = None,
     ) -> str:
-        """
-        Raises:
-            CoreDeviceNotFoundError
-            CoreDeviceInvalidPasswordError
-        """
-
-        device = None
-        found_device = False
-
-        # We iterate over the devices that match this email and organization_id (usually we only get one but we may have more in some cases)
-        for available_device in iter_matching_devices(
-            self.core_config.config_dir, email=email, organization_id=organization_id
-        ):
-            # Indicate that we did find a device, useful for the final error
-            found_device = True
-
-            # We have a user password
-            if user_password:
-                # But not encrypted key, meaning we're trying to log offline
+        # We have a user password, we're trying to get the device key from it
+        if user_password:
+            # No encrypted key, meaning we're trying to log in while offline
+            if not encrypted_key:
+                # Load the key from the file
+                encrypted_key = load_device_encrypted_key(device)
+                # No key, probably because we never logged while online
                 if not encrypted_key:
-                    # Load the key from the file
-                    encrypted_key = load_device_encrypted_key(available_device)
-                # No key, probably because we never logged while online, let's try the next device
-                if not encrypted_key:
-                    continue
-                try:
-                    # Decrypt the parsec password using the user password
-                    key = decrypt_parsec_key(user_password, encrypted_key)
-                except CryptoError:
-                    # Let's try the next device
-                    continue
+                    raise CoreDeviceEncryptedKeyNotFoundError
             try:
-                # This operation can be done concurrently and ensures the email/password couple is valid
-                device = load_device_or_error(
-                    available_device=available_device,
-                    password=key or "",
-                )
-            except (CoreDeviceNotFoundError, CoreDeviceInvalidPasswordError):
-                # Cannot authenticate the device, let's try the next device
-                continue
-            else:
-                # Everything seems alright, if we have a user_password and an encrypted_key, let's save the encrypted_key so it stays up to date
-                if user_password and encrypted_key:
-                    save_device_encrypted_key(available_device, encrypted_key=encrypted_key)
-                break
+                # Decrypt the parsec password using the user password
+                key = decrypt_parsec_key(user_password, encrypted_key)
+            except CryptoError as exc:
+                raise CoreDeviceInvalidPasswordError from exc
 
-        # We did not find a matching device
-        if not found_device:
-            raise CoreDeviceNotFoundError
-        # We did find a matching device but did not manage to authenticate
-        if found_device and not device:
-            raise CoreDeviceInvalidPasswordError
+        # This operation can be done concurrently and ensures the email/password couple is valid
+        loaded_device = load_device_or_error(
+            available_device=device,
+            password=key or "",
+        )
+        # Everything seems alright, if we have a user_password and an encrypted_key, let's save the encrypted_key so it stays up to date
+        if user_password and encrypted_key:
+            save_device_encrypted_key(device, encrypted_key=encrypted_key)
 
         # The lock is needed here to avoid concurrent logins with the same email
         async with self._login_lock:
+            device_tuple = (device.organization_id, device.human_handle.email)
             # Return existing auth_token if the login has already be done for this device
-            existing_auth_token = self._email_to_auth_token.get((organization_id, email))
+            existing_auth_token = self._email_to_auth_token.get(device_tuple)
             if existing_auth_token:
                 # No need to check if the related component is still available
                 # given `_on_stopped` callback (see below) makes sure to
@@ -201,18 +175,50 @@ class CoresManager:
 
             def _on_stopped():
                 self._auth_token_to_component_handle.pop(auth_token, None)
-                self._email_to_auth_token.pop((organization_id, email), None)
+                self._email_to_auth_token.pop(device_tuple, None)
 
             auth_token = uuid4().hex
             component_handle = await self.ltcm.register_component(
                 partial(
-                    start_core, core_config=self.core_config, device=device, on_stopped=_on_stopped
+                    start_core,
+                    core_config=self.core_config,
+                    device=loaded_device,
+                    on_stopped=_on_stopped,
                 )
             )
             self._auth_token_to_component_handle[auth_token] = component_handle
-            self._email_to_auth_token[(organization_id, email)] = auth_token
+            self._email_to_auth_token[device_tuple] = auth_token
 
             return auth_token
+
+    async def login(
+        self,
+        email: str,
+        key: Optional[str] = None,
+        user_password: Optional[str] = None,
+        encrypted_key: Optional[str] = None,
+        organization_id: Optional[OrganizationID] = None,
+    ) -> str:
+        matching_devices = find_matching_devices(
+            self.core_config.config_dir, email=email, organization_id=organization_id
+        )
+        if not matching_devices:
+            raise CoreDeviceNotFoundError
+        last_exc: Optional[Exception] = None
+        for device in matching_devices:
+            try:
+                return await self._authenticate(
+                    device, key=key, user_password=user_password, encrypted_key=encrypted_key
+                )
+            except CoreManagerError as exc:
+                # Expected, just reraise it at the end if we didn't find the device
+                last_exc = exc
+            except Exception as exc:
+                # This is unexpected, log it and reraire it at the end
+                logger.exception("Unhandled exception when logging in")
+                last_exc = exc
+        assert last_exc is not None
+        raise last_exc
 
     async def logout(self, auth_token: str) -> None:
         """
@@ -261,15 +267,11 @@ class CoresManager:
         for available_device in list_available_devices(self.core_config.config_dir):
             if only_offline_available and not device_has_encrypted_key(available_device):
                 continue
-            # The lock is needed here to avoid concurrent logins with the same email
             async with self._login_lock:
                 # Check if the device is logged in
                 existing_auth_token = self._email_to_auth_token.get(
                     (available_device.organization_id, available_device.human_handle.email)
                 )
-                # Ensuring that two devices from the same user only appear once
-                # It doesn't really matter if there are many devices with the same email and org_id,
-                # when login we try them all anyway.
                 key = (available_device.organization_id, available_device.human_handle.email)
                 if key not in devices:
                     devices[key] = (available_device, existing_auth_token)
