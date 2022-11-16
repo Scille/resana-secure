@@ -1,14 +1,24 @@
 import pytest
 import re
-from typing import List, Tuple
+from typing import List, Tuple, cast
 from unittest.mock import ANY
 from quart_trio.testing import TrioTestApp
 
 from parsec.api.protocol import OrganizationID
 from parsec.backend import BackendApp
 from parsec.core.types import BackendAddr, BackendOrganizationBootstrapAddr
+from parsec.core.local_device import list_available_devices
 
 from .conftest import LocalDeviceTestbed
+
+from resana_secure.cores_manager import (
+    CoresManager,
+    CoreDeviceInvalidPasswordError,
+    CoreDeviceNotFoundError,
+    CoreDeviceEncryptedKeyNotFoundError,
+)
+from resana_secure.app import ResanaApp
+from resana_secure.crypto import encrypt_parsec_key
 
 
 @pytest.mark.trio
@@ -232,8 +242,7 @@ async def test_authentication_missing_organization_id(
     assert response.status_code == 200
     assert body == {"token": ANY}
 
-    # Tokens should not be the same
-    assert body["token"] != token
+    assert body["token"] == token
 
 
 @pytest.mark.trio
@@ -423,3 +432,112 @@ async def test_multi_org_authentication(
         tokens.append(body["token"])
 
     assert len(tokens) == 3
+
+
+@pytest.mark.trio
+@pytest.mark.parametrize("use_org_id", [True, False])
+async def test_encrypted_key_auth(
+    test_app: TrioTestApp, backend_addr: BackendAddr, running_backend: BackendApp, use_org_id
+):
+    test_client = test_app.test_client()
+
+    ORG_ID = OrganizationID("OrgID")
+    EMAIL = "zana@wraeclast.nz"
+    USER_PASSWORD = "Still sane, Exile?"
+    PARSEC_KEY = (
+        "But at least you're done now, right, Exile? You'll leave the Atlas alone... right?"
+    )
+    ENCRYPTED_KEY = encrypt_parsec_key(USER_PASSWORD, PARSEC_KEY)
+
+    org_backend_addr = BackendOrganizationBootstrapAddr.build(backend_addr, ORG_ID)
+
+    response = await test_client.post(
+        "/organization/bootstrap",
+        json={
+            "organization_url": org_backend_addr.to_url(),
+            "email": EMAIL,
+            "key": PARSEC_KEY,
+        },
+    )
+    assert response.status_code == 200
+
+    app = cast(ResanaApp, test_app.app)
+
+    devices = list_available_devices(app.core_config.config_dir)
+    assert len(devices) == 1
+    device = devices[0]
+    assert not (device.key_file_path.parent / f"{device.slughash}.enc_key").exists()
+
+    # Auth using user_password as key should fail
+    response = await test_client.post(
+        "/auth",
+        json={
+            "email": EMAIL,
+            "key": USER_PASSWORD,
+            "organization": ORG_ID.str if use_org_id else None,
+        },
+    )
+    body = await response.get_json()
+    assert response.status_code == 400
+    assert body == {"error": "bad_key"}
+
+    # Auth using parsec_key as key should work
+    response = await test_client.post(
+        "/auth",
+        json={
+            "email": EMAIL,
+            "key": PARSEC_KEY,
+            "organization": ORG_ID.str if use_org_id else None,
+        },
+    )
+    body = await response.get_json()
+    assert response.status_code == 200
+    # Logout
+    response = await test_client.delete(
+        "/auth", headers={"Authorization": f"Bearer {body['token']}"}
+    )
+
+    assert not (device.key_file_path.parent / f"{device.slughash}.enc_key").exists()
+
+    cores_manager: CoresManager = app.cores_manager
+
+    # Try to login with a device that does not exists
+    with pytest.raises(CoreDeviceNotFoundError):
+        await cores_manager.login(
+            email="b@c.d", organization_id=ORG_ID, user_password=USER_PASSWORD
+        )
+
+    # Try to login while offline using only the user password
+    with pytest.raises(CoreDeviceEncryptedKeyNotFoundError):
+        await cores_manager.login(email=EMAIL, organization_id=ORG_ID, user_password=USER_PASSWORD)
+
+    # Auth using encrypted_key and user_password should work
+    response = await test_client.post(
+        "/auth",
+        json={
+            "email": EMAIL,
+            "encrypted_key": ENCRYPTED_KEY,
+            "user_password": USER_PASSWORD,
+            "organization": ORG_ID.str if use_org_id else None,
+        },
+    )
+    body = await response.get_json()
+    assert response.status_code == 200
+    # Logout
+    response = await test_client.delete(
+        "/auth", headers={"Authorization": f"Bearer {body['token']}"}
+    )
+
+    assert (device.key_file_path.parent / f"{device.slughash}.enc_key").exists()
+
+    # Now we should be able to log in offline
+    token = await cores_manager.login(
+        email=EMAIL, organization_id=ORG_ID if use_org_id else None, user_password=USER_PASSWORD
+    )
+    assert token is not None
+
+    # Also try to login offline with an incorrect password for good measure
+    with pytest.raises(CoreDeviceInvalidPasswordError):
+        await cores_manager.login(
+            email=EMAIL, organization_id=ORG_ID, user_password="IncorrectPassword"
+        )

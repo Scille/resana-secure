@@ -57,13 +57,26 @@ Procède à l'authentification auprès du client Parsec.
 Cette requête doit être réalisée en tout premier, elle fournit un cookie
 de session permettant d'authentifier les autres requêtes.
 
-Request:
+Deux différentes options sont disponibles pour l'authentification :
+
+- La première (historique) utilise la clef Parsec :
 
 ```python
 {
-    "organization": <string>,
+    "organization": Optional<string>,
     "email": <string>,
     "key": <base64>
+}
+```
+
+- La seconde utilise la clef Parsec chiffrée ainsi que le mot de passe utilisateur. Cette méthode d'authentification doit être utilisée au moins une fois avant de pouvoir se connecter en mode hors-ligne.
+
+```python
+{
+    "organization": Optional<string>,
+    "email": <string>,
+    "encrypted_key": <base64>,
+    "user_password": <string>
 }
 ```
 
