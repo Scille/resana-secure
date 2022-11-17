@@ -27,7 +27,7 @@ from parsec.backend.user import User as BackendUser, Device as BackendDevice
 from parsec.backend.config import BackendConfig, MockedBlockStoreConfig
 
 from resana_secure.app import app_factory
-from resana_secure.cli import CoreConfig
+from resana_secure.cli import ResanaConfig
 
 
 LocalDeviceTestbed = namedtuple("LocalDeviceTestbed", "device,email,key,organization")
@@ -75,19 +75,18 @@ def core_config_dir(tmp_path: Path):
 
 @pytest.fixture
 def core_config(tmp_path: Path, core_config_dir: Path):
-    return CoreConfig(
+    return ResanaConfig(
         config_dir=core_config_dir,
         data_base_dir=tmp_path / "data",
         mountpoint_base_dir=tmp_path / "mountpoint",
         mountpoint_enabled=True,
         ipc_win32_mutex_name="resana-secure",
-        ipc_socket_file=tmp_path / "resana-secure.lock",
         preferred_org_creation_backend_addr=None,
     )
 
 
 @pytest.fixture
-async def test_app(core_config: CoreConfig, client_origin: str):
+async def test_app(core_config: ResanaConfig, client_origin: str):
     async with app_factory(config=core_config, client_allowed_origins=[client_origin]) as app:
         async with app.test_app() as test_app:
             yield test_app

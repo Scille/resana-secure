@@ -17,6 +17,17 @@ from ._version import __version__
 logger = structlog.get_logger()
 
 
+class ResanaConfig(CoreConfig):
+    # CoreConfig sets `ipc_socket_file` as a property, we inherit
+    # it so we can overwrite it
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @property
+    def ipc_socket_file(self) -> Path:
+        return self.data_base_dir / "resana-secure.lock"
+
+
 def _cook_website_url(url: str) -> str:
     if not url.startswith("https://") and not url.startswith("http://"):
         raise ValueError
@@ -125,7 +136,7 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
     config_dir = args.config or default_config_dir
     data_base_dir = args.data or default_data_base_dir
 
-    config = CoreConfig(
+    config = ResanaConfig(
         config_dir=config_dir,
         data_base_dir=data_base_dir,
         # Only used on linux (Windows mounts with drive letters)
@@ -133,7 +144,6 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
         # Use a mock to disable mountpoint instead of relying on this option
         mountpoint_enabled=True,
         ipc_win32_mutex_name="resana-secure",
-        ipc_socket_file=data_base_dir / "resana-secure.lock",
         preferred_org_creation_backend_addr=None,
     )
 
