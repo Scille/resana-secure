@@ -87,18 +87,29 @@ def device_has_encrypted_key(device: AvailableDevice) -> bool:
     return load_device_encrypted_key(device) is not None
 
 
-def is_org_hosted_on_rie(org_addr: BackendOrganizationAddr, rie_server_addrs: List[Tuple[str, Optional[int]]]) -> bool:
+def is_org_hosted_on_rie(
+    org_addr: BackendOrganizationAddr, rie_server_addrs: List[Tuple[str, Optional[int]]]
+) -> bool:
     # `rie_server_addrs` contains a list of tuple of either (domain, port) or (domain, None)
     # We check if our org addr matches either of those.
-    return any(netloc in rie_server_addrs for netloc in [(org_addr.hostname, None), (org_addr.hostname, org_addr.port)])
+    # If `rie_server_addrs` we return True for the sake of compatibility
+    return not rie_server_addrs or any(
+        netloc in rie_server_addrs
+        for netloc in [(org_addr.hostname, None), (org_addr.hostname, org_addr.port)]
+    )
 
 
 @asynccontextmanager
 async def start_core(
-    core_config: CoreConfig, device: LocalDevice, on_stopped: Callable, rie_server_addrs: List[Tuple[str, Optional[int]]],
+    core_config: CoreConfig,
+    device: LocalDevice,
+    on_stopped: Callable,
+    rie_server_addrs: List[Tuple[str, Optional[int]]],
 ) -> AsyncIterator[LoggedCore]:
 
-    core_config = core_config.evolve(mountpoint_enabled=is_org_hosted_on_rie(device.organization_addr, rie_server_addrs))
+    core_config = core_config.evolve(
+        mountpoint_enabled=is_org_hosted_on_rie(device.organization_addr, rie_server_addrs)
+    )
 
     async with logged_core_factory(core_config, device) as core:
         try:
@@ -131,7 +142,9 @@ async def _on_fs_sync_refused_by_sequester_service(
 class CoresManager:
     _instance = None
 
-    def __init__(self, core_config: CoreConfig, ltcm: LTCM, rie_server_addrs: List[Tuple[str, Optional[int]]]):
+    def __init__(
+        self, core_config: CoreConfig, ltcm: LTCM, rie_server_addrs: List[Tuple[str, Optional[int]]]
+    ):
         self._email_to_auth_token: Dict[Tuple[OrganizationID, str], str] = {}
         self._auth_token_to_component_handle: Dict[str, int] = {}
         self._login_lock = trio.Lock()

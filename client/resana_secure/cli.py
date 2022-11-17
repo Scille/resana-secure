@@ -122,7 +122,12 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
     )
     parser.add_argument("--disable-gui", action="store_true")
     parser.add_argument("--disable-mountpoint", action="store_true")
-    parser.add_argument("--rie-server-addr", action="append", default=["resana-secure-interne.parsec.cloud"], type=_parse_host)
+    parser.add_argument(
+        "--rie-server-addr",
+        action="append",
+        default=["resana-secure-interne.parsec.cloud"],
+        type=_parse_host,
+    )
     parser.add_argument(
         "--log-level", choices=("DEBUG", "INFO", "WARNING", "ERROR"), default=default_log_level
     )
@@ -130,7 +135,9 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
     args = parser.parse_args(args=args)
 
     if os.environ.get("RESANA_RIE_SERVER_ADDR"):
-        args.rie_server_addr.extend([_parse_host(h) for h in os.environ.get("RESANA_RIE_SERVER_ADDR").split(";")])
+        args.rie_server_addr.extend(
+            [_parse_host(h) for h in os.environ.get("RESANA_RIE_SERVER_ADDR", "").split(";")]
+        )
 
     (mountpoint_base_dir, default_data_base_dir, default_config_dir) = get_default_dirs()
     config_dir = args.config or default_config_dir

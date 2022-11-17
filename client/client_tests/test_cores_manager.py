@@ -1,4 +1,4 @@
-from parsec.core.types import BackendOrganizationAddr, BackendAddr
+from parsec.core.types import BackendAddr
 
 from resana_secure.cores_manager import is_org_hosted_on_rie
 

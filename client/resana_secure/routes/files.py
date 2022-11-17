@@ -5,7 +5,7 @@ import subprocess
 from pathlib import PurePath
 from quart import Blueprint, request
 from base64 import b64decode
-from typing import Optional, cast, TYPE_CHECKING
+from typing import Optional, cast
 
 from PyQt5.QtWidgets import QApplication
 
@@ -403,7 +403,8 @@ async def open_workspace_item(core, workspace_id, entry_id):
         except MountpointNotMounted:
             # Not mounted, use the GUI to download the file
             qt_app = cast(ResanaGuiApp, QApplication.instance())
-            await trio.to_thread.run_sync(qt_app.save_file_requested.emit, workspace, path)
+            if qt_app:
+                await trio.to_thread.run_sync(qt_app.save_file_requested.emit, workspace, path)
 
     return {}, 200
 

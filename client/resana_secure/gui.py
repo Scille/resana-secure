@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Callable, TYPE_CHECKING
 from importlib import resources
-from functools import partial
 from pathlib import Path
 from contextlib import asynccontextmanager, AbstractAsyncContextManager
 import trio
@@ -200,22 +199,29 @@ class ResanaGuiApp(QApplication):
         self.save_file_requested.connect(self._on_save_file_requested)
 
     def _on_save_file_requested(self, workspace_fs: WorkspaceFS, path: FsPath):
-
         async def _save_file(save_path, workspace_fs, file_path):
             try:
-                self.message_requested.emit("Téléchargement", f"Le fichier {file_path.name.str} est en cours de téléchargement.\nIl sera ouvert automatiquement.")
+                self.message_requested.emit(
+                    "Téléchargement",
+                    f"Le fichier {file_path.name.str} est en cours de téléchargement.\nIl sera ouvert automatiquement.",
+                )
                 async with await trio.open_file(save_path, "wb") as dest_fd:
                     async with await workspace_fs.open_file(file_path, "rb") as wk_fd:
-                        while (data := await wk_fd.read()):
+                        while data := await wk_fd.read(size=DEFAULT_BLOCK_SIZE):
                             await dest_fd.write(data)
             except Exception:
-                self.message_requested.emit("Erreur", f"Impossible de télécharger le fichier {file_path.name.str}.")
+                self.message_requested.emit(
+                    "Erreur", f"Impossible de télécharger le fichier {file_path.name.str}."
+                )
                 logger.exception("Failed to download the a outside of mountpoint")
             else:
-                await trio.to_thread.run_sync(lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(save_path))))
+                await trio.to_thread.run_sync(
+                    lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(save_path)))
+                )
 
-
-        dest, _ = QDialogInProcess.getSaveFileName(None, f"Sauvegarde du fichier {path.name.str}", str(Path.home() / path.name.str))
+        dest, _ = QDialogInProcess.getSaveFileName(
+            None, f"Sauvegarde du fichier {path.name.str}", str(Path.home() / path.name.str)
+        )
         if dest:
             self.nursery.start_soon(_save_file, dest, workspace_fs, path)
 

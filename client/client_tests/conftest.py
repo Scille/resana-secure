@@ -87,7 +87,9 @@ def core_config(tmp_path: Path, core_config_dir: Path):
 
 @pytest.fixture
 async def test_app(core_config: ResanaConfig, client_origin: str):
-    async with app_factory(config=core_config, client_allowed_origins=[client_origin]) as app:
+    async with app_factory(
+        config=core_config, client_allowed_origins=[client_origin], rie_server_addrs=[]
+    ) as app:
         async with app.test_app() as test_app:
             yield test_app
 
