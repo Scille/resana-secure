@@ -6,8 +6,8 @@ authors = ["Scille SAS"]
 
 [tool.poetry.dependencies]
 python = "~3.9.0"
-quart = "^0.17.0"
-quart-trio = "^0.9.1"
+quart = "^0.18.1"
+quart-trio = "^0.10.0"
 quart-cors = "^0.5"
 hypercorn = "^0.13.2"
 
