@@ -6,13 +6,13 @@ authors = ["Scille SAS"]
 
 [tool.poetry.dependencies]
 python = "~3.9.0"
-quart = "^0.17.0"
-quart-trio = "^0.9.1"
+quart = "^0.18.1"
+quart-trio = "^0.10.0"
 quart-cors = "^0.5"
 hypercorn = "^0.13.2"
 httpx = "0.16.0"
 # install parsec from pypi
-parsec-cloud = { version = "^2.13.0rc4", extras = ["backend"] }
+parsec-cloud = { version = "^2.14.0", extras = ["backend"] }
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.0"
