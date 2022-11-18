@@ -38,6 +38,8 @@ from parsec.core.ipcinterface import (
     IPCServerNotRunning,
     IPCCommand,
 )
+from ._version import __version__ as RESANA_VERSION
+
 
 if TYPE_CHECKING:
     from .app import ResanaApp
@@ -54,7 +56,7 @@ class Systray(QSystemTrayIcon):
         self.nursery = nursery
         self.quart_app = quart_app
 
-        self.setToolTip("Resana Secure")
+        self.setToolTip(f"Resana Secure v{RESANA_VERSION}")
         self.menu = QMenu()
 
         self.menu.addSection("Resana Secure")
