@@ -188,8 +188,6 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
         client_allowed_origins=args.client_origin,
     )
 
-    print(config.rie_server_addrs)
-
     if args.disable_gui:
 
         async def trio_main():

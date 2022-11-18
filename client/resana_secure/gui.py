@@ -43,6 +43,7 @@ from parsec.core.ipcinterface import (
     IPCCommand,
 )
 from parsec.core.gui.custom_dialogs import QDialogInProcess
+from ._version import __version__ as RESANA_VERSION
 
 if TYPE_CHECKING:
     from .app import ResanaApp
@@ -133,6 +134,9 @@ class ResanaGuiApp(QApplication):
         self.save_file_requested.connect(self._on_save_file_requested)
         self._cancel_scope: trio.CancelScope = cancel_scope
         self.quart_app = quart_app
+        self.setApplicationName("Resana Secure")
+        self.setApplicationDisplayName("Resana Secure")
+        self.setApplicationVersion(RESANA_VERSION)
         with resources.path("resana_secure", "icon.png") as icon_path:
             icon = QIcon(str(icon_path))
             self.tray.setIcon(icon)
