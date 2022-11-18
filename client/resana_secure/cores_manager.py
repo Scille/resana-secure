@@ -104,11 +104,10 @@ async def start_core(
     core_config: CoreConfig,
     device: LocalDevice,
     on_stopped: Callable,
-    rie_server_addrs: List[Tuple[str, Optional[int]]],
 ) -> AsyncIterator[LoggedCore]:
 
     core_config = core_config.evolve(
-        mountpoint_enabled=is_org_hosted_on_rie(device.organization_addr, rie_server_addrs)
+        mountpoint_enabled=is_org_hosted_on_rie(device.organization_addr, core_config.rie_server_addrs)
     )
 
     async with logged_core_factory(core_config, device) as core:
@@ -143,14 +142,13 @@ class CoresManager:
     _instance = None
 
     def __init__(
-        self, core_config: CoreConfig, ltcm: LTCM, rie_server_addrs: List[Tuple[str, Optional[int]]]
+        self, core_config: CoreConfig, ltcm: LTCM
     ):
         self._email_to_auth_token: Dict[Tuple[OrganizationID, str], str] = {}
         self._auth_token_to_component_handle: Dict[str, int] = {}
         self._login_lock = trio.Lock()
         self.core_config = core_config
         self.ltcm = ltcm
-        self.rie_server_addrs = rie_server_addrs
 
     async def _authenticate(
         self,
@@ -207,7 +205,6 @@ class CoresManager:
                     core_config=self.core_config,
                     device=loaded_device,
                     on_stopped=_on_stopped,
-                    rie_server_addrs=self.rie_server_addrs,
                 )
             )
             self._auth_token_to_component_handle[auth_token] = component_handle

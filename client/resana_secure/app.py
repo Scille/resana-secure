@@ -57,7 +57,6 @@ class ResanaApp(QuartTrio):
 async def app_factory(
     config: CoreConfig,
     client_allowed_origins: List[str],
-    rie_server_addrs: List[Tuple[str, Optional[int]]],
 ) -> AsyncIterator[ResanaApp]:
     app = ResanaApp(__name__, static_folder=None)
     app.config.from_mapping(
@@ -121,7 +120,7 @@ async def app_factory(
         app.ltcm = ltcm
         app.core_config = config
         app.cores_manager = CoresManager(
-            core_config=config, ltcm=ltcm, rie_server_addrs=rie_server_addrs
+            core_config=config, ltcm=ltcm,
         )
         app.greeters_manager = GreetersManager()
         app.claimers_manager = ClaimersManager()
@@ -134,7 +133,6 @@ async def serve_app(
     port: int,
     config: CoreConfig,
     client_allowed_origins: List[str],
-    rie_server_addrs: List[Tuple[str, Optional[int]]],
     task_status: trio_typing.TaskStatus = trio.TASK_STATUS_IGNORED,
 ) -> AsyncIterator[ResanaApp]:
     hyper_config = HyperConfig.from_mapping(
@@ -148,7 +146,6 @@ async def serve_app(
     async with app_factory(
         config=config,
         client_allowed_origins=client_allowed_origins,
-        rie_server_addrs=rie_server_addrs,
     ) as app:
         app.hyper_config = hyper_config
         app.task_status = task_status

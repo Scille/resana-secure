@@ -1,10 +1,11 @@
 import argparse
 import trio
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 from pathlib import Path
 from functools import partial
 import os
 import sys
+import attr
 import logging
 import structlog
 
@@ -17,11 +18,9 @@ from ._version import __version__
 logger = structlog.get_logger()
 
 
+@attr.s(slots=True, frozen=True, auto_attribs=True, kw_only=True)
 class ResanaConfig(CoreConfig):
-    # CoreConfig sets `ipc_socket_file` as a property, we inherit
-    # it so we can overwrite it
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    rie_server_addrs: List[Tuple[str, Optional[int]]] = []
 
     @property
     def ipc_socket_file(self) -> Path:
@@ -125,14 +124,23 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
     parser.add_argument(
         "--rie-server-addr",
         action="append",
-        default=["resana-secure-interne.parsec.cloud"],
+        nargs="+",
+        default=[("resana-secure-interne.parsec.cloud", None)],
         type=_parse_host,
+        help="Host or host:port for which mountpoints will be disabled"
     )
     parser.add_argument(
         "--log-level", choices=("DEBUG", "INFO", "WARNING", "ERROR"), default=default_log_level
     )
     parser.add_argument("--log-file", type=Path, default=default_log_file)
     args = parser.parse_args(args=args)
+
+    rie_server_addrs = []
+    for host in args.rie_server_addr:
+        if isinstance(host, List):
+            rie_server_addrs.extend(host)
+        else:
+            rie_server_addrs.append(host)
 
     if os.environ.get("RESANA_RIE_SERVER_ADDR"):
         args.rie_server_addr.extend(
@@ -152,6 +160,7 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
         mountpoint_enabled=True,
         ipc_win32_mutex_name="resana-secure",
         preferred_org_creation_backend_addr=None,
+        rie_server_addrs=rie_server_addrs,
     )
 
     _setup_logging(args.log_level, args.log_file)
@@ -177,8 +186,9 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
         port=args.port,
         config=config,
         client_allowed_origins=args.client_origin,
-        rie_server_addrs=args.rie_server_addr,
     )
+
+    print(config.rie_server_addrs)
 
     if args.disable_gui:
 
