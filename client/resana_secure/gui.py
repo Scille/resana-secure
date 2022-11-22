@@ -31,6 +31,7 @@ from parsec.core.local_device import (
     AvailableDevice,
 )
 from parsec.core.config import CoreConfig
+from parsec.core.fs import FsPath
 from parsec.core.ipcinterface import (
     run_ipc_server,
     send_to_ipc_server,
@@ -107,6 +108,7 @@ class Systray(QSystemTrayIcon):
 
 class ResanaGuiApp(QApplication):
     message_requested = pyqtSignal(str, str)
+    file_rejected = pyqtSignal(FsPath)
 
     def __init__(
         self,
@@ -134,9 +136,16 @@ class ResanaGuiApp(QApplication):
         self.message_requested.connect(
             lambda title, msg: self.tray.showMessage(title, msg, self.windowIcon())
         )
+        self.file_rejected.connect(self._on_file_rejected)
 
         # Show the tray only after setting an icon to avoid a warning
         self.tray.show()
+
+    def _on_file_rejected(self, file_path: FsPath):
+        self.message_requested.emit(
+            "Fichier malicieux détecté",
+            f"Le fichier `{file_path}` a été détecté comme malicieux. Il ne sera pas synchronisé.",
+        )
 
     async def _on_login_clicked(self, device: AvailableDevice, password: str):
         try:

@@ -106,17 +106,13 @@ async def start_core(
             on_stopped()
 
 
-async def _on_fs_sync_refused_by_sequester_service(
+def _on_fs_sync_refused_by_sequester_service(
     event,
     file_path,
     **kwargs,
 ):
     if event == CoreEvent.FS_ENTRY_SYNC_REJECTED_BY_SEQUESTER_SERVICE:
-        trio.to_thread.run_sync(
-            QApplication.message_requested.emit,
-            "Fichier malicieux détecté",
-            f"Le fichier `{file_path}` a été détecté comme malicieux. Il ne sera pas synchronisé.",
-        )
+        QApplication.instance().file_rejected.emit(file_path)
 
 
 class CoresManager:
