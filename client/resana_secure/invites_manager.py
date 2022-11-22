@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from resana_secure.ltcm import ComponentNotRegistered
 import trio
 from typing import Dict, Type, AsyncIterator
@@ -45,7 +47,7 @@ class BaseLongTermCtx:
 class BaseInviteManager:
     _LONG_TERM_CTX_CLS: Type[BaseLongTermCtx]
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._addr_to_claim_ctx: Dict[BackendInvitationAddr, BaseLongTermCtx] = {}
 
     @asynccontextmanager
@@ -136,7 +138,7 @@ class GreetLongTermCtx(BaseLongTermCtx):
     @asynccontextmanager
     async def start(  # type: ignore[override]
         cls, config: CoreConfig, device: LocalDevice, addr: BackendInvitationAddr
-    ) -> AsyncIterator["GreetLongTermCtx"]:
+    ) -> AsyncIterator[GreetLongTermCtx]:
         async with backend_authenticated_cmds_factory(
             addr=device.organization_addr,
             device_id=device.device_id,
@@ -145,13 +147,14 @@ class GreetLongTermCtx(BaseLongTermCtx):
         ) as cmds:
 
             if addr.invitation_type == InvitationType.USER:
-                initial_ctx = UserGreetInitialCtx(cmds=cmds, token=addr.token)
-                in_progress_ctx = await initial_ctx.do_wait_peer()
+                user_initial_ctx = UserGreetInitialCtx(cmds=cmds, token=addr.token)
+                user_in_progress_ctx = await user_initial_ctx.do_wait_peer()
+                instance = cls(user_in_progress_ctx)
             else:
-                initial_ctx = DeviceGreetInitialCtx(cmds=cmds, token=addr.token)
-                in_progress_ctx = await initial_ctx.do_wait_peer()
-
-            yield cls(in_progress_ctx)
+                device_initial_ctx = DeviceGreetInitialCtx(cmds=cmds, token=addr.token)
+                device_in_progress_ctx = await device_initial_ctx.do_wait_peer()
+                instance = cls(device_in_progress_ctx)
+            yield instance
 
 
 class GreetersManager(BaseInviteManager):

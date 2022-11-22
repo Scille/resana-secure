@@ -150,6 +150,7 @@ class ResanaGuiApp(QApplication):
         )
 
     async def _on_login_clicked(self, device: AvailableDevice, password: str):
+        assert device.human_handle is not None
         try:
             await self.quart_app.cores_manager.login(
                 email=device.human_handle.email,
@@ -181,6 +182,7 @@ class ResanaGuiApp(QApplication):
             pass
 
     def _on_device_clicked(self, device: AvailableDevice, token: str):
+        assert device.human_handle is not None
         if token:
             answer = QMessageBox.question(
                 None,

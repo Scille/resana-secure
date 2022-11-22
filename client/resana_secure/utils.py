@@ -1,4 +1,5 @@
-from uuid import UUID
+from __future__ import annotations
+
 from typing import Optional
 from functools import wraps
 from base64 import urlsafe_b64decode, urlsafe_b64encode
@@ -7,8 +8,8 @@ from quart import jsonify, current_app, session, request
 from werkzeug.exceptions import HTTPException
 from werkzeug.routing import BaseConverter
 
-from parsec.api.protocol import OrganizationID, InvitationType
-from parsec.core.types import BackendInvitationAddr, BackendAddr
+from parsec.api.protocol import OrganizationID, InvitationType, InvitationToken
+from parsec.core.types import BackendInvitationAddr, BackendOrganizationAddr
 from parsec.core.backend_connection import (
     BackendConnectionError,
     BackendNotAvailable,
@@ -95,10 +96,10 @@ async def check_data():
 
 
 def build_apitoken(
-    backend_addr: BackendAddr,
+    backend_addr: BackendOrganizationAddr | BackendInvitationAddr,
     organization_id: OrganizationID,
     invitation_type: InvitationType,
-    token: UUID,
+    token: InvitationToken,
 ) -> str:
     invitation_addr = BackendInvitationAddr.build(
         backend_addr=backend_addr.get_backend_addr(),

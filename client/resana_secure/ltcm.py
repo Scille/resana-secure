@@ -149,7 +149,7 @@ class LTCM:
     on the behalf of the API consumer.
     """
 
-    def __init__(self, nursery):
+    def __init__(self, nursery: trio.Nursery):
         self._nursery = nursery
         self._components: Dict[int, ManagedComponent] = {}
 

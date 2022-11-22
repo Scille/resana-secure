@@ -1,6 +1,7 @@
 import trio
+from enum import Enum
 from uuid import uuid4
-from typing import AsyncIterator, Callable, Dict, Optional, Tuple, List
+from typing import TYPE_CHECKING, AsyncIterator, Callable, Dict, Optional, Tuple, List, cast
 from functools import partial
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -22,6 +23,9 @@ from parsec.api.protocol import OrganizationID
 
 from .crypto import decrypt_parsec_key, CryptoError
 from .ltcm import ComponentNotRegistered, LTCM
+
+if TYPE_CHECKING:
+    from .gui import ResanaGuiApp
 
 
 logger = structlog.get_logger()
@@ -107,17 +111,16 @@ async def start_core(
 
 
 def _on_fs_sync_refused_by_sequester_service(
-    event,
-    file_path,
-    **kwargs,
-):
+    event: Enum,
+    **kwargs: object,
+) -> None:
     if event == CoreEvent.FS_ENTRY_SYNC_REJECTED_BY_SEQUESTER_SERVICE:
-        QApplication.instance().file_rejected.emit(file_path)
+        file_path = kwargs["file_path"]
+        instance = cast(ResanaGuiApp, QApplication.instance())
+        instance.file_rejected.emit(file_path)
 
 
 class CoresManager:
-    _instance = None
-
     def __init__(self, core_config: CoreConfig, ltcm: LTCM):
         self._email_to_auth_token: Dict[Tuple[OrganizationID, str], str] = {}
         self._auth_token_to_component_handle: Dict[str, int] = {}
@@ -158,9 +161,12 @@ class CoresManager:
 
         # The lock is needed here to avoid concurrent logins with the same email
         async with self._login_lock:
+            assert device.human_handle is not None
             device_tuple = (device.organization_id, device.human_handle.email)
             # Return existing auth_token if the login has already be done for this device
-            existing_auth_token = self._email_to_auth_token.get(device_tuple)
+            existing_auth_token = self._email_to_auth_token.get(
+                device_tuple, device.human_handle.email
+            )
             if existing_auth_token:
                 # No need to check if the related component is still available
                 # given `_on_stopped` callback (see below) makes sure to
@@ -236,7 +242,7 @@ class CoresManager:
             raise CoreNotLoggedError from exc
 
     @asynccontextmanager
-    async def get_core(self, auth_token: str) -> LoggedCore:
+    async def get_core(self, auth_token: str) -> AsyncIterator[LoggedCore]:
         """
         Raises:
             CoreNotLoggedError
@@ -265,6 +271,7 @@ class CoresManager:
                 continue
             async with self._login_lock:
                 # Check if the device is logged in
+                assert available_device.human_handle is not None
                 existing_auth_token = self._email_to_auth_token.get(
                     (available_device.organization_id, available_device.human_handle.email)
                 )
