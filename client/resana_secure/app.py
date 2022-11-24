@@ -60,7 +60,7 @@ async def app_factory(
     app = ResanaApp(__name__, static_folder=None)
     app.config.from_mapping(
         # We need a big max content length to accept file upload !
-        MAX_CONTENT_LENGTH=2**30,  # 1Go limit
+        MAX_CONTENT_LENGTH=2**31,  # 2Go limit
         # Secret key changes each time the application is started, this is
         # fine as long as we only use it for session cookies.
         # The reason for doing this is we serve the api on localhost, so

@@ -1079,6 +1079,22 @@ Créé un nouveau fichier.
 
 Request:
 
+En multipart pour les grands fichiers (> 1 Go)
+
+```python
+data={
+    "parent": <id>
+    }
+files={
+    "file": (
+        "name": <string>,
+        "content": <bytes>
+    )
+}
+```
+
+ou en base64 en json
+
 ```python
 {
     "name": <string>,
