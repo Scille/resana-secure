@@ -127,7 +127,7 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
         nargs="+",
         default=[("resana-secure-interne.parsec.cloud", None)],
         type=_parse_host,
-        help="Host or host:port for which mountpoints will be disabled"
+        help="Host or host:port for which mountpoints will be disabled",
     )
     parser.add_argument(
         "--log-level", choices=("DEBUG", "INFO", "WARNING", "ERROR"), default=default_log_level
@@ -151,7 +151,7 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
     config_dir = args.config or default_config_dir
     data_base_dir = args.data or default_data_base_dir
 
-    config = ResanaConfig(
+    config = ResanaConfig(  # type: ignore[call-arg]
         config_dir=config_dir,
         data_base_dir=data_base_dir,
         # Only used on linux (Windows mounts with drive letters)

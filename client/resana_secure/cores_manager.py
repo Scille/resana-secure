@@ -107,7 +107,9 @@ async def start_core(
 ) -> AsyncIterator[LoggedCore]:
 
     core_config = core_config.evolve(
-        mountpoint_enabled=is_org_hosted_on_rie(device.organization_addr, core_config.rie_server_addrs)
+        mountpoint_enabled=is_org_hosted_on_rie(
+            device.organization_addr, core_config.rie_server_addrs
+        )
     )
 
     async with logged_core_factory(core_config, device) as core:
@@ -137,9 +139,7 @@ def _on_fs_sync_refused_by_sequester_service(
 class CoresManager:
     _instance = None
 
-    def __init__(
-        self, core_config: CoreConfig, ltcm: LTCM
-    ):
+    def __init__(self, core_config: CoreConfig, ltcm: LTCM):
         self._email_to_auth_token: Dict[Tuple[OrganizationID, str], str] = {}
         self._auth_token_to_component_handle: Dict[str, int] = {}
         self._login_lock = trio.Lock()

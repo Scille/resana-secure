@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 import secrets
 import logging
-from typing import AsyncIterator, List, Tuple, Optional
+from typing import AsyncIterator, List
 from contextlib import asynccontextmanager
 
 import trio
@@ -120,7 +120,8 @@ async def app_factory(
         app.ltcm = ltcm
         app.core_config = config
         app.cores_manager = CoresManager(
-            core_config=config, ltcm=ltcm,
+            core_config=config,
+            ltcm=ltcm,
         )
         app.greeters_manager = GreetersManager()
         app.claimers_manager = ClaimersManager()
