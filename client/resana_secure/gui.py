@@ -33,8 +33,10 @@ from parsec.core.local_device import (
     AvailableDevice,
 )
 from parsec.core.config import CoreConfig
+
 from parsec.core.types import DEFAULT_BLOCK_SIZE
 from parsec.core.fs import FsPath, WorkspaceFS
+
 from parsec.core.ipcinterface import (
     run_ipc_server,
     send_to_ipc_server,
@@ -42,8 +44,10 @@ from parsec.core.ipcinterface import (
     IPCServerNotRunning,
     IPCCommand,
 )
+
 from parsec.core.gui.custom_dialogs import QDialogInProcess
 from ._version import __version__ as RESANA_VERSION
+
 
 if TYPE_CHECKING:
     from .app import ResanaApp
@@ -60,7 +64,7 @@ class Systray(QSystemTrayIcon):
         self.nursery = nursery
         self.quart_app = quart_app
 
-        self.setToolTip("Resana Secure")
+        self.setToolTip(f"Resana Secure v{RESANA_VERSION}")
         self.menu = QMenu()
 
         self.menu.addSection("Resana Secure")
@@ -114,6 +118,7 @@ class Systray(QSystemTrayIcon):
 class ResanaGuiApp(QApplication):
     message_requested = pyqtSignal(str, str)
     save_file_requested = pyqtSignal(WorkspaceFS, FsPath)
+    file_rejected = pyqtSignal(FsPath)
 
     def __init__(
         self,
@@ -145,9 +150,16 @@ class ResanaGuiApp(QApplication):
         self.message_requested.connect(
             lambda title, msg: self.tray.showMessage(title, msg, self.windowIcon())
         )
+        self.file_rejected.connect(self._on_file_rejected)
 
         # Show the tray only after setting an icon to avoid a warning
         self.tray.show()
+
+    def _on_file_rejected(self, file_path: FsPath):
+        self.message_requested.emit(
+            "Fichier malicieux détecté",
+            f"Le fichier `{file_path}` a été détecté comme malicieux. Il ne sera pas synchronisé.",
+        )
 
     async def _on_login_clicked(self, device: AvailableDevice, password: str):
         try:
