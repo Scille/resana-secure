@@ -1079,21 +1079,15 @@ Créé un nouveau fichier.
 
 Request:
 
-En multipart pour les grands fichiers (> 1 Go)
+En multipart (recommandé)
 
 ```python
-data={
-    "parent": <id>
-    }
-files={
-    "file": (
-        "name": <string>,
-        "content": <bytes>
-    )
-}
+HTTP multipart form-data avec
+    name="parent" <ID_PARENT>
+    name="file"; filename="<NOM_DU_FICHIER>" <CONTENU_DU_FICHIER>
 ```
 
-ou en base64 en json
+ou en base64 en JSON (déprécié)
 
 ```python
 {
