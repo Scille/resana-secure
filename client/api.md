@@ -1079,6 +1079,16 @@ Créé un nouveau fichier.
 
 Request:
 
+En multipart (recommandé)
+
+```python
+HTTP multipart form-data avec
+    name="parent" <ID_PARENT>
+    name="file"; filename="<NOM_DU_FICHIER>" <CONTENU_DU_FICHIER>
+```
+
+ou en base64 en JSON (déprécié)
+
 ```python
 {
     "name": <string>,
