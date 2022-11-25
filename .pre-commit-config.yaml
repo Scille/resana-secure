@@ -47,3 +47,13 @@ repos:
         "types-cryptography",
       ]
       args: ["--scripts-are-modules"]  # Remove "--ignore-missing-imports"
+
+-   repo: local
+    hooks:
+      - id: mypy-client
+        name: Mypy on client directory (using `poetry run mypy`)
+        entry: sh -c 'echo $@ | xargs realpath | (cd client; xargs poetry run mypy)' _
+        require_serial: true
+        language: system
+        types_or: [ python, pyi ]
+        files: ^client/
