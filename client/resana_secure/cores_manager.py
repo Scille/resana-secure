@@ -93,7 +93,7 @@ def device_has_encrypted_key(device: AvailableDevice) -> bool:
 
 @asynccontextmanager
 async def start_core(
-    core_config: CoreConfig, device: LocalDevice, on_stopped: Callable
+    core_config: CoreConfig, device: LocalDevice, on_stopped: Callable[[], None]
 ) -> AsyncIterator[LoggedCore]:
     async with logged_core_factory(core_config, device) as core:
         try:
@@ -173,7 +173,7 @@ class CoresManager:
 
             # Actual login is required
 
-            def _on_stopped():
+            def _on_stopped() -> None:
                 self._auth_token_to_component_handle.pop(auth_token, None)
                 self._email_to_auth_token.pop(device_tuple, None)
 
@@ -252,9 +252,8 @@ class CoresManager:
             raise CoreNotLoggedError
 
         try:
-            async with self.ltcm.acquire_component(  # type: ignore[var-annotated]
-                component_handle
-            ) as component:
+            async with self.ltcm.acquire_component(component_handle) as component:
+                assert isinstance(component, LoggedCore)
                 yield component
 
         except ComponentNotRegistered as exc:

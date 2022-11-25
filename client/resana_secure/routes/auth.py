@@ -1,25 +1,30 @@
-from quart import Blueprint, current_app, session
+from __future__ import annotations
+
+from typing import cast, Any
+from quart import Blueprint, session
 import base64
 
+from parsec.api.protocol import OrganizationID
 from ..cores_manager import (
+    CoresManager,
     CoreNotLoggedError,
     CoreDeviceNotFoundError,
     CoreDeviceInvalidPasswordError,
 )
 from ..utils import check_data, APIException, get_auth_token
-from parsec.api.protocol import OrganizationID
+from ..app import current_app
 
 
 auth_bp = Blueprint("auth_api", __name__)
 
 
 @auth_bp.route("/<path:subpath>", methods=["OPTIONS"])
-async def do_head(subpath):
+async def do_head(subpath: str) -> tuple[dict[str, Any], int]:
     return {}, 200
 
 
 @auth_bp.route("/auth", methods=["POST"])
-async def do_auth():
+async def do_auth() -> tuple[dict[str, Any], int]:
     # Either send a non-encrypted Parsec Key using the field `key`
     # or send the encrypted Parsec Key with the field `encrypted_key` and
     # the user password with the field `user_password`.
@@ -55,8 +60,9 @@ async def do_auth():
             except (NameError, TypeError, ValueError):
                 bad_fields.add("organization")
 
+    cores_manager = cast(CoresManager, current_app.cores_manager)
     try:
-        auth_token = await current_app.cores_manager.login(
+        auth_token = await cores_manager.login(
             email=email,
             key=key,
             user_password=user_password,
@@ -74,13 +80,14 @@ async def do_auth():
 
 
 @auth_bp.route("/auth", methods=["DELETE"])
-async def remove_auth():
+async def remove_auth() -> tuple[dict[str, Any], int]:
     auth_token = get_auth_token()
     if not auth_token:
         return {}, 200
     session.pop("logged_in", None)
+    cores_manager = cast(CoresManager, current_app.cores_manager)
     try:
-        auth_token = await current_app.cores_manager.logout(auth_token=auth_token)
+        await cores_manager.logout(auth_token=auth_token)
 
     except CoreNotLoggedError:
         pass

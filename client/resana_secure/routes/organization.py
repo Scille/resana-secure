@@ -1,4 +1,8 @@
-from quart import Blueprint, current_app
+from __future__ import annotations
+
+from quart import Blueprint
+
+from typing import Any
 
 import platform
 import binascii
@@ -14,13 +18,13 @@ from parsec.core.types import BackendOrganizationBootstrapAddr
 from parsec.api.protocol import HumanHandle, DeviceLabel
 from parsec.core.local_device import save_device_with_password_in_config
 from ..utils import APIException, backend_errors_to_api_exceptions, check_data
-
+from ..app import current_app
 
 organization_bp = Blueprint("organization_api", __name__)
 
 
 @organization_bp.route("/organization/bootstrap", methods=["POST"])
-async def organization_bootstrap():
+async def organization_bootstrap() -> tuple[dict[str, Any], int]:
     async with check_data() as (data, bad_fields):
         email = data.get("email")
         try:

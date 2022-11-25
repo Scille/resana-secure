@@ -81,7 +81,9 @@ def core_config(tmp_path: Path, core_config_dir: Path):
         mountpoint_base_dir=tmp_path / "mountpoint",
         mountpoint_enabled=True,
         ipc_win32_mutex_name="resana-secure",
-        preferred_org_creation_backend_addr=None,
+        preferred_org_creation_backend_addr=BackendAddr.from_url(
+            "parsec://localhost:6777?no_ssl=true"
+        ),
     )
 
 

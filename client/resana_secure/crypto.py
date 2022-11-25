@@ -113,11 +113,11 @@ def decrypt_parsec_key(user_password: str, b64_serialized_encrypted_data: str) -
 if __name__ == "__main__":
     import argparse
 
-    def _decrypt_and_print(args):
+    def _decrypt_and_print(args: argparse.Namespace) -> None:
         parsec_key = decrypt_parsec_key(args.password, args.encrypted)
         print(f"Parsec key is `{parsec_key}`")
 
-    def _encrypt_and_print(args):
+    def _encrypt_and_print(args: argparse.Namespace) -> None:
         encrypted_parsec_key = encrypt_parsec_key(args.password, args.parsec_key)
         print(f"Encrypted Parsec key is `{encrypted_parsec_key}`")
 

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from quart import Blueprint
+from typing import TypedDict, Any
 
-from typing import TypedDict
+from quart import Blueprint
 
 from parsec.core.logged_core import LoggedCore
 from parsec.api.protocol import InvitationType
@@ -21,13 +21,13 @@ invitations_bp = Blueprint("invitations_api", __name__)
 
 
 class GetInvitationReply(TypedDict):
-    users: list[dict]
-    device: dict | None
+    users: list[dict[str, str]]
+    device: dict[str, str] | None
 
 
 @invitations_bp.route("/invitations", methods=["GET"])
 @authenticated
-async def get_invitations(core: LoggedCore):
+async def get_invitations(core: LoggedCore) -> tuple[GetInvitationReply, int]:
     with backend_errors_to_api_exceptions():
         invitations = await core.list_invitations()
 
@@ -61,7 +61,7 @@ async def get_invitations(core: LoggedCore):
 
 @invitations_bp.route("/invitations", methods=["POST"])
 @authenticated
-async def create_invitation(core: LoggedCore):
+async def create_invitation(core: LoggedCore) -> tuple[dict[str, Any], int]:
     async with check_data() as (data, bad_fields):
         type = data.get("type")
         if type not in ("user", "device"):
@@ -86,7 +86,7 @@ async def create_invitation(core: LoggedCore):
 
 @invitations_bp.route("/invitations/<string:apitoken>", methods=["DELETE"])
 @authenticated
-async def delete_invitation(core: LoggedCore, apitoken: str):
+async def delete_invitation(core: LoggedCore, apitoken: str) -> tuple[dict[str, Any], int]:
     try:
         addr = apitoken_to_addr(apitoken)
     except ValueError:

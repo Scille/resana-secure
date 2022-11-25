@@ -3,21 +3,25 @@ from __future__ import annotations
 import re
 import secrets
 import logging
-from typing import AsyncIterator, List
+from typing import AsyncIterator, List, cast
 from contextlib import asynccontextmanager
 
-import trio
-import trio_typing
-from quart import current_app, ctx
 from quart_cors import cors
 from quart_trio import QuartTrio
+from quart import current_app as quart_current_app
 from hypercorn.config import Config as HyperConfig
 from hypercorn.trio import serve as hypercorn_trio_serve
 
 from parsec.core.config import CoreConfig
 
+# Expose current_app as a ResanaApp for all modules
+if True:  # Hack to please flake8
+    current_app = cast("ResanaApp", quart_current_app)
+
+from .ltcm import LTCM
 from .cores_manager import CoresManager
 from .invites_manager import ClaimersManager, GreetersManager
+
 from .routes.auth import auth_bp
 from .routes.humans import humans_bp
 from .routes.files import files_bp
@@ -26,7 +30,6 @@ from .routes.workspaces import workspaces_bp
 from .routes.invitations import invitations_bp
 from .routes.recovery import recovery_bp
 from .routes.organization import organization_bp
-from .ltcm import LTCM
 
 
 class ResanaApp(QuartTrio):
@@ -38,19 +41,9 @@ class ResanaApp(QuartTrio):
     claimers_manager: ClaimersManager
     core_config: CoreConfig
     hyper_config: HyperConfig
-    task_status: trio_typing.TaskStatus
 
-    def app_context(self) -> ctx.AppContext:
-        app_context = super().app_context()
-        app_context.g.ltcm = self.ltcm
-        app_context.g.cores_manager = self.cores_manager
-        app_context.g.greeters_manager = self.greeters_manager
-        app_context.g.claimers_manager = self.claimers_manager
-        app_context.g.core_config = self.core_config
-        return app_context
-
-    async def serve(self):
-        return await hypercorn_trio_serve(self, self.hyper_config, task_status=self.task_status)
+    async def serve(self) -> None:
+        return await hypercorn_trio_serve(self, self.hyper_config)
 
 
 @asynccontextmanager
@@ -84,7 +77,7 @@ async def app_factory(
     app.register_blueprint(organization_bp)
 
     @app.route("/", methods=["GET"])
-    async def landing_page():
+    async def landing_page() -> tuple[str, int]:
         routes = sorted(
             [
                 (rule.methods, re.sub(r"<\w+:(\w+)>", r"{\1}", rule.rule))
@@ -96,6 +89,8 @@ async def app_factory(
         body += "<h2>Available routes</h2>"
         body += "<ul>"
         for methods, url in routes:
+            if methods is None:
+                continue
             methods_display = ", ".join(methods - {"HEAD", "OPTIONS"})
             if methods_display:
                 body += f"<li>{methods_display} <a href={url}>{url}</a></li>"
@@ -130,7 +125,6 @@ async def serve_app(
     port: int,
     config: CoreConfig,
     client_allowed_origins: List[str],
-    task_status: trio_typing.TaskStatus = trio.TASK_STATUS_IGNORED,
 ) -> AsyncIterator[ResanaApp]:
     hyper_config = HyperConfig.from_mapping(
         {
@@ -142,5 +136,4 @@ async def serve_app(
 
     async with app_factory(config=config, client_allowed_origins=client_allowed_origins) as app:
         app.hyper_config = hyper_config
-        app.task_status = task_status
         yield app

@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 from quart import Blueprint, request
+
+from typing import Any
 
 from parsec.core.logged_core import LoggedCore
 from ..utils import authenticated, backend_errors_to_api_exceptions, APIException
@@ -9,7 +13,7 @@ humans_bp = Blueprint("humans_api", __name__)
 
 @humans_bp.route("/humans", methods=["GET"])
 @authenticated
-async def search_humans(core: LoggedCore):
+async def search_humans(core: LoggedCore) -> tuple[dict[str, Any], int]:
     bad_fields = []
     query = request.args.get("query")
     try:
@@ -35,7 +39,7 @@ async def search_humans(core: LoggedCore):
             query=query, page=page, per_page=per_page, omit_revoked=omit_revoked
         )
 
-    user_info: list[dict] = []
+    user_info: list[dict[str, Any]] = []
     for user in results:
         assert user.human_handle is not None
         user_info.append(
@@ -61,7 +65,7 @@ async def search_humans(core: LoggedCore):
 
 @humans_bp.route("/humans/<string:email>/revoke", methods=["POST"])
 @authenticated
-async def revoke_user(core: LoggedCore, email: str):
+async def revoke_user(core: LoggedCore, email: str) -> tuple[dict[str, Any], int]:
     with backend_errors_to_api_exceptions():
         results, _ = await core.find_humans(query=email)
         # find_humans doesn't guarantee exact match on email, so manually filter just to be sure

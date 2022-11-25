@@ -1,5 +1,13 @@
+from __future__ import annotations
+
 import argparse
-from typing import Optional, Tuple
+from typing import (
+    Optional,
+    Tuple,
+    Any,
+    MutableMapping,
+    Sequence,
+)
 from pathlib import Path
 from functools import partial
 import os
@@ -7,7 +15,7 @@ import sys
 import logging
 import structlog
 
-from parsec.core.config import CoreConfig
+from parsec.core.config import CoreConfig, BackendAddr
 
 from .app import serve_app
 from ._version import __version__
@@ -17,11 +25,6 @@ logger = structlog.get_logger()
 
 
 class ResanaConfig(CoreConfig):
-    # CoreConfig sets `ipc_socket_file` as a property, we inherit
-    # it so we can overwrite it
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     @property
     def ipc_socket_file(self) -> Path:
         return self.data_base_dir / "resana-secure.lock"
@@ -39,7 +42,7 @@ _cook_website_url.__name__ = "http[s] url"  # Used by argparse for help output
 def _setup_logging(log_level: str, log_file: Optional[Path]) -> None:
     # The infamous logging configuration...
 
-    def _structlog_renderer(_, __, event_dict):
+    def _structlog_renderer(_arg1: Any, _arg2: str, event_dict: MutableMapping[str, Any]) -> Any:
         event = event_dict.pop("event", "")
         if event_dict:
             args = ", ".join(f"{k}: {repr(v)}" for k, v in event_dict.items())
@@ -92,7 +95,11 @@ def get_default_dirs() -> Tuple[Path, Path, Path]:
     return mountpoint_base_dir, data_base_dir, config_dir
 
 
-def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Optional[Path] = None):
+def run_cli(
+    args: Sequence[str] | None = None,
+    default_log_level: str = "INFO",
+    default_log_file: Optional[Path] = None,
+) -> None:
     parser = argparse.ArgumentParser(description="Process some integers.")
     parser.add_argument("--port", type=int, default=5775)
     parser.add_argument("--host", default="127.0.0.1")
@@ -111,11 +118,11 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
         "--log-level", choices=("DEBUG", "INFO", "WARNING", "ERROR"), default=default_log_level
     )
     parser.add_argument("--log-file", type=Path, default=default_log_file)
-    args = parser.parse_args(args=args)
+    namespace = parser.parse_args(args=args)
 
     (mountpoint_base_dir, default_data_base_dir, default_config_dir) = get_default_dirs()
-    config_dir = args.config or default_config_dir
-    data_base_dir = args.data or default_data_base_dir
+    config_dir = namespace.config or default_config_dir
+    data_base_dir = namespace.data or default_data_base_dir
 
     config = ResanaConfig(
         config_dir=config_dir,
@@ -125,21 +132,25 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
         # Use a mock to disable mountpoint instead of relying on this option
         mountpoint_enabled=True,
         ipc_win32_mutex_name="resana-secure",
-        preferred_org_creation_backend_addr=None,
+        preferred_org_creation_backend_addr=BackendAddr.from_url(
+            "parsec://localhost:6777?no_ssl=true"
+        ),
     )
 
-    _setup_logging(args.log_level, args.log_file)
+    _setup_logging(namespace.log_level, namespace.log_file)
     logger.debug(
-        "Starting resana-secure !", version=__version__, **{k: v for (k, v) in args._get_kwargs()}
+        "Starting resana-secure !",
+        version=__version__,
+        **{k: v for (k, v) in namespace._get_kwargs()},
     )
 
-    if args.disable_mountpoint:
+    if namespace.disable_mountpoint:
         # TODO: Parsec core factory should allow to do that
         from parsec.core.mountpoint import manager
 
-        def _get_mountpoint_runner_mocked():
-            async def _nop_runner(*args, **kwargs):
-                None
+        def _get_mountpoint_runner_mocked() -> Any:
+            async def _nop_runner(*args: object, **kwargs: object) -> None:
+                pass
 
             return _nop_runner
 
@@ -147,15 +158,15 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
 
     quart_app_context = partial(
         serve_app,
-        host=args.host,
-        port=args.port,
+        host=namespace.host,
+        port=namespace.port,
         config=config,
-        client_allowed_origins=args.client_origin,
+        client_allowed_origins=namespace.client_origin,
     )
 
-    if args.disable_gui:
+    if namespace.disable_gui:
 
-        async def trio_main():
+        async def trio_main() -> None:
             async with quart_app_context() as app:
                 await app.serve()
 
@@ -165,6 +176,6 @@ def run_cli(args=None, default_log_level: str = "INFO", default_log_file: Option
 
         run_gui(
             quart_app_context=quart_app_context,
-            resana_website_url=args.resana_website_url,
+            resana_website_url=namespace.resana_website_url,
             config=config,
         )
