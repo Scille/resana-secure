@@ -150,7 +150,9 @@ async def local_device(
     password = "P@ssw0rd."
     human_handle = HumanHandle(email="alice@example.com", label="Alice")
     bootstrap_addr = BackendOrganizationBootstrapAddr.build(
-        backend_addr=backend_addr, organization_id=organization_id
+        backend_addr=backend_addr,
+        organization_id=organization_id,
+        token=None,
     )
 
     new_device = await bootstrap_organization(
@@ -244,4 +246,5 @@ async def other_user(running_backend: BackendApp, local_device: LocalDeviceTestb
     await running_backend.user.create_user(
         organization_id=organization_id, user=user, first_device=device
     )
+    assert user.human_handle is not None
     return RemoteDeviceTestbed(device.device_id, email=user.human_handle.email)

@@ -164,9 +164,7 @@ class CoresManager:
             assert device.human_handle is not None
             device_tuple = (device.organization_id, device.human_handle.email)
             # Return existing auth_token if the login has already be done for this device
-            existing_auth_token = self._email_to_auth_token.get(
-                device_tuple, device.human_handle.email
-            )
+            existing_auth_token = self._email_to_auth_token.get(device_tuple)
             if existing_auth_token:
                 # No need to check if the related component is still available
                 # given `_on_stopped` callback (see below) makes sure to
