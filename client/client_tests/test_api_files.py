@@ -142,6 +142,25 @@ class FilesTestBed:
             assert body == {}
         return body
 
+    async def search(
+        self,
+        search_string: str,
+        case_sensitive: bool = False,
+        exclude_folders: bool = False,
+        expected_status_code: int = 200,
+    ):
+        response = await self.authenticated_client.post(
+            f"/workspaces/{self.wid}/search",
+            json={
+                "case_sensitive": case_sensitive,
+                "exclude_folders": exclude_folders,
+                "string": search_string,
+            },
+        )
+        body = await response.get_json()
+        assert response.status_code == expected_status_code
+        return body
+
 
 @pytest.fixture()
 async def testbed(authenticated_client: TestClientProtocol):
@@ -516,3 +535,111 @@ async def test_create_folder_already_exists(testbed: FilesTestBed):
         await testbed.create_folder("foo", parent=testbed.root_entry_id, expected_status_code=400)
         == expected_body
     )
+
+
+@pytest.mark.trio
+async def test_search_files(testbed: FilesTestBed):
+    # Search string not a string
+    content = await testbed.search(
+        search_string=42, case_sensitive=True, exclude_folders=False, expected_status_code=400  # type: ignore[arg-type]
+    )
+    assert content == {"error": "bad_data", "fields": ["string"]}
+
+    # Case sensitive not a bool
+    content = await testbed.search(
+        search_string="test", case_sensitive="Yes", exclude_folders=False, expected_status_code=400  # type: ignore[arg-type]
+    )
+    assert content == {"error": "bad_data", "fields": ["case_sensitive"]}
+
+    # Exclude folders not a bool
+    content = await testbed.search(
+        search_string="test", case_sensitive=True, exclude_folders="Yes", expected_status_code=400  # type: ignore[arg-type]
+    )
+    assert content == {"error": "bad_data", "fields": ["exclude_folders"]}
+
+    # /AAA/
+    #    aaa_bbb_ccc.png
+    #    ddd_eee_fff.png
+    # /BBB/
+    #    /ddd/
+    #        aaa_bbb_ccc.jpg
+    #    AAA_BBB_CCC.PNG
+    #    aAa_bBb_cCc.pNg
+    #    ggg_hhh_iii.jpg
+
+    d1 = await testbed.create_folder("AAA", parent=testbed.root_entry_id, expected_status_code=201)
+    d2 = await testbed.create_folder("BBB", parent=testbed.root_entry_id, expected_status_code=201)
+    dd1 = await testbed.create_folder("ddd", parent=d1, expected_status_code=201)
+
+    await testbed.create_file("aaa_bbb_ccc.png", parent=d1)
+    await testbed.create_file("AAA_BBB_CCC.PNG", parent=d2)
+    await testbed.create_file("aAa_bBb_cCc.pNg", parent=d2)
+    await testbed.create_file("ddd_eee_fff.png", parent=d1)
+    await testbed.create_file("aaa_bbb_ccc.jpg", parent=dd1)
+    await testbed.create_file("ggg_hhh_iii.jpg", parent=d2)
+
+    def _extract_file_names(files):
+        return [(f["name"], f["path"], f["type"]) for f in files]
+
+    assert _extract_file_names(
+        (await testbed.search(search_string="bbb", expected_status_code=200))["files"]
+    ) == [
+        ("aaa_bbb_ccc.png", "/AAA", "file"),
+        ("aaa_bbb_ccc.jpg", "/AAA/ddd", "file"),
+        ("BBB", "/", "folder"),
+        ("AAA_BBB_CCC.PNG", "/BBB", "file"),
+        ("aAa_bBb_cCc.pNg", "/BBB", "file"),
+    ]
+
+    assert _extract_file_names(
+        (
+            await testbed.search(
+                search_string="bbb",
+                exclude_folders=True,
+                case_sensitive=False,
+                expected_status_code=200,
+            )
+        )["files"]
+    ) == [
+        ("aaa_bbb_ccc.png", "/AAA", "file"),
+        ("aaa_bbb_ccc.jpg", "/AAA/ddd", "file"),
+        ("AAA_BBB_CCC.PNG", "/BBB", "file"),
+        ("aAa_bBb_cCc.pNg", "/BBB", "file"),
+    ]
+
+    assert _extract_file_names(
+        (await testbed.search(search_string="bbb", case_sensitive=True, expected_status_code=200))[
+            "files"
+        ]
+    ) == [
+        ("aaa_bbb_ccc.png", "/AAA", "file"),
+        ("aaa_bbb_ccc.jpg", "/AAA/ddd", "file"),
+    ]
+    assert _extract_file_names(
+        (await testbed.search(search_string=".jpg", expected_status_code=200))["files"]
+    ) == [("aaa_bbb_ccc.jpg", "/AAA/ddd", "file"), ("ggg_hhh_iii.jpg", "/BBB", "file")]
+    assert _extract_file_names(
+        (await testbed.search(search_string=".PnG", expected_status_code=200))["files"]
+    ) == [
+        ("aaa_bbb_ccc.png", "/AAA", "file"),
+        ("ddd_eee_fff.png", "/AAA", "file"),
+        ("AAA_BBB_CCC.PNG", "/BBB", "file"),
+        ("aAa_bBb_cCc.pNg", "/BBB", "file"),
+    ]
+    result = await testbed.search(
+        search_string="bB", case_sensitive=True, exclude_folders=True, expected_status_code=200
+    )
+    assert result == {
+        "files": [
+            {
+                "name": "aAa_bBb_cCc.pNg",
+                "path": "/BBB",
+                "type": "file",
+                "id": ANY,
+                "created": ANY,
+                "updated": ANY,
+                "extension": "png",
+                "size": 0,
+            }
+        ]
+    }

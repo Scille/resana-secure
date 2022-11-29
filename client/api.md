@@ -1263,6 +1263,46 @@ ou
 
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
 
+
+### `POST /workspace/<id>/search`
+
+```python
+{
+    "string": <string>,
+    "case_sensitive": <bool> = false,
+    "exclude_folders": <bool> = false
+}
+```
+
+```python
+HTTP 200
+{
+    "files": [
+        {
+            "id": <uuid>,
+            "name": <string>,
+            "path": <string>,
+            "extension": <string>,
+            "type": <string> = "folder" | "file",
+            "size": <int>,
+            "created": <datetime>,
+            "updated": <datetime>,
+        },
+        ...
+    ]
+}
+```
+
+ou
+
+```python
+HTTP 404
+{
+    "error": "unknown_workspace"
+}
+```
+
+
 ### [NOT IMPLEMENTED] `GET /workspace/<id>/reencryption`
 
 Récupère les information de rechiffrement du workspace.
