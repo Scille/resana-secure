@@ -9,7 +9,9 @@ from quart import jsonify, session, request
 from werkzeug.exceptions import HTTPException
 from werkzeug.routing import BaseConverter
 
+from parsec._parsec import DateTime
 from parsec.core.logged_core import LoggedCore
+from parsec.api.data import EntryID
 from parsec.api.protocol import OrganizationID, InvitationType, InvitationToken
 from parsec.core.types import BackendInvitationAddr, BackendOrganizationAddr
 from parsec.core.backend_connection import (
@@ -35,6 +37,8 @@ from parsec.core.invite import (
     InviteAlreadyUsedError,
     InvitePeerResetError,
 )
+from parsec.core.mountpoint import MountpointAlreadyMounted, MountpointNotMounted
+from parsec.core.fs.workspacefs import WorkspaceFS, WorkspaceFSTimestamped
 
 from .cores_manager import CoreNotLoggedError
 from .invites_manager import LongTermCtxNotStarted
@@ -90,6 +94,36 @@ def authenticated(
     return wrapper
 
 
+def requires_rie(fn: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
+    @wraps(fn)
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+        assert isinstance(args[0], LoggedCore)
+        if not args[0].config.mountpoint_enabled:
+            raise APIException(401, {"error": "not_connected_to_rie"})
+        return await fn(*args, **kwargs)
+
+    return wrapper
+
+
+async def check_if_timestamp() -> Optional[DateTime]:
+    data = await request.get_json(silent=True)
+    if data is None:
+        if request.mimetype == "":
+            # No content given
+            return None
+        else:
+            raise APIException(400, {"error": "json_body_expected"})
+    timestamp_raw = data.get("timestamp")
+    if timestamp_raw is not None:
+        try:
+            timestamp = DateTime.from_rfc3339(timestamp_raw)
+        except (ValueError, TypeError):
+            raise APIException(400, {"error": "bad_data", "fields": ["timestamp"]})
+    else:
+        timestamp = None
+    return timestamp
+
+
 @asynccontextmanager
 async def check_data() -> AsyncIterator[tuple[Any, set[str]]]:
     if not request.is_json:
@@ -121,6 +155,32 @@ def build_apitoken(
 def apitoken_to_addr(apitoken: str) -> BackendInvitationAddr:
     invitation_url = urlsafe_b64decode(apitoken.encode("ascii")).decode("ascii")
     return BackendInvitationAddr.from_url(invitation_url)
+
+
+def get_workspace_type(
+    core: LoggedCore, workspace_id: EntryID, timestamp: Optional[DateTime] = None
+) -> WorkspaceFS | WorkspaceFSTimestamped:
+    workspace = core.user_fs.get_workspace(workspace_id)
+    if timestamp:
+        workspace = WorkspaceFSTimestamped(workspace, timestamp)
+    return workspace
+
+
+def split_workspace_timestamp(workspace_id: str) -> tuple[EntryID, Optional[DateTime]]:
+    timestamp_parsed = None
+    if "_" in workspace_id:
+        workspace_id_temp, *others = workspace_id.split("_")
+        workspace_id = workspace_id_temp
+        timestamp = others[0]
+        try:
+            timestamp_parsed = DateTime.from_rfc3339(timestamp)
+        except ValueError:
+            raise APIException(404, {"error": "unknown_workspace"})
+    try:
+        workspace_id_parsed = EntryID.from_hex(workspace_id)
+    except ValueError:
+        raise APIException(404, {"error": "unknown_workspace"})
+    return workspace_id_parsed, timestamp_parsed
 
 
 @contextmanager
@@ -166,3 +226,8 @@ def backend_errors_to_api_exceptions() -> Iterator[None]:
 
     except LongTermCtxNotStarted:
         raise APIException(409, {"error": "invalid_state"})
+
+    except MountpointAlreadyMounted:
+        raise APIException(400, {"error": "mountpoint_already_mounted"})
+    except MountpointNotMounted:
+        raise APIException(404, {"error": "mountpoint_not_mounted"})

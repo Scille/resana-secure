@@ -1,9 +1,11 @@
 import pytest
+import trio
 from unittest.mock import ANY
 from collections import namedtuple
 from quart.typing import TestClientProtocol
 
 from .conftest import RemoteDeviceTestbed
+from parsec._parsec import DateTime
 
 
 WorkspaceInfo = namedtuple("WorkspaceInfo", "id,name")
@@ -172,3 +174,102 @@ async def test_share_ok(
     body = await response.get_json()
     assert response.status_code == 200
     assert body == {"roles": {"alice@example.com": "OWNER", "bob@example.com": "MANAGER"}}
+
+
+@pytest.mark.trio
+async def test_mount_unmount_workspace(
+    authenticated_client: TestClientProtocol,
+    workspace: WorkspaceInfo,
+):
+    await trio.sleep(2)  # 2 seconds to ensure the default mountpoint is present
+
+    # Unmount workspace mounted by default
+    response = await authenticated_client.post(f"/workspaces/{workspace.id}/unmount")
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {}
+
+    # Unmount not mounted workspace
+    response = await authenticated_client.post(f"/workspaces/{workspace.id}/unmount")
+    body = await response.get_json()
+    assert response.status_code == 404
+    assert body == {"error": "mountpoint_not_mounted"}
+
+    # Mount workspace
+    response = await authenticated_client.post(f"/workspaces/{workspace.id}/mount")
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {"id": workspace.id}
+
+    # Mount already mounted workspace
+    response = await authenticated_client.post(f"/workspaces/{workspace.id}/mount")
+    body = await response.get_json()
+    assert response.status_code == 400
+    assert body == {"error": "mountpoint_already_mounted"}
+
+    # Mount invalid workspace
+    response = await authenticated_client.post("/workspaces/c3acdcb2ede6437f89fb94da11d733f2/mount")
+    body = await response.get_json()
+    assert response.status_code == 404
+    assert body == {"error": "unknown_workspace"}
+
+    # Unmount workspace
+    response = await authenticated_client.post(f"/workspaces/{workspace.id}/unmount")
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {}
+
+
+@pytest.mark.trio
+async def test_mount_unmount_workspace_timestamped(
+    authenticated_client: TestClientProtocol,
+    workspace: WorkspaceInfo,
+):
+    await trio.sleep(2)  # 2 seconds to ensure the default mountpoint is present
+    now = DateTime.now().to_rfc3339()
+
+    # List mountpoints
+    response = await authenticated_client.get("/workspaces/mountpoints")
+    assert response.status_code == 200
+    assert await response.get_json() == {
+        "snapshots": [],
+        "workspaces": [
+            {"id": workspace.id, "name": workspace.name, "role": "OWNER"},
+        ],
+    }
+
+    # Mount timestamped
+    response = await authenticated_client.post(
+        f"/workspaces/{workspace.id}/mount", json={"timestamp": now}
+    )
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {"id": workspace.id, "timestamp": now}
+
+    # List mountpoints with timestamped
+    response = await authenticated_client.get("/workspaces/mountpoints")
+    assert response.status_code == 200
+    assert await response.get_json() == {
+        "snapshots": [
+            {"id": workspace.id, "name": workspace.name, "role": "READER", "timestamp": now},
+        ],
+        "workspaces": [
+            {"id": workspace.id, "name": workspace.name, "role": "OWNER"},
+        ],
+    }
+
+    # Unmount timestamped
+    response = await authenticated_client.post(
+        f"/workspaces/{workspace.id}/unmount", json={"timestamp": now}
+    )
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {}
+
+    # Mount with invalid timestamp
+    response = await authenticated_client.post(
+        f"/workspaces/{workspace.id}/mount", json={"timestamp": "2020-06-02T082810"}
+    )
+    body = await response.get_json()
+    assert response.status_code == 400
+    assert body == {"error": "bad_data", "fields": ["timestamp"]}

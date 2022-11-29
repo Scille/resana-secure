@@ -40,12 +40,14 @@ async def organization_bootstrap() -> tuple[dict[str, Any], int]:
             backend_addr = BackendOrganizationBootstrapAddr.from_url(organization_url)
         except ValueError:
             bad_fields.add("organization_url")
-        sequester_key = data.get("sequester_verify_key")
-        if sequester_key:
+        sequester_key_raw = data.get("sequester_verify_key")
+        if sequester_key_raw:
             try:
-                sequester_key = SequesterVerifyKeyDer(base64.b64decode(sequester_key))
+                sequester_key = SequesterVerifyKeyDer(base64.b64decode(sequester_key_raw))
             except (ValueError, TypeError, binascii.Error):
                 bad_fields.add("sequester_verify_key")
+        else:
+            sequester_key = None
 
     try:
         device_label = DeviceLabel(platform.node() or "-unknown-")

@@ -658,12 +658,12 @@ HTTP 200
             "name": <string>,
             "role": <string>
         }
-    ],
+    ]
     …
 }
 ```
 
-`role` peut être: `OWNER`, `MANAGER`, `CONTRIBUTOR`, `READER`
+`role` peut être: `OWNER`, `MANAGER`, `CONTRIBUTOR`, `READER`.
 
 ### `POST /workspaces`
 
@@ -721,9 +721,16 @@ ou
 
 - le renommage d'un workspace n'impacte que l'utilisateur réalisant ce renommage (si le workspace est partagé avec d'autres utilisateurs, ceux-ci ne verront pas le changement de nom)
 
-### `GET /workspace/<id>/share`
+### `GET /workspaces/<id>/share`
 
-Récupère les informations de partage d'un workspace.
+Récupère les informations de partage d'un workspace. Un timestamp au format rfc3339 peut être fourni pour avoir les données à la date précisée.
+
+Request:
+```python
+{
+    "timestamp": Optional<string>
+}
+```
 
 Response:
 
@@ -742,7 +749,7 @@ ou
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
 - HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
-### `PATCH /workspace/<id>/share`
+### `PATCH /workspaces/<id>/share`
 
 Partage un workspace.
 
@@ -791,11 +798,130 @@ ou
 
 - le renommage d'un workspace n'impacte que l'utilisateur réalisant ce renommage (si le workspace est partagé avec d'autres utilisateurs, ceux-ci ne verront pas le changement de nom)
 
+### `GET /workspaces/mountpoints`
+
+Liste les workspaces montés
+
+Response:
+
+```python
+HTTP 200
+{
+    "snapshots": [
+        {
+            "id": <string>,
+            "name": <string>,
+            "role": <string>
+        }
+    ],
+    "workspaces": [
+        {
+            "id": <uuid>,
+            "name": <string>,
+            "role": <string>
+        }
+    ],
+    …
+}
+```
+
+`role` peut être: `OWNER`, `MANAGER`, `CONTRIBUTOR`, `READER`. Dans le cas des snapshot, le rôle sera toujours `READER`.
+
+### `POST /workspaces/<id>/mount`
+
+Monte un workspace en point de montage.
+
+Deux options sont disponibles, la première sans argument pour un montage standard du workspace, la deuxième en spécifiant un timestamp en format rfc3339 pour monter le workspace dans l'état dans lequel il était à la date donnée.
+
+Dans ce deuxième cas :
+
+Request:
+
+```python
+{
+    "timestamp": Optional<string>
+}
+```
+
+Response:
+
+```python
+HTTP 200
+{
+    "id": <string>
+    "timestamp": Optional<string>
+}
+```
+
+ou
+
+```python
+HTTP 400
+{
+    "error": "mountpoint_already_mounted"
+}
+```
+
+ou
+
+```python
+HTTP 404
+{
+    "error": "unknown_workspace"
+}
+```
+
+
+### `POST /workspaces/<id>/unmount`
+
+Démonte un workspace. S'il s'agit d'un workspace monté à une date donnée via un timestamp, ce même timestamp doit être fourni pour le démonter.
+
+Request:
+
+```python
+{
+    "timestamp": Optional<string>
+}
+```
+
+Response:
+
+```python
+HTTP 200
+{
+}
+```
+
+ou
+
+```python
+HTTP 404
+{
+    "error": "mountpoint_not_mounted"
+}
+```
+
+ou
+
+```python
+HTTP 404
+{
+    "error": "unknown_workspace"
+}
+```
+
 ## Dossiers
 
-### `GET /workspace/<id>/folders`
+### `GET /workspaces/<id>/folders`
 
-Consulter l'arborescence d'un workspace.
+Consulter l'arborescence d'un workspace. Un timestamp au format rfc3339 peut être fourni pour avoir les données à la date précisée.
+
+Request:
+```python
+{
+    "timestamp": Optional<string>
+}
+```
 
 Response:
 
@@ -833,7 +959,7 @@ ou
 
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
-### `POST /workspace/<id>/folders`
+### `POST /workspaces/<id>/folders`
 
 Créé un nouveau répertoire.
 
@@ -877,7 +1003,7 @@ ou
 
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
-### `POST /workspace/<id>/folders/rename`
+### `POST /workspaces/<id>/folders/rename`
 
 Déplace/renomme un repertoire.
 
@@ -958,7 +1084,7 @@ ou
 - HTTP 403 si l'utilisateur n'a pas le profil `OWNER`/`MANAGER`/`CONTRIBUTER` sur le workspace
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
-### `DELETE /workspace/<id>/folders/<id>`
+### `DELETE /workspaces/<id>/folders/<id>`
 
 Supprime un répertoire.
 
@@ -1028,9 +1154,16 @@ ou
 
 ## Fichiers
 
-### `GET /workspace/<id>/files/<folder_id>`
+### `GET /workspaces/<id>/files/<folder_id>`
 
-Consulte l'arborescence des fichiers d'un workspace.
+Consulte l'arborescence des fichiers d'un workspace. Un timestamp au format rfc3339 peut être fourni pour avoir les données à la date précisée.
+
+Request:
+```python
+{
+    "timestamp": Optional<string>
+}
+```
 
 Response:
 
@@ -1073,7 +1206,7 @@ ou
 
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
-### `POST /workspace/<id>/files`
+### `POST /workspaces/<id>/files`
 
 Créé un nouveau fichier.
 
@@ -1128,7 +1261,7 @@ ou
 
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
-### `POST /workspace/<id>/files/rename`
+### `POST /workspaces/<id>/files/rename`
 
 Déplace/renomme un fichier
 
@@ -1181,7 +1314,7 @@ ou
 
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
-### `DELETE /workspace/<id>/files/<id>`
+### `DELETE /workspaces/<id>/files/<id>`
 
 Supprime un fichier.
 
@@ -1222,14 +1355,15 @@ ou
 
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
-### `POST /workspace/<id>/open/<id>`
+### `POST /workspaces/<id>/open/<id>`
 
-Ouvre un fichier/répertoire.
+Ouvre un fichier/répertoire. Un timestamp au format rfc3339 peut être fourni pour ouvrir le fichier dans l'état dans lequel il se trouvait à la date précisée.
 
 Request:
 
 ```python
 {
+    "timestamp": Optional<string>
 }
 ```
 
@@ -1263,17 +1397,21 @@ ou
 
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
 
+### `POST /workspaces/<id>/search`
 
-### `POST /workspace/<id>/search`
+Un timestamp au format rfc3339 peut être fourni pour avoir les données à la date précisée.
 
+Request:
 ```python
 {
     "string": <string>,
     "case_sensitive": <bool> = false,
     "exclude_folders": <bool> = false
+    "timestamp": Optional<string>
 }
 ```
 
+Reponse:
 ```python
 HTTP 200
 {
@@ -1302,8 +1440,7 @@ HTTP 404
 }
 ```
 
-
-### [NOT IMPLEMENTED] `GET /workspace/<id>/reencryption`
+### [NOT IMPLEMENTED] `GET /workspaces/<id>/reencryption`
 
 Récupère les information de rechiffrement du workspace.
 
@@ -1345,7 +1482,7 @@ ou
 `role_revoked` liste des email des HumanHandle dont le user a perdu l'accès au workspace
 `reencryption_already_in_progress` le rechiffrement est déjà en cours
 
-### [NOT IMPLEMENTED] `POST /workspace/<id>/reencryption`
+### [NOT IMPLEMENTED] `POST /workspaces/<id>/reencryption`
 
 Lance le rechiffrement du workspace.
 

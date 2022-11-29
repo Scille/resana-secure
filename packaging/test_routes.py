@@ -12,6 +12,7 @@ import urllib.parse
 import contextlib
 import uuid
 from dataclasses import dataclass
+from parsec._parsec import DateTime
 
 
 from resana_secure.cli import get_default_dirs
@@ -359,6 +360,11 @@ def test_files(auth_token, resana_addr):
             MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test2.txt"
         ).read_bytes() == file_content
 
+    time.sleep(
+        2.0
+    )  # Wait for file sync to get timestamp, 2 seconds is long enough to be consistent
+    timestamp = DateTime.now().to_rfc3339()
+
     # Post a large file with JSON
     with run_test("Post large file with JSON") as context:
         file_content = random.randbytes(LARGE_FILE_SIZE)
@@ -569,6 +575,95 @@ def test_files(auth_token, resana_addr):
             "test3.txt",
             "test4.txt",
         ]
+
+    # Mount workspace at previous timestamp
+    with run_test("Mount timestamped workspace") as context:
+        r = make_request(
+            "POST",
+            f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/mount",
+            auth_token=auth_token,
+            json={"timestamp": timestamp},
+        )
+        context.context = r
+        assert r.status_code == 200
+        assert r.json() == {"id": f"{VARIABLES['workspace_id']}", "timestamp": timestamp}
+
+    # List workspaces with timestamped
+    with run_test("List workspaces with timestamped") as context:
+        r = make_request("GET", f"{resana_addr}/workspaces/mountpoints", auth_token=auth_token)
+        context.context = r
+        assert r.status_code == 200
+        assert r.json() == {
+            "snapshots": [
+                {
+                    "id": VARIABLES["workspace_id"],
+                    "name": f"{DEFAULT_WORKSPACE}_RENAMED",
+                    "role": "READER",
+                    "timestamp": timestamp,
+                }
+            ],
+            "workspaces": [
+                {
+                    "id": f"{VARIABLES['workspace_id']}",
+                    "name": f"{DEFAULT_WORKSPACE}_RENAMED",
+                    "role": "OWNER",
+                }
+            ],
+        }
+
+    # Check the timestamped content
+    with run_test("Check timestamped content") as context:
+        r = make_request(
+            "GET",
+            f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/files/{VARIABLES['sub_folder_id']}",
+            json={"timestamp": timestamp},
+            auth_token=auth_token,
+        )
+        context.request = r
+
+        assert r.status_code == 200
+        assert r.json() == {
+            "files": [
+                {
+                    "created": ANY,
+                    "extension": "txt",
+                    "id": VARIABLES["file1_id"],
+                    "name": "test.txt",
+                    "size": SMALL_FILE_SIZE,
+                    "updated": ANY,
+                },
+                {
+                    "created": ANY,
+                    "extension": "txt",
+                    "id": VARIABLES["file2_id"],
+                    "name": "test2.txt",
+                    "size": SMALL_FILE_SIZE,
+                    "updated": ANY,
+                },
+            ]
+        }
+
+    # Unmount workspace
+    with run_test("Unmount timestamped workspace"):
+        r = make_request(
+            "POST",
+            f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/unmount",
+            json={"timestamp": timestamp},
+            auth_token=auth_token,
+        )
+        context.context = r
+        assert r.status_code == 200
+        assert r.json() == {}
+
+    # Checking that the timestamped is gone
+    with run_test("Check timestamped unmounted") as context:
+        r = make_request("GET", f"{resana_addr}/workspaces/mountpoints", auth_token=auth_token)
+        context.request = r
+        assert r.status_code == 200
+        assert r.json() == {
+            "snapshots": [],
+            "workspaces": [{"id": ANY, "name": f"{DEFAULT_WORKSPACE}_RENAMED", "role": "OWNER"}],
+        }
 
 
 def test_user_invitations(auth_token, resana_addr, org_id):
