@@ -1,9 +1,14 @@
+from __future__ import annotations
+
+from typing import Any
+
 import os
-from quart import Blueprint, current_app
-from base64 import b64encode, b64decode
 import tempfile
 from pathlib import Path
+from quart import Blueprint
+from base64 import b64encode, b64decode
 
+from parsec.core.logged_core import LoggedCore
 from parsec.core.local_device import (
     save_recovery_device,
     get_recovery_device_file_name,
@@ -13,21 +18,21 @@ from parsec.core.local_device import (
 )
 
 from ..utils import APIException, authenticated, check_data
-
+from ..app import current_app
 
 recovery_bp = Blueprint("recovery_api", __name__)
 
 
 @recovery_bp.route("/recovery/export", methods=["POST"])
 @authenticated
-async def export_device(core):
+async def export_device(core: LoggedCore) -> tuple[dict[str, Any], int]:
     async with check_data() as (data, bad_fields):
         bad_fields |= data.keys()  # No fields allowed
 
-    fp, path = tempfile.mkstemp(suffix=".psrk")
+    fp, raw_path = tempfile.mkstemp(suffix=".psrk")
     # Closing the open file returned by mkstemp
     os.close(fp)
-    path = Path(path)
+    path = Path(raw_path)
     try:
         passphrase = await save_recovery_device(path, core.device, True)
         raw = path.read_bytes()
@@ -47,7 +52,7 @@ async def export_device(core):
 
 
 @recovery_bp.route("/recovery/import", methods=["POST"])
-async def import_device():
+async def import_device() -> tuple[dict[str, Any], int]:
     async with check_data() as (data, bad_fields):
         file_content = data.get("recovery_device_file_content")
         if not isinstance(file_content, str):
@@ -68,10 +73,10 @@ async def import_device():
         if not isinstance(password, str):
             bad_fields.add("new_device_key")
 
-    fp, path = tempfile.mkstemp(suffix=".psrk")
+    fp, raw_path = tempfile.mkstemp(suffix=".psrk")
     # Closing the open file returned by mkstemp
     os.close(fp)
-    path = Path(path)
+    path = Path(raw_path)
     try:
         path.write_bytes(file_content)
         try:

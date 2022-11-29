@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import trio
-from typing import Callable, Dict, TypeVar, Optional, AsyncIterator
+from trio_typing import TaskStatus
+from typing import Callable, Dict, Optional, AsyncIterator, AsyncContextManager, Awaitable
 from contextlib import asynccontextmanager
 
 
@@ -80,24 +83,25 @@ class ComponentNotRegistered(Exception):
     pass
 
 
-ComponentTypeVar = TypeVar("ComponentTypeVar")
-
-
 class ManagedComponent:
-    def __init__(self, component: ComponentTypeVar, stop_component: Callable) -> None:
+    def __init__(self, component: object, stop_component: Callable[[], Awaitable[None]]) -> None:
         self._rwlock = ReadWriteLock()
-        self._component: Optional[ComponentTypeVar] = component
+        self._component: Optional[object] = component
         self._stop_component_callback = stop_component
 
     @classmethod
-    async def run(cls, component_factory: Callable, task_status=trio.TASK_STATUS_IGNORED):
+    async def run(
+        cls,
+        component_factory: Callable[[], AsyncContextManager[object]],
+        task_status: TaskStatus[ManagedComponent] = trio.TASK_STATUS_IGNORED,
+    ) -> None:
         """
         Raises: Nothing
         """
         with trio.CancelScope() as cancel_scope:
             component_stopped = trio.Event()
 
-            async def _stop_component():
+            async def _stop_component() -> None:
                 cancel_scope.cancel()
                 await component_stopped.wait()
 
@@ -116,7 +120,7 @@ class ManagedComponent:
                         managed_component._component = None
                     component_stopped.set()
 
-    async def stop(self):
+    async def stop(self) -> None:
         """
         Raises: Nothing
         """
@@ -126,7 +130,7 @@ class ManagedComponent:
             await self._stop_component_callback()
 
     @asynccontextmanager
-    async def acquire(self) -> AsyncIterator[ComponentTypeVar]:
+    async def acquire(self) -> AsyncIterator[object]:
         """
         Raises: ComponentNotRegistered
         """
@@ -149,13 +153,13 @@ class LTCM:
     on the behalf of the API consumer.
     """
 
-    def __init__(self, nursery):
+    def __init__(self, nursery: trio.Nursery):
         self._nursery = nursery
         self._components: Dict[int, ManagedComponent] = {}
 
     @classmethod
     @asynccontextmanager
-    async def run(cls) -> AsyncIterator["LTCM"]:
+    async def run(cls) -> AsyncIterator[LTCM]:
         """
         Raises: Nothing
         """
@@ -163,7 +167,9 @@ class LTCM:
             yield cls(nursery)
             nursery.cancel_scope.cancel()
 
-    async def register_component(self, component_factory: Callable) -> int:
+    async def register_component(
+        self, component_factory: Callable[[], AsyncContextManager[object]]
+    ) -> int:
         """
         Raises: Nothing
         """
@@ -186,7 +192,7 @@ class LTCM:
         return handle in self._components
 
     @asynccontextmanager
-    async def acquire_component(self, handle: int) -> AsyncIterator[ComponentTypeVar]:
+    async def acquire_component(self, handle: int) -> AsyncIterator[object]:
         """
         Raises: ComponentNotRegistered
         """
@@ -194,6 +200,5 @@ class LTCM:
             managed_component = self._components[handle]
         except KeyError:
             raise ComponentNotRegistered
-        component: ComponentTypeVar
         async with managed_component.acquire() as component:
             yield component
