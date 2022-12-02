@@ -19,7 +19,7 @@ from parsec.core.local_device import (
 )
 from parsec.api.protocol import OrganizationID
 
-from .cli import ResanaConfig
+from .config import ResanaConfig
 from .crypto import decrypt_parsec_key, CryptoError
 from .ltcm import ComponentNotRegistered, LTCM
 

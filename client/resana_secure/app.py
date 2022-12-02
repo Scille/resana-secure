@@ -17,7 +17,7 @@ if True:  # Hack to please flake8
     current_app = cast("ResanaApp", quart_current_app)
 
 from .ltcm import LTCM
-from .cli import ResanaConfig
+from .config import ResanaConfig
 from .cores_manager import CoresManager
 from .invites_manager import ClaimersManager, GreetersManager
 

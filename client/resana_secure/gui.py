@@ -46,7 +46,7 @@ from parsec.core.ipcinterface import (
 )
 
 from parsec.core.gui.custom_dialogs import QDialogInProcess
-from .cli import ResanaConfig
+from .config import ResanaConfig
 from ._version import __version__ as RESANA_VERSION
 
 

@@ -14,32 +14,17 @@ from pathlib import Path
 from functools import partial
 import os
 import sys
-import attr
 import logging
 import structlog
 
-from parsec.core.config import CoreConfig, BackendAddr
+from parsec.core.config import BackendAddr
 
 from .app import serve_app
+from .config import ResanaConfig, _CoreConfig
 from ._version import __version__
 
 
 logger = structlog.get_logger()
-
-
-class _CoreConfig(CoreConfig):
-    @property
-    def ipc_socket_file(self) -> Path:
-        return self.data_base_dir / "resana-secure.lock"
-
-
-@attr.s(slots=True, frozen=True, auto_attribs=True, kw_only=True)
-class ResanaConfig:
-    core_config: _CoreConfig
-    rie_server_addrs: List[Tuple[str, Optional[int]]] = []
-
-    def evolve(self, **kwargs: Any) -> ResanaConfig:
-        return attr.evolve(self, **kwargs)
 
 
 def _cook_website_url(url: str) -> str:
