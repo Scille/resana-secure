@@ -3,21 +3,24 @@ from __future__ import annotations
 import re
 import secrets
 import logging
-from typing import AsyncIterator, List
+from typing import AsyncIterator, List, cast
 from contextlib import asynccontextmanager
 
-import trio
-import trio_typing
-from quart import current_app, ctx
 from quart_cors import cors
 from quart_trio import QuartTrio
+from quart import current_app as quart_current_app
 from hypercorn.config import Config as HyperConfig
 from hypercorn.trio import serve as hypercorn_trio_serve
 
-from parsec.core.config import CoreConfig
+# Expose current_app as a ResanaApp for all modules
+if True:  # Hack to please flake8
+    current_app = cast("ResanaApp", quart_current_app)
 
+from .ltcm import LTCM
+from .cli import ResanaConfig
 from .cores_manager import CoresManager
 from .invites_manager import ClaimersManager, GreetersManager
+
 from .routes.auth import auth_bp
 from .routes.humans import humans_bp
 from .routes.files import files_bp
@@ -26,7 +29,6 @@ from .routes.workspaces import workspaces_bp
 from .routes.invitations import invitations_bp
 from .routes.recovery import recovery_bp
 from .routes.organization import organization_bp
-from .ltcm import LTCM
 
 
 class ResanaApp(QuartTrio):
@@ -36,32 +38,22 @@ class ResanaApp(QuartTrio):
     cores_manager: CoresManager
     greeters_manager: GreetersManager
     claimers_manager: ClaimersManager
-    core_config: CoreConfig
+    resana_config: ResanaConfig
     hyper_config: HyperConfig
-    task_status: trio_typing.TaskStatus
 
-    def app_context(self) -> ctx.AppContext:
-        app_context = super().app_context()
-        app_context.g.ltcm = self.ltcm
-        app_context.g.cores_manager = self.cores_manager
-        app_context.g.greeters_manager = self.greeters_manager
-        app_context.g.claimers_manager = self.claimers_manager
-        app_context.g.core_config = self.core_config
-        return app_context
-
-    async def serve(self):
-        return await hypercorn_trio_serve(self, self.hyper_config, task_status=self.task_status)
+    async def serve(self) -> None:
+        return await hypercorn_trio_serve(self, self.hyper_config)
 
 
 @asynccontextmanager
 async def app_factory(
-    config: CoreConfig,
+    config: ResanaConfig,
     client_allowed_origins: List[str],
 ) -> AsyncIterator[ResanaApp]:
     app = ResanaApp(__name__, static_folder=None)
     app.config.from_mapping(
         # We need a big max content length to accept file upload !
-        MAX_CONTENT_LENGTH=2**30,  # 1Go limit
+        MAX_CONTENT_LENGTH=2**31,  # 2Go limit
         # Secret key changes each time the application is started, this is
         # fine as long as we only use it for session cookies.
         # The reason for doing this is we serve the api on localhost, so
@@ -85,7 +77,7 @@ async def app_factory(
     app.register_blueprint(organization_bp)
 
     @app.route("/", methods=["GET"])
-    async def landing_page():
+    async def landing_page() -> tuple[str, int]:
         routes = sorted(
             [
                 (rule.methods, re.sub(r"<\w+:(\w+)>", r"{\1}", rule.rule))
@@ -97,6 +89,8 @@ async def app_factory(
         body += "<h2>Available routes</h2>"
         body += "<ul>"
         for methods, url in routes:
+            if methods is None:
+                continue
             methods_display = ", ".join(methods - {"HEAD", "OPTIONS"})
             if methods_display:
                 body += f"<li>{methods_display} <a href={url}>{url}</a></li>"
@@ -118,9 +112,9 @@ async def app_factory(
 
     async with LTCM.run() as ltcm:
         app.ltcm = ltcm
-        app.core_config = config
+        app.resana_config = config
         app.cores_manager = CoresManager(
-            core_config=config,
+            config=config,
             ltcm=ltcm,
         )
         app.greeters_manager = GreetersManager()
@@ -132,9 +126,8 @@ async def app_factory(
 async def serve_app(
     host: str,
     port: int,
-    config: CoreConfig,
+    config: ResanaConfig,
     client_allowed_origins: List[str],
-    task_status: trio_typing.TaskStatus = trio.TASK_STATUS_IGNORED,
 ) -> AsyncIterator[ResanaApp]:
     hyper_config = HyperConfig.from_mapping(
         {
@@ -149,5 +142,4 @@ async def serve_app(
         client_allowed_origins=client_allowed_origins,
     ) as app:
         app.hyper_config = hyper_config
-        app.task_status = task_status
         yield app

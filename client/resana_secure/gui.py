@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Callable, TYPE_CHECKING
 from importlib import resources
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, Callable, AsyncIterator, Awaitable
 from contextlib import asynccontextmanager, AbstractAsyncContextManager
 import trio
 import os
@@ -46,6 +46,7 @@ from parsec.core.ipcinterface import (
 )
 
 from parsec.core.gui.custom_dialogs import QDialogInProcess
+from .cli import ResanaConfig
 from ._version import __version__ as RESANA_VERSION
 
 
@@ -56,9 +57,9 @@ logger = get_logger()
 
 
 class Systray(QSystemTrayIcon):
-    device_clicked = pyqtSignal(AvailableDevice, str)
+    device_clicked = pyqtSignal(AvailableDevice, object)
 
-    def __init__(self, nursery: trio.Nursery, quart_app: ResanaApp, **kwargs):
+    def __init__(self, nursery: trio.Nursery, quart_app: ResanaApp, **kwargs: Any):
         super().__init__(**kwargs)
 
         self.nursery = nursery
@@ -85,20 +86,21 @@ class Systray(QSystemTrayIcon):
         self.setContextMenu(self.menu)
         self.activated.connect(self.on_activated)
 
-    def _on_device_clicked(self, device: AvailableDevice, token: str):
-        def _internal_on_device_clicked():
+    def _on_device_clicked(self, device: AvailableDevice, token: str | None) -> Callable[[], None]:
+        def _internal_on_device_clicked() -> None:
             self.device_clicked.emit(device, token)
 
         return _internal_on_device_clicked
 
-    def _list_login_menu(self):
+    def _list_login_menu(self) -> None:
         self.login_menu.clear()
 
-        async def _add_devices_to_login_menu():
+        async def _add_devices_to_login_menu() -> None:
             devices = await self.quart_app.cores_manager.list_available_devices(
                 only_offline_available=True
             )
             for (_, _), (device, token) in devices.items():
+                assert device.human_handle is not None
                 action = self.login_menu.addAction(
                     f"{device.organization_id.str} - {device.human_handle.email} - {'Connecté' if token else 'Non connecté'}"
                 )
@@ -108,7 +110,7 @@ class Systray(QSystemTrayIcon):
 
         self.nursery.start_soon(_add_devices_to_login_menu)
 
-    def on_activated(self, reason: QSystemTrayIcon.ActivationReason):
+    def on_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
         # Does not work on Linux (Debian with XFCE) where DoubleClick is not triggered,
         # resulting in two QSystemTrayIcon.Trigger instead
         if reason == QSystemTrayIcon.DoubleClick:
@@ -125,11 +127,11 @@ class ResanaGuiApp(QApplication):
         cancel_scope: trio.CancelScope,
         nursery: trio.Nursery,
         quart_app: ResanaApp,
-        config: CoreConfig,
+        config: ResanaConfig,
         resana_website_url: str,
     ):
         super().__init__([])
-        self.config: CoreConfig = config
+        self.config: ResanaConfig = config
         self.nursery: trio.Nursery = nursery
         self.resana_website_url: str = resana_website_url
         self.tray = Systray(self.nursery, quart_app, parent=self)
@@ -155,13 +157,14 @@ class ResanaGuiApp(QApplication):
         # Show the tray only after setting an icon to avoid a warning
         self.tray.show()
 
-    def _on_file_rejected(self, file_path: FsPath):
+    def _on_file_rejected(self, file_path: FsPath) -> None:
         self.message_requested.emit(
             "Fichier malicieux détecté",
             f"Le fichier `{file_path}` a été détecté comme malicieux. Il ne sera pas synchronisé.",
         )
 
-    async def _on_login_clicked(self, device: AvailableDevice, password: str):
+    async def _on_login_clicked(self, device: AvailableDevice, password: str) -> None:
+        assert device.human_handle is not None
         try:
             await self.quart_app.cores_manager.login(
                 email=device.human_handle.email,
@@ -183,7 +186,7 @@ class ResanaGuiApp(QApplication):
                 "Vous devez vous connecter au moins une fois au serveur Resana pour utiliser l'authentification hors-ligne.",
             )
 
-    async def _on_logout_clicked(self, token):
+    async def _on_logout_clicked(self, token: str) -> None:
         try:
             await self.quart_app.cores_manager.logout(token)
             self.message_requested.emit("Déconnexion", "Vous avez été déconnecté(e).")
@@ -192,7 +195,8 @@ class ResanaGuiApp(QApplication):
             # in another way. Better to not show anything.
             pass
 
-    def _on_device_clicked(self, device: AvailableDevice, token: str):
+    def _on_device_clicked(self, device: AvailableDevice, token: str | None) -> None:
+        assert device.human_handle is not None
         if token:
             answer = QMessageBox.question(
                 None,
@@ -214,8 +218,8 @@ class ResanaGuiApp(QApplication):
                 self.nursery.start_soon(self._on_login_clicked, device, password)
         self.save_file_requested.connect(self._on_save_file_requested)
 
-    def _on_save_file_requested(self, workspace_fs: WorkspaceFS, path: FsPath):
-        async def _save_file(save_path, workspace_fs, file_path):
+    def _on_save_file_requested(self, workspace_fs: WorkspaceFS, path: FsPath) -> None:
+        async def _save_file(save_path: str, workspace_fs: WorkspaceFS, file_path: FsPath) -> None:
             try:
                 self.message_requested.emit(
                     "Téléchargement",
@@ -241,10 +245,10 @@ class ResanaGuiApp(QApplication):
         if dest:
             self.nursery.start_soon(_save_file, dest, workspace_fs, path)
 
-    def _on_open_clicked(self):
+    def _on_open_clicked(self) -> None:
         QDesktopServices.openUrl(QUrl(self.resana_website_url))
 
-    def quit(self):
+    def quit(self) -> None:  # type: ignore[override]
         self.tray.hide()
         # Overwrite quit so that it closes the trio loop (that will itself
         # trigger the actual closing of the application)
@@ -254,8 +258,8 @@ class ResanaGuiApp(QApplication):
 @asynccontextmanager
 async def _run_ipc_server(
     cancel_scope: trio.CancelScope, config: CoreConfig, resana_website_url: str
-):
-    async def _cmd_handler(_):
+) -> AsyncIterator[None]:
+    async def _cmd_handler(_: object) -> dict[str, str]:
         QDesktopServices.openUrl(QUrl(resana_website_url))
         return {"status": "ok"}
 
@@ -281,7 +285,7 @@ async def _run_ipc_server(
             await trio.sleep_forever()
 
 
-def _patch_cores_manager(cores_manager: CoresManager):
+def _patch_cores_manager(cores_manager: CoresManager) -> None:
     """Testing Resana with offline login can be a bit of a drag,
     because devices need to be created using an encrypted key.
     For testing purposes only, we can set the variable `RESANA_DEBUG_GUI=true`
@@ -298,14 +302,14 @@ def _patch_cores_manager(cores_manager: CoresManager):
     real_login = cores_manager.login
     real_list_available_devices = cores_manager.list_available_devices
 
-    def _patched_login(self, *args, **kwargs):
+    def _patched_login(self: object, *args: Any, **kwargs: Any) -> Awaitable[str]:
         # Replacing `key` by `user_password`
         if kwargs.get("user_password"):
             pwd = kwargs.pop("user_password")
             kwargs["key"] = pwd
         return real_login(*args, **kwargs)
 
-    async def _patched_list_available_devices(self, *args, **kwargs):
+    async def _patched_list_available_devices(self: object, *args: object, **kwargs: object) -> Any:
         # Set `only_offline_available` to False
         return await real_list_available_devices(only_offline_available=False)
 
@@ -318,13 +322,13 @@ def _patch_cores_manager(cores_manager: CoresManager):
 
 async def _qtrio_run(
     quart_app_context: Callable[[], AbstractAsyncContextManager[ResanaApp]],
-    config: CoreConfig,
+    config: ResanaConfig,
     resana_website_url: str,
-):
+) -> None:
     with trio.CancelScope() as cancel_scope:
         # Exits gracefully with a Ctrl+C
         signal.signal(signal.SIGINT, lambda *_: cancel_scope.cancel())
-        async with _run_ipc_server(cancel_scope, config, resana_website_url):
+        async with _run_ipc_server(cancel_scope, config.core_config, resana_website_url):
             async with trio.open_nursery() as nursery:
                 async with quart_app_context() as quart_app:
 
@@ -344,8 +348,8 @@ async def _qtrio_run(
 def run_gui(
     quart_app_context: Callable[[], AbstractAsyncContextManager[ResanaApp]],
     resana_website_url: str,
-    config: CoreConfig,
-):
+    config: ResanaConfig,
+) -> None:
 
     # In theory this should lead to better rendering on high dpi desktop
     # but it seems to make absolutely no difference.

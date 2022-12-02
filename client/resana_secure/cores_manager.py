@@ -1,6 +1,7 @@
 import trio
+from enum import Enum
 from uuid import uuid4
-from typing import AsyncIterator, Callable, Dict, Optional, Tuple, List
+from typing import TYPE_CHECKING, AsyncIterator, Callable, Dict, Optional, Tuple, List, cast
 from functools import partial
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -10,7 +11,6 @@ from PyQt5.QtWidgets import QApplication
 from parsec.core.core_events import CoreEvent
 from parsec.core.types import LocalDevice, BackendOrganizationAddr
 from parsec.core.logged_core import logged_core_factory, LoggedCore
-from parsec.core.config import CoreConfig
 from parsec.core.local_device import (
     list_available_devices,
     load_device_with_password,
@@ -19,9 +19,12 @@ from parsec.core.local_device import (
 )
 from parsec.api.protocol import OrganizationID
 
-
+from .cli import ResanaConfig
 from .crypto import decrypt_parsec_key, CryptoError
 from .ltcm import ComponentNotRegistered, LTCM
+
+if TYPE_CHECKING:
+    from .gui import ResanaGuiApp
 
 
 logger = structlog.get_logger()
@@ -101,15 +104,11 @@ def is_org_hosted_on_rie(
 
 @asynccontextmanager
 async def start_core(
-    core_config: CoreConfig,
-    device: LocalDevice,
-    on_stopped: Callable,
+    config: ResanaConfig, device: LocalDevice, on_stopped: Callable[[], None]
 ) -> AsyncIterator[LoggedCore]:
 
-    core_config = core_config.evolve(
-        mountpoint_enabled=is_org_hosted_on_rie(
-            device.organization_addr, core_config.rie_server_addrs
-        )
+    core_config = config.core_config.evolve(
+        mountpoint_enabled=is_org_hosted_on_rie(device.organization_addr, config.rie_server_addrs)
     )
 
     async with logged_core_factory(core_config, device) as core:
@@ -128,22 +127,21 @@ async def start_core(
 
 
 def _on_fs_sync_refused_by_sequester_service(
-    event,
-    file_path,
-    **kwargs,
-):
+    event: Enum,
+    **kwargs: object,
+) -> None:
     if event == CoreEvent.FS_ENTRY_SYNC_REJECTED_BY_SEQUESTER_SERVICE:
-        QApplication.instance().file_rejected.emit(file_path)
+        file_path = kwargs["file_path"]
+        instance = cast(ResanaGuiApp, QApplication.instance())
+        instance.file_rejected.emit(file_path)
 
 
 class CoresManager:
-    _instance = None
-
-    def __init__(self, core_config: CoreConfig, ltcm: LTCM):
+    def __init__(self, config: ResanaConfig, ltcm: LTCM):
         self._email_to_auth_token: Dict[Tuple[OrganizationID, str], str] = {}
         self._auth_token_to_component_handle: Dict[str, int] = {}
         self._login_lock = trio.Lock()
-        self.core_config = core_config
+        self.config = config
         self.ltcm = ltcm
 
     async def _authenticate(
@@ -179,6 +177,7 @@ class CoresManager:
 
         # The lock is needed here to avoid concurrent logins with the same email
         async with self._login_lock:
+            assert device.human_handle is not None
             device_tuple = (device.organization_id, device.human_handle.email)
             # Return existing auth_token if the login has already be done for this device
             existing_auth_token = self._email_to_auth_token.get(device_tuple)
@@ -190,7 +189,7 @@ class CoresManager:
 
             # Actual login is required
 
-            def _on_stopped():
+            def _on_stopped() -> None:
                 self._auth_token_to_component_handle.pop(auth_token, None)
                 self._email_to_auth_token.pop(device_tuple, None)
 
@@ -198,7 +197,7 @@ class CoresManager:
             component_handle = await self.ltcm.register_component(
                 partial(
                     start_core,
-                    core_config=self.core_config,
+                    config=self.config,
                     device=loaded_device,
                     on_stopped=_on_stopped,
                 )
@@ -217,7 +216,7 @@ class CoresManager:
         organization_id: Optional[OrganizationID] = None,
     ) -> str:
         matching_devices = find_matching_devices(
-            self.core_config.config_dir, email=email, organization_id=organization_id
+            self.config.core_config.config_dir, email=email, organization_id=organization_id
         )
         if not matching_devices:
             raise CoreDeviceNotFoundError
@@ -257,7 +256,7 @@ class CoresManager:
             raise CoreNotLoggedError from exc
 
     @asynccontextmanager
-    async def get_core(self, auth_token: str) -> LoggedCore:
+    async def get_core(self, auth_token: str) -> AsyncIterator[LoggedCore]:
         """
         Raises:
             CoreNotLoggedError
@@ -269,9 +268,8 @@ class CoresManager:
             raise CoreNotLoggedError
 
         try:
-            async with self.ltcm.acquire_component(  # type: ignore[var-annotated]
-                component_handle
-            ) as component:
+            async with self.ltcm.acquire_component(component_handle) as component:
+                assert isinstance(component, LoggedCore)
                 yield component
 
         except ComponentNotRegistered as exc:
@@ -281,11 +279,12 @@ class CoresManager:
         self, only_offline_available: bool = False
     ) -> dict[Tuple[OrganizationID, str], Tuple[AvailableDevice, Optional[str]]]:
         devices = {}
-        for available_device in list_available_devices(self.core_config.config_dir):
+        for available_device in list_available_devices(self.config.core_config.config_dir):
             if only_offline_available and not device_has_encrypted_key(available_device):
                 continue
             async with self._login_lock:
                 # Check if the device is logged in
+                assert available_device.human_handle is not None
                 existing_auth_token = self._email_to_auth_token.get(
                     (available_device.organization_id, available_device.human_handle.email)
                 )

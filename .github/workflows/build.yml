@@ -27,6 +27,8 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - uses: pre-commit/action@v2.0.0
+        env:
+          SKIP: mypy-client
 
 
 #################################################################################
@@ -66,6 +68,8 @@ jobs:
         run: poetry run py.test server_tests
         timeout-minutes: 10
         working-directory: server
+      - name: '[Quality] Run pre-commit with mypy-client'
+        uses: pre-commit/action@v2.0.0
 
 
 #################################################################################

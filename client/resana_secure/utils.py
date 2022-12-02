@@ -1,14 +1,17 @@
-from uuid import UUID
-from typing import Optional
+from __future__ import annotations
+
+from typing import Callable, AsyncIterator, Iterator, Optional, Any, TypeVar, Awaitable
+from typing_extensions import ParamSpec, Concatenate
 from functools import wraps
 from base64 import urlsafe_b64decode, urlsafe_b64encode
 from contextlib import asynccontextmanager, contextmanager
-from quart import jsonify, current_app, session, request
+from quart import jsonify, session, request
 from werkzeug.exceptions import HTTPException
 from werkzeug.routing import BaseConverter
 
-from parsec.api.protocol import OrganizationID, InvitationType
-from parsec.core.types import BackendInvitationAddr, BackendAddr
+from parsec.core.logged_core import LoggedCore
+from parsec.api.protocol import OrganizationID, InvitationType, InvitationToken
+from parsec.core.types import BackendInvitationAddr, BackendOrganizationAddr
 from parsec.core.backend_connection import (
     BackendConnectionError,
     BackendNotAvailable,
@@ -35,18 +38,19 @@ from parsec.core.invite import (
 
 from .cores_manager import CoreNotLoggedError
 from .invites_manager import LongTermCtxNotStarted
+from .app import current_app
 
 
 class EntryIDConverter(BaseConverter):
-    def to_python(self, value):
+    def to_python(self, value: str) -> Any:
         return super().to_python(value)
 
-    def to_url(self, value) -> str:
+    def to_url(self, value: Any) -> str:
         return super().to_url(value)
 
 
 class APIException(HTTPException):
-    def __init__(self, status_code, data) -> None:
+    def __init__(self, status_code: int, data: Any) -> None:
         response = jsonify(data)
         response.status_code = status_code
         super().__init__(response=response)
@@ -66,14 +70,19 @@ def get_auth_token() -> Optional[str]:
     return auth_token
 
 
-def authenticated(fn):
-    @wraps(fn)
-    async def wrapper(*args, **kwargs):
-        auth_token = get_auth_token() or ""
+P = ParamSpec("P")
+T = TypeVar("T")
 
+
+def authenticated(
+    fn: Callable[Concatenate[LoggedCore, P], Awaitable[T]]
+) -> Callable[P, Awaitable[T]]:
+    @wraps(fn)
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+        auth_token = get_auth_token() or ""
         try:
             async with current_app.cores_manager.get_core(auth_token) as core:
-                return await fn(*args, core=core, **kwargs)
+                return await fn(core, *args, **kwargs)
 
         except CoreNotLoggedError:
             raise APIException(401, {"error": "authentication_requested"})
@@ -82,23 +91,23 @@ def authenticated(fn):
 
 
 @asynccontextmanager
-async def check_data():
+async def check_data() -> AsyncIterator[tuple[Any, set[str]]]:
     if not request.is_json:
         raise APIException(400, {"error": "json_body_expected"})
     data = await request.get_json(silent=True)
     if data is None:
         raise APIException(400, {"error": "json_body_expected"})
-    bad_fields = set()
+    bad_fields: set[str] = set()
     yield data, bad_fields
     if bad_fields:
         raise APIException(400, {"error": "bad_data", "fields": list(bad_fields)})
 
 
 def build_apitoken(
-    backend_addr: BackendAddr,
+    backend_addr: BackendOrganizationAddr | BackendInvitationAddr,
     organization_id: OrganizationID,
     invitation_type: InvitationType,
-    token: UUID,
+    token: InvitationToken,
 ) -> str:
     invitation_addr = BackendInvitationAddr.build(
         backend_addr=backend_addr.get_backend_addr(),
@@ -115,7 +124,7 @@ def apitoken_to_addr(apitoken: str) -> BackendInvitationAddr:
 
 
 @contextmanager
-def backend_errors_to_api_exceptions():
+def backend_errors_to_api_exceptions() -> Iterator[None]:
     try:
         yield
 

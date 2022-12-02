@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sys
 import os
 import trio
@@ -5,13 +7,15 @@ import subprocess
 from pathlib import PurePath
 from quart import Blueprint, request
 from base64 import b64decode
-from typing import Optional, cast
 
 from PyQt5.QtWidgets import QApplication
+from typing import Optional, Sequence, cast, TypedDict, Any
 
+from parsec._parsec import DateTime
+from parsec.core.logged_core import LoggedCore
 from parsec.api.data import EntryID, EntryName
 from parsec.core.mountpoint import MountpointNotMounted
-from parsec.core.fs import FsPath
+from parsec.core.fs import FsPath, WorkspaceFS
 from parsec.core.fs.exceptions import (
     FSNotADirectoryError,
     FSFileNotFoundError,
@@ -26,10 +30,21 @@ from resana_secure.gui import ResanaGuiApp
 files_bp = Blueprint("files_api", __name__)
 
 
+class EntryInfo(TypedDict):
+    id: EntryID
+    type: str
+    children: Sequence[EntryName]
+    created: DateTime
+    updated: DateTime
+    size: int
+
+
 # TODO: Parsec api should provide a way to do this
-async def entry_id_to_path(workspace, needle_entry_id):
-    async def _recursive_search(path):
-        entry_info = await workspace.path_info(path=path)
+async def entry_id_to_path(
+    workspace: WorkspaceFS, needle_entry_id: EntryID
+) -> tuple[FsPath, EntryInfo] | None:
+    async def _recursive_search(path: FsPath) -> tuple[FsPath, EntryInfo] | None:
+        entry_info = cast(EntryInfo, await workspace.path_info(path=path))
         if entry_info["id"] == needle_entry_id:
             return path, entry_info
         if entry_info["type"] == "folder":
@@ -47,20 +62,24 @@ async def entry_id_to_path(workspace, needle_entry_id):
 
 @files_bp.route("/workspaces/<string:workspace_id>/folders", methods=["GET"])
 @authenticated
-async def get_workspace_folders_tree(core, workspace_id):
+async def get_workspace_folders_tree(
+    core: LoggedCore, workspace_id: str
+) -> tuple[dict[str, Any], int]:
     try:
-        workspace_id = EntryID.from_hex(workspace_id)
+        workspace_id_parsed = EntryID.from_hex(workspace_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
     with backend_errors_to_api_exceptions():
-        workspace = core.user_fs.get_workspace(workspace_id)
+        workspace = core.user_fs.get_workspace(workspace_id_parsed)
 
-        async def _recursive_build_tree(path: str, name: Optional[EntryName]):
-            entry_info = await workspace.path_info(path=path)
+        async def _recursive_build_tree(
+            path: str, name: Optional[EntryName]
+        ) -> dict[str, Any] | None:
+            entry_info = cast(EntryInfo, await workspace.path_info(path=path))
             if entry_info["type"] != "folder":
-                return
-            stat = {
+                return None
+            stat: dict[str, Any] = {
                 "id": entry_info["id"].hex,
                 "name": name.str if name is not None else "/",
                 "created": entry_info["created"].to_rfc3339(),
@@ -78,14 +97,17 @@ async def get_workspace_folders_tree(core, workspace_id):
 
         cooked_tree = await _recursive_build_tree(path="/", name=None)
 
+    assert cooked_tree is not None
     return cooked_tree, 200
 
 
 @files_bp.route("/workspaces/<string:workspace_id>/folders", methods=["POST"])
 @authenticated
-async def create_workspace_folder(core, workspace_id):
+async def create_workspace_folder(
+    core: LoggedCore, workspace_id: str
+) -> tuple[dict[str, Any], int]:
     try:
-        workspace_id = EntryID.from_hex(workspace_id)
+        workspace_id_parsed = EntryID.from_hex(workspace_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
@@ -102,7 +124,7 @@ async def create_workspace_folder(core, workspace_id):
             bad_fields.add("parent")
 
     with backend_errors_to_api_exceptions():
-        workspace = core.user_fs.get_workspace(workspace_id)
+        workspace = core.user_fs.get_workspace(workspace_id_parsed)
 
         result = await entry_id_to_path(workspace, parent_entry_id)
         if not result:
@@ -117,13 +139,17 @@ async def create_workspace_folder(core, workspace_id):
 
 @files_bp.route("/workspaces/<string:workspace_id>/folders/rename", methods=["POST"])
 @authenticated
-async def rename_workspace_folder(core, workspace_id):
+async def rename_workspace_folder(
+    core: LoggedCore, workspace_id: str
+) -> tuple[dict[str, Any], int]:
     return await _rename_workspace_entry(core, workspace_id, expected_entry_type="folder")
 
 
-async def _rename_workspace_entry(core, workspace_id, expected_entry_type):
+async def _rename_workspace_entry(
+    core: LoggedCore, workspace_id: str, expected_entry_type: str
+) -> tuple[dict[str, Any], int]:
     try:
-        workspace_id = EntryID.from_hex(workspace_id)
+        workspace_id_parsed = EntryID.from_hex(workspace_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
@@ -146,7 +172,7 @@ async def _rename_workspace_entry(core, workspace_id, expected_entry_type):
                 bad_fields.add("new_parent")
 
     with backend_errors_to_api_exceptions():
-        workspace = core.user_fs.get_workspace(workspace_id)
+        workspace = core.user_fs.get_workspace(workspace_id_parsed)
 
         result = await entry_id_to_path(workspace, entry_id)
         if not result:
@@ -185,27 +211,31 @@ async def _rename_workspace_entry(core, workspace_id, expected_entry_type):
 
 @files_bp.route("/workspaces/<string:workspace_id>/folders/<string:folder_id>", methods=["DELETE"])
 @authenticated
-async def delete_workspace_folder(core, workspace_id, folder_id):
+async def delete_workspace_folder(
+    core: LoggedCore, workspace_id: str, folder_id: str
+) -> tuple[dict[str, Any], int]:
     return await _delete_workspace_entry(
         core, workspace_id, folder_id, expected_entry_type="folder"
     )
 
 
-async def _delete_workspace_entry(core, workspace_id, entry_id, expected_entry_type):
+async def _delete_workspace_entry(
+    core: LoggedCore, workspace_id: str, entry_id: str, expected_entry_type: str
+) -> tuple[dict[str, Any], int]:
     try:
-        workspace_id = EntryID.from_hex(workspace_id)
+        workspace_id_parsed = EntryID.from_hex(workspace_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
     try:
-        entry_id = EntryID.from_hex(entry_id)
+        entry_id_parsed = EntryID.from_hex(entry_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_entry"})
 
     with backend_errors_to_api_exceptions():
-        workspace = core.user_fs.get_workspace(workspace_id)
+        workspace = core.user_fs.get_workspace(workspace_id_parsed)
 
-        result = await entry_id_to_path(workspace, entry_id)
+        result = await entry_id_to_path(workspace, entry_id_parsed)
         if not result:
             raise APIException(404, {"error": "unknown_entry"})
         path, _ = result
@@ -233,27 +263,33 @@ async def _delete_workspace_entry(core, workspace_id, entry_id, expected_entry_t
 
 @files_bp.route("/workspaces/<string:workspace_id>/files/<string:folder_id>", methods=["GET"])
 @authenticated
-async def get_workspace_folder_content(core, workspace_id, folder_id):
+async def get_workspace_folder_content(
+    core: LoggedCore, workspace_id: str, folder_id: str
+) -> tuple[dict[str, Any], int]:
     try:
-        workspace_id = EntryID.from_hex(workspace_id)
+        workspace_id_parsed = EntryID.from_hex(workspace_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
     try:
-        folder_id = EntryID.from_hex(folder_id)
+        folder_id_parsed = EntryID.from_hex(folder_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_folder"})
 
     with backend_errors_to_api_exceptions():
-        workspace = core.user_fs.get_workspace(workspace_id)
+        workspace = core.user_fs.get_workspace(workspace_id_parsed)
 
-        async def _build_cooked_files():
-            folder_path, folder_stat = await entry_id_to_path(workspace, folder_id)
+        async def _build_cooked_files() -> list[dict[str, int | str]]:
+            result = await entry_id_to_path(workspace, folder_id_parsed)
+            assert result is not None
+            folder_path, folder_stat = result
             if folder_stat["type"] != "folder":
                 raise APIException(404, {"error": "unknown_folder"})
-            cooked_files = []
+            cooked_files: list[dict[str, int | str]] = []
             for child_name in folder_stat["children"]:
-                child_stat = await workspace.path_info(path=folder_path / child_name.str)
+                child_stat = cast(
+                    EntryInfo, await workspace.path_info(path=folder_path / child_name.str)
+                )
                 if child_stat["type"] == "folder":
                     continue
                 extension = child_name.str.rsplit(".", 1)[-1]
@@ -278,9 +314,9 @@ async def get_workspace_folder_content(core, workspace_id, folder_id):
 
 @files_bp.route("/workspaces/<string:workspace_id>/files", methods=["POST"])
 @authenticated
-async def create_workspace_file(core, workspace_id):
+async def create_workspace_file(core: LoggedCore, workspace_id: str) -> tuple[dict[str, Any], int]:
     try:
-        workspace_id = EntryID.from_hex(workspace_id)
+        workspace_id_parsed = EntryID.from_hex(workspace_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
@@ -301,9 +337,9 @@ async def create_workspace_file(core, workspace_id):
             bad_fields.append("name")
 
         form = await request.form
-        parent_entry_id = form.get("parent")
+        parent_entry_id_raw = cast(str, form.get("parent", ""))
         try:
-            parent_entry_id = EntryID.from_hex(parent_entry_id)
+            parent_entry_id = EntryID.from_hex(parent_entry_id_raw)
         except (TypeError, ValueError):
             bad_fields.append("parent")
 
@@ -314,26 +350,26 @@ async def create_workspace_file(core, workspace_id):
 
     else:
         # Otherwise consider is has been sent as json
-        async with check_data() as (data, bad_fields):
+        async with check_data() as (data, bad_fields_set):
             name = data.get("name")
             try:
                 name = EntryName(name)
             except (TypeError, ValueError):
-                bad_fields.add("name")
-            parent_entry_id = data.get("parent")
+                bad_fields_set.add("name")
+            parent_entry_id_raw = data.get("parent")
             try:
-                parent_entry_id = EntryID.from_hex(parent_entry_id)
+                parent_entry_id = EntryID.from_hex(parent_entry_id_raw)
             except (TypeError, ValueError):
-                bad_fields.add("parent")
+                bad_fields_set.add("parent")
 
             content = data.get("content")
             try:
                 content = b64decode(content)
             except (TypeError, ValueError):
-                bad_fields.add("content")
+                bad_fields_set.add("content")
 
     with backend_errors_to_api_exceptions():
-        workspace = core.user_fs.get_workspace(workspace_id)
+        workspace = core.user_fs.get_workspace(workspace_id_parsed)
 
         result = await entry_id_to_path(workspace, parent_entry_id)
         if not result:
@@ -342,6 +378,7 @@ async def create_workspace_file(core, workspace_id):
         path = parent_path / name
 
         entry_id, fd = await workspace.transactions.file_create(path, open=True)
+        assert fd is not None
         try:
             if isinstance(content, bytes):
                 await workspace.transactions.fd_write(fd, content=content, offset=0)
@@ -364,41 +401,43 @@ async def create_workspace_file(core, workspace_id):
 
 @files_bp.route("/workspaces/<string:workspace_id>/files/rename", methods=["POST"])
 @authenticated
-async def rename_workspace_file(core, workspace_id):
+async def rename_workspace_file(core: LoggedCore, workspace_id: str) -> tuple[dict[str, Any], int]:
     return await _rename_workspace_entry(core, workspace_id, expected_entry_type="file")
 
 
 @files_bp.route("/workspaces/<string:workspace_id>/files/<string:file_id>", methods=["DELETE"])
 @authenticated
-async def delete_workspace_file(core, workspace_id, file_id):
+async def delete_workspace_file(
+    core: LoggedCore, workspace_id: str, file_id: str
+) -> tuple[dict[str, Any], int]:
     return await _delete_workspace_entry(core, workspace_id, file_id, expected_entry_type="file")
 
 
 @files_bp.route("/workspaces/<string:workspace_id>/open/<string:entry_id>", methods=["POST"])
 @authenticated
-async def open_workspace_item(core, workspace_id, entry_id):
+async def open_workspace_item(
+    core: LoggedCore, workspace_id: str, entry_id: str
+) -> tuple[dict[str, Any], int]:
     try:
-        workspace_id = EntryID.from_hex(workspace_id)
+        workspace_id_parsed = EntryID.from_hex(workspace_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
     try:
-        entry_id = EntryID.from_hex(entry_id)
+        entry_id_parsed = EntryID.from_hex(entry_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_file"})
 
     with backend_errors_to_api_exceptions():
-        workspace = core.user_fs.get_workspace(workspace_id)
+        workspace = core.user_fs.get_workspace(workspace_id_parsed)
 
-        result = await entry_id_to_path(workspace, entry_id)
+        result = await entry_id_to_path(workspace, entry_id_parsed)
         if not result:
             raise APIException(404, {"error": "unknown_file"})
         path, _ = result
 
         try:
-            fspath = core.mountpoint_manager.get_path_in_mountpoint(workspace_id, path)
-            # Must run the open in a thread, otherwise we will block the current thread
-            # that is supposed to handle the actual open operation asked by the kernel !
+            fspath = core.mountpoint_manager.get_path_in_mountpoint(workspace_id_parsed, path)
             await trio.to_thread.run_sync(_open_item, fspath)
         except MountpointNotMounted:
             # Not mounted, use the GUI to download the file

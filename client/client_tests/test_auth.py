@@ -399,7 +399,10 @@ async def test_multi_org_authentication(
     EMAIL = "gordon.freeman@blackmesa.nm"
     PASSWORD = "abcd"
 
-    addrs = [BackendOrganizationBootstrapAddr.build(backend_addr, org_id) for org_id in ORG_IDS]
+    addrs = [
+        BackendOrganizationBootstrapAddr.build(backend_addr, org_id, token=None)
+        for org_id in ORG_IDS
+    ]
 
     # Create 3 different orgs using the same email
     for backend_addr in addrs:
@@ -449,7 +452,7 @@ async def test_encrypted_key_auth(
     )
     ENCRYPTED_KEY = encrypt_parsec_key(USER_PASSWORD, PARSEC_KEY)
 
-    org_backend_addr = BackendOrganizationBootstrapAddr.build(backend_addr, ORG_ID)
+    org_backend_addr = BackendOrganizationBootstrapAddr.build(backend_addr, ORG_ID, token=None)
 
     response = await test_client.post(
         "/organization/bootstrap",

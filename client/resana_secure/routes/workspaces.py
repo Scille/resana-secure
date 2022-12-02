@@ -1,5 +1,10 @@
+from __future__ import annotations
+
+from typing import Any
+
 from quart import Blueprint
 
+from parsec.core.logged_core import LoggedCore
 from parsec.api.data import EntryID, EntryName
 from parsec.api.protocol import RealmRole
 
@@ -11,7 +16,7 @@ workspaces_bp = Blueprint("workspaces_api", __name__)
 
 @workspaces_bp.route("/workspaces", methods=["GET"])
 @authenticated
-async def list_workspaces(core):
+async def list_workspaces(core: LoggedCore) -> tuple[dict[str, Any], int]:
     # get_user_manifest() never raise exception
     user_manifest = core.user_fs.get_user_manifest()
     return (
@@ -20,6 +25,7 @@ async def list_workspaces(core):
                 [
                     {"id": entry.id.hex, "name": entry.name.str, "role": entry.role.str}
                     for entry in user_manifest.workspaces
+                    if entry.role is not None
                 ],
                 key=lambda elem: elem["name"],
             )
@@ -30,7 +36,7 @@ async def list_workspaces(core):
 
 @workspaces_bp.route("/workspaces", methods=["POST"])
 @authenticated
-async def create_workspaces(core):
+async def create_workspaces(core: LoggedCore) -> tuple[dict[str, Any], int]:
     async with check_data() as (data, bad_fields):
         name = data.get("name")
         if not isinstance(name, str):
@@ -50,7 +56,7 @@ async def create_workspaces(core):
 
 @workspaces_bp.route("/workspaces/sync", methods=["POST"])
 @authenticated
-async def sync_workspaces(core):
+async def sync_workspaces(core: LoggedCore) -> tuple[dict[str, Any], int]:
     # Core already do the sync in background, this route is to ensure
     # synchronization has occured
     user_fs = core.user_fs
@@ -66,9 +72,9 @@ async def sync_workspaces(core):
 # TODO: provide an EntryID url converter
 @workspaces_bp.route("/workspaces/<string:workspace_id>", methods=["PATCH"])
 @authenticated
-async def rename_workspaces(core, workspace_id):
+async def rename_workspaces(core: LoggedCore, workspace_id: str) -> tuple[dict[str, Any], int]:
     try:
-        workspace_id = EntryID.from_hex(workspace_id)
+        parsed_workspace_id = EntryID.from_hex(workspace_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
@@ -89,7 +95,7 @@ async def rename_workspaces(core, workspace_id):
             bad_fields.add("new_name")
 
     for entry in core.user_fs.get_user_manifest().workspaces:
-        if entry.id == workspace_id:
+        if entry.id == parsed_workspace_id:
             if entry.name != old_name:
                 raise APIException(409, {"error": "precondition_failed"})
             else:
@@ -98,7 +104,7 @@ async def rename_workspaces(core, workspace_id):
         raise APIException(404, {"error": "unknown_workspace"})
 
     with backend_errors_to_api_exceptions():
-        workspace_id = await core.user_fs.workspace_rename(workspace_id, new_name)
+        await core.user_fs.workspace_rename(parsed_workspace_id, new_name)
 
     # TODO: should we do a `user_fs.sync()` ?
 
@@ -107,14 +113,16 @@ async def rename_workspaces(core, workspace_id):
 
 @workspaces_bp.route("/workspaces/<string:workspace_id>/share", methods=["GET"])
 @authenticated
-async def get_workspace_share_info(core, workspace_id):
+async def get_workspace_share_info(
+    core: LoggedCore, workspace_id: str
+) -> tuple[dict[str, Any], int]:
     try:
-        workspace_id = EntryID.from_hex(workspace_id)
+        parsed_workspace_id = EntryID.from_hex(workspace_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
     with backend_errors_to_api_exceptions():
-        workspace = core.user_fs.get_workspace(workspace_id)
+        workspace = core.user_fs.get_workspace(parsed_workspace_id)
 
         cooked_roles = {}
         roles = await workspace.get_user_roles()
@@ -128,9 +136,9 @@ async def get_workspace_share_info(core, workspace_id):
 
 @workspaces_bp.route("/workspaces/<string:workspace_id>/share", methods=["PATCH"])
 @authenticated
-async def share_workspace(core, workspace_id):
+async def share_workspace(core: LoggedCore, workspace_id: str) -> tuple[dict[str, Any], int]:
     try:
-        workspace_id = EntryID.from_hex(workspace_id)
+        parsed_workspace_id = EntryID.from_hex(workspace_id)
     except ValueError:
         raise APIException(404, {"error": "unknown_workspace"})
 
@@ -157,7 +165,7 @@ async def share_workspace(core, workspace_id):
             raise APIException(404, {"error": "unknown_email"})
 
         await core.user_fs.workspace_share(
-            workspace_id=workspace_id, recipient=recipient, role=role
+            workspace_id=parsed_workspace_id, recipient=recipient, role=role
         )
 
     return {}, 200

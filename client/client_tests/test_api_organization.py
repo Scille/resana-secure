@@ -28,7 +28,7 @@ async def created_org_token(
 
 @pytest.fixture
 async def org_bootstrap_addr(
-    backend_addr: BackendApp, created_org_token: str, default_org_id: OrganizationID
+    backend_addr: BackendAddr, created_org_token: str, default_org_id: OrganizationID
 ):
     return BackendOrganizationBootstrapAddr.build(backend_addr, default_org_id, created_org_token)
 
@@ -56,6 +56,7 @@ async def test_bootstrap_organization(
     available_devices = list_available_devices(core_config_dir)
     assert len(available_devices) == 1
     assert available_devices[0].organization_id.str == org_bootstrap_addr.organization_id.str
+    assert available_devices[0].human_handle is not None
     assert available_devices[0].human_handle.email == "gordon.freeman@blackmesa.nm"
 
 
@@ -299,6 +300,7 @@ async def test_bootstrap_organization_with_sequester_key(
     available_devices = list_available_devices(core_config_dir)
     assert len(available_devices) == 1
     assert available_devices[0].organization_id.str == org_bootstrap_addr.organization_id.str
+    assert available_devices[0].human_handle is not None
     assert available_devices[0].human_handle.email == "gordon.freeman@blackmesa.nm"
 
     organization = await running_backend.organization.get(org_bootstrap_addr.organization_id)

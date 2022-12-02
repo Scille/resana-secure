@@ -1,8 +1,10 @@
+from __future__ import annotations
+
+
 from resana_secure.ltcm import ComponentNotRegistered
 import trio
 from typing import Dict, Type, AsyncIterator
 from functools import partial
-from quart import g
 from contextlib import asynccontextmanager
 
 from parsec.api.protocol import InvitationType
@@ -14,23 +16,25 @@ from parsec.core.types import LocalDevice, BackendInvitationAddr
 from parsec.core.config import CoreConfig
 from parsec.core.invite import claimer_retrieve_info, UserGreetInitialCtx, DeviceGreetInitialCtx
 
+from .app import current_app
+
 
 class LongTermCtxNotStarted(Exception):
     pass
 
 
 class BaseLongTermCtx:
-    def __init__(self, initial_ctx):
-        self._in_progress_ctx = initial_ctx
-        self._lock = trio.Lock()
+    def __init__(self, initial_ctx: object) -> None:
+        self._in_progress_ctx: object = initial_ctx
+        self._lock: trio.Lock = trio.Lock()
 
-    def update_in_progress_ctx(self, new_ctx):
+    def update_in_progress_ctx(self, new_ctx: object) -> None:
         self._in_progress_ctx = new_ctx
 
-    def get_in_progress_ctx(self):
+    def get_in_progress_ctx(self) -> object:
         return self._in_progress_ctx
 
-    def mark_as_terminated(self):
+    def mark_as_terminated(self) -> None:
         self._in_progress_ctx = None
 
     @asynccontextmanager
@@ -45,15 +49,20 @@ class BaseLongTermCtx:
 class BaseInviteManager:
     _LONG_TERM_CTX_CLS: Type[BaseLongTermCtx]
 
-    def __init__(self):
-        self._addr_to_claim_ctx: Dict[BackendInvitationAddr, BaseLongTermCtx] = {}
+    def __init__(self) -> None:
+        self._addr_to_claim_ctx: Dict[BackendInvitationAddr, int] = {}
 
     @asynccontextmanager
     async def start_ctx(
-        self, addr: BackendInvitationAddr, **kwargs
+        self, addr: BackendInvitationAddr, **kwargs: object
     ) -> AsyncIterator[BaseLongTermCtx]:
-        component_handle = await g.ltcm.register_component(
-            partial(self._LONG_TERM_CTX_CLS.start, config=g.core_config, addr=addr, **kwargs)
+        component_handle = await current_app.ltcm.register_component(
+            partial(
+                self._LONG_TERM_CTX_CLS.start,
+                config=current_app.resana_config.core_config,
+                addr=addr,
+                **kwargs,
+            )
         )
 
         # Register the component and teardown any previous one
@@ -63,11 +72,12 @@ class BaseInviteManager:
         self._addr_to_claim_ctx[addr] = component_handle
 
         try:
-            async with g.ltcm.acquire_component(component_handle) as component:
+            async with current_app.ltcm.acquire_component(component_handle) as component:
                 # LTCM allow concurrent access to the component, however our
                 # invitation components rely on a single backend transport
                 # connection so we need a lock here to avoid concurrent
                 # operations on it
+                assert isinstance(component, BaseLongTermCtx)
                 async with component._lock:
                     yield component
 
@@ -78,9 +88,9 @@ class BaseInviteManager:
         if component.get_in_progress_ctx() is None:
             await self._stop_ctx(addr, component_handle)
 
-    async def _stop_ctx(self, addr, component_handle):
+    async def _stop_ctx(self, addr: BackendInvitationAddr, component_handle: int) -> None:
         try:
-            await g.ltcm.unregister_component(component_handle)
+            await current_app.ltcm.unregister_component(component_handle)
         except ComponentNotRegistered:
             pass
         removed_component_handle = self._addr_to_claim_ctx.pop(addr, None)
@@ -98,11 +108,12 @@ class BaseInviteManager:
             raise LongTermCtxNotStarted
 
         try:
-            async with g.ltcm.acquire_component(component_handle) as component:
+            async with current_app.ltcm.acquire_component(component_handle) as component:
                 # LTCM allow concurrent access to the component, however our
                 # invitation components rely on a single backend transport
                 # connection so we need a lock here to avoid concurrent
                 # operations on it
+                assert isinstance(component, BaseLongTermCtx)
                 async with component._lock:
                     yield component
 
@@ -136,7 +147,7 @@ class GreetLongTermCtx(BaseLongTermCtx):
     @asynccontextmanager
     async def start(  # type: ignore[override]
         cls, config: CoreConfig, device: LocalDevice, addr: BackendInvitationAddr
-    ) -> AsyncIterator["GreetLongTermCtx"]:
+    ) -> AsyncIterator[GreetLongTermCtx]:
         async with backend_authenticated_cmds_factory(
             addr=device.organization_addr,
             device_id=device.device_id,
@@ -145,13 +156,14 @@ class GreetLongTermCtx(BaseLongTermCtx):
         ) as cmds:
 
             if addr.invitation_type == InvitationType.USER:
-                initial_ctx = UserGreetInitialCtx(cmds=cmds, token=addr.token)
-                in_progress_ctx = await initial_ctx.do_wait_peer()
+                user_initial_ctx = UserGreetInitialCtx(cmds=cmds, token=addr.token)
+                user_in_progress_ctx = await user_initial_ctx.do_wait_peer()
+                instance = cls(user_in_progress_ctx)
             else:
-                initial_ctx = DeviceGreetInitialCtx(cmds=cmds, token=addr.token)
-                in_progress_ctx = await initial_ctx.do_wait_peer()
-
-            yield cls(in_progress_ctx)
+                device_initial_ctx = DeviceGreetInitialCtx(cmds=cmds, token=addr.token)
+                device_in_progress_ctx = await device_initial_ctx.do_wait_peer()
+                instance = cls(device_in_progress_ctx)
+            yield instance
 
 
 class GreetersManager(BaseInviteManager):
