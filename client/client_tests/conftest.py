@@ -74,7 +74,7 @@ def core_config_dir(tmp_path: Path):
 
 
 @pytest.fixture
-def core_config(tmp_path: Path, core_config_dir: Path):
+def core_config(backend_addr: BackendAddr, tmp_path: Path, core_config_dir: Path):
     return ResanaConfig(
         core_config=_CoreConfig(
             config_dir=core_config_dir,
@@ -85,7 +85,8 @@ def core_config(tmp_path: Path, core_config_dir: Path):
             preferred_org_creation_backend_addr=BackendAddr.from_url(
                 "parsec://localhost:6777?no_ssl=true"
             ),
-        )
+        ),
+        rie_server_addrs=[(backend_addr.hostname, None)],
     )
 
 
