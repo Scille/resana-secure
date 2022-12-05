@@ -96,7 +96,10 @@ def is_org_hosted_on_rie(
     # `rie_server_addrs` contains a list of tuple of either (domain, port) or (domain, None)
     # We check if our org addr matches either of those.
     # If `rie_server_addrs` we return True for the sake of compatibility
-    return (org_addr.hostname, None) in rie_server_addrs or (org_addr.hostname, org_addr.port) in rie_server_addrs
+    return (org_addr.hostname, None) in rie_server_addrs or (
+        org_addr.hostname,
+        org_addr.port,
+    ) in rie_server_addrs
 
 
 @asynccontextmanager
