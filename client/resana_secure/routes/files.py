@@ -443,6 +443,7 @@ async def open_workspace_item(
             # Not mounted, use the GUI to download the file
             qt_app = cast(ResanaGuiApp, QApplication.instance())
             if qt_app:
+                # Signals must be emitted using a thread to not block dialogs' exec_ method.
                 await trio.to_thread.run_sync(qt_app.save_file_requested.emit, workspace, path)
 
     return {}, 200

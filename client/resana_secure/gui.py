@@ -233,7 +233,7 @@ class ResanaGuiApp(QApplication):
                 self.message_requested.emit(
                     "Erreur", f"Impossible de télécharger le fichier {file_path.name.str}."
                 )
-                logger.exception("Failed to download the a outside of mountpoint")
+                logger.exception("Failed to save the file with mountpoints deactivated")
             else:
                 await trio.to_thread.run_sync(
                     lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(save_path)))
