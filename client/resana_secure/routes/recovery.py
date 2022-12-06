@@ -87,7 +87,7 @@ async def import_device() -> tuple[dict[str, Any], int]:
         path.unlink()
 
     save_device_with_password_in_config(
-        config_dir=current_app.core_config.config_dir,
+        config_dir=current_app.resana_config.core_config.config_dir,
         device=new_device,
         password=password,
     )

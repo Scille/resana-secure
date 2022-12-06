@@ -61,7 +61,7 @@ async def organization_bootstrap() -> tuple[dict[str, Any], int]:
                 sequester_authority_verify_key=sequester_key,
             )
             save_device_with_password_in_config(
-                config_dir=current_app.core_config.config_dir,
+                config_dir=current_app.resana_config.core_config.config_dir,
                 device=new_device,
                 password=password,
             )

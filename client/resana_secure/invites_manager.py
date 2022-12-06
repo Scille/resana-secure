@@ -58,7 +58,10 @@ class BaseInviteManager:
     ) -> AsyncIterator[BaseLongTermCtx]:
         component_handle = await current_app.ltcm.register_component(
             partial(
-                self._LONG_TERM_CTX_CLS.start, config=current_app.core_config, addr=addr, **kwargs
+                self._LONG_TERM_CTX_CLS.start,
+                config=current_app.resana_config.core_config,
+                addr=addr,
+                **kwargs,
             )
         )
 

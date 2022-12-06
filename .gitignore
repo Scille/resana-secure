@@ -1,4 +1,6 @@
 /venv*
+/client/venv*
+/server/venv*
 /.vscode
 /.mypy_cache
 /.pytest_cache

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from importlib import resources
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, AsyncIterator, Awaitable
 from contextlib import asynccontextmanager, AbstractAsyncContextManager
 import trio
 import os
 import qtrio
 import signal
+import multiprocessing
 from structlog import get_logger
 from PyQt5.QtWidgets import (
     QApplication,
@@ -31,7 +33,10 @@ from parsec.core.local_device import (
     AvailableDevice,
 )
 from parsec.core.config import CoreConfig
-from parsec.core.fs import FsPath
+
+from parsec.core.types import DEFAULT_BLOCK_SIZE
+from parsec.core.fs import FsPath, WorkspaceFS
+
 from parsec.core.ipcinterface import (
     run_ipc_server,
     send_to_ipc_server,
@@ -39,6 +44,9 @@ from parsec.core.ipcinterface import (
     IPCServerNotRunning,
     IPCCommand,
 )
+
+from parsec.core.gui.custom_dialogs import QDialogInProcess
+from .config import ResanaConfig
 from ._version import __version__ as RESANA_VERSION
 
 
@@ -111,6 +119,7 @@ class Systray(QSystemTrayIcon):
 
 class ResanaGuiApp(QApplication):
     message_requested = pyqtSignal(str, str)
+    save_file_requested = pyqtSignal(WorkspaceFS, FsPath)
     file_rejected = pyqtSignal(FsPath)
 
     def __init__(
@@ -118,19 +127,23 @@ class ResanaGuiApp(QApplication):
         cancel_scope: trio.CancelScope,
         nursery: trio.Nursery,
         quart_app: ResanaApp,
-        config: CoreConfig,
+        config: ResanaConfig,
         resana_website_url: str,
     ):
         super().__init__([])
-        self.config: CoreConfig = config
+        self.config: ResanaConfig = config
         self.nursery: trio.Nursery = nursery
         self.resana_website_url: str = resana_website_url
         self.tray = Systray(self.nursery, quart_app, parent=self)
         self.tray.close_clicked.connect(self.quit)
         self.tray.open_clicked.connect(self._on_open_clicked)
         self.tray.device_clicked.connect(self._on_device_clicked)
+        self.save_file_requested.connect(self._on_save_file_requested)
         self._cancel_scope: trio.CancelScope = cancel_scope
         self.quart_app = quart_app
+        self.setApplicationName("Resana Secure")
+        self.setApplicationDisplayName("Resana Secure")
+        self.setApplicationVersion(RESANA_VERSION)
         with resources.path("resana_secure", "icon.png") as icon_path:
             icon = QIcon(str(icon_path))
             self.tray.setIcon(icon)
@@ -203,6 +216,34 @@ class ResanaGuiApp(QApplication):
             )
             if ok and password:
                 self.nursery.start_soon(self._on_login_clicked, device, password)
+        self.save_file_requested.connect(self._on_save_file_requested)
+
+    def _on_save_file_requested(self, workspace_fs: WorkspaceFS, path: FsPath) -> None:
+        async def _save_file(save_path: str, workspace_fs: WorkspaceFS, file_path: FsPath) -> None:
+            try:
+                self.message_requested.emit(
+                    "Téléchargement",
+                    f"Le fichier {file_path.name.str} est en cours de téléchargement.\nIl sera ouvert automatiquement.",
+                )
+                async with await trio.open_file(save_path, "wb") as dest_fd:
+                    async with await workspace_fs.open_file(file_path, "rb") as wk_fd:
+                        while data := await wk_fd.read(size=DEFAULT_BLOCK_SIZE):
+                            await dest_fd.write(data)
+            except Exception:
+                self.message_requested.emit(
+                    "Erreur", f"Impossible de télécharger le fichier {file_path.name.str}."
+                )
+                logger.exception("Failed to save the file with mountpoints deactivated")
+            else:
+                await trio.to_thread.run_sync(
+                    lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(save_path)))
+                )
+
+        dest, _ = QDialogInProcess.getSaveFileName(
+            None, f"Sauvegarde du fichier {path.name.str}", str(Path.home() / path.name.str)
+        )
+        if dest:
+            self.nursery.start_soon(_save_file, dest, workspace_fs, path)
 
     def _on_open_clicked(self) -> None:
         QDesktopServices.openUrl(QUrl(self.resana_website_url))
@@ -281,13 +322,13 @@ def _patch_cores_manager(cores_manager: CoresManager) -> None:
 
 async def _qtrio_run(
     quart_app_context: Callable[[], AbstractAsyncContextManager[ResanaApp]],
-    config: CoreConfig,
+    config: ResanaConfig,
     resana_website_url: str,
 ) -> None:
     with trio.CancelScope() as cancel_scope:
         # Exits gracefully with a Ctrl+C
         signal.signal(signal.SIGINT, lambda *_: cancel_scope.cancel())
-        async with _run_ipc_server(cancel_scope, config, resana_website_url):
+        async with _run_ipc_server(cancel_scope, config.core_config, resana_website_url):
             async with trio.open_nursery() as nursery:
                 async with quart_app_context() as quart_app:
 
@@ -307,7 +348,7 @@ async def _qtrio_run(
 def run_gui(
     quart_app_context: Callable[[], AbstractAsyncContextManager[ResanaApp]],
     resana_website_url: str,
-    config: CoreConfig,
+    config: ResanaConfig,
 ) -> None:
 
     # In theory this should lead to better rendering on high dpi desktop
@@ -320,4 +361,7 @@ def run_gui(
     #    Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     # )
 
-    qtrio.run(_qtrio_run, quart_app_context, config, resana_website_url)
+    multiprocessing.set_start_method("spawn")
+
+    with QDialogInProcess.manage_pools():
+        qtrio.run(_qtrio_run, quart_app_context, config, resana_website_url)
