@@ -390,7 +390,7 @@ pyparsing = ">=2.0.2,<3.0.5 || >3.0.5"
 
 [[package]]
 name = "parsec-cloud"
-version = "2.14.0"
+version = "2.15.0rc1"
 description = "Secure cloud framework"
 category = "main"
 optional = false
@@ -425,7 +425,7 @@ wsproto = ">=1.0,<2.0"
 
 [package.extras]
 backend = ["boto3 (>=1.23,<2.0)", "botocore (>=1.26,<2.0)", "hypercorn (>=0.13.2,<0.14.0)", "jinja2 (>=3.0,<4.0)", "pbr (>=5.9,<6.0)", "python-swiftclient (>=3.13,<5.0)", "quart (>=0.18.1,<0.19.0)", "quart-trio (>=0.10.0,<0.11.0)", "trio-asyncio (>=0.12,<0.13)", "triopg (>=0.6,<0.7)"]
-core = ["PyQt5 (>=5.15,<6.0)", "fusepy (>=3.0,<4.0)", "packaging (>=21.3,<22.0)", "psutil (>=5.9,<6.0)", "pypac (>=0.16,<0.17)", "pyqt5-sip (>=12.9,<13.0)", "qrcode (>=7.3,<8.0)", "qtrio (>=0.5.1,<0.6.0)", "winfspy (>=0.8,<0.9)", "zxcvbn (>=4.4,<5.0)"]
+core = ["PyQt5 (>=5.15,<6.0)", "fusepy (>=3.0,<4.0)", "packaging (>=21.3,<22.0)", "psutil (>=5.9,<6.0)", "pypac (>=0.16,<0.17)", "pyqt5-sip (>=12.9,<13.0)", "qrcode (>=7.3,<8.0)", "qtrio (>=0.6.0,<0.7.0)", "winfspy (>=0.8,<0.9)", "zxcvbn (>=4.4,<5.0)"]
 
 [[package]]
 name = "pathspec"
@@ -893,7 +893,7 @@ testing = ["flake8 (<5)", "func-timeout", "jaraco.functools", "jaraco.itertools"
 [metadata]
 lock-version = "1.1"
 python-versions = "~3.9.0"
-content-hash = "d0398b20c88bf1b1594999d9a3ed5ea0935dd6f5ee77828bce5351d057bcc02b"
+content-hash = "5c3d7ae2a8a14352ac4dc65879b9b630be4eaec9dfb4bbf8f50180945424f4c3"
 
 [metadata.files]
 aiofiles = [
@@ -1230,7 +1230,7 @@ packaging = [
     {file = "packaging-21.3.tar.gz", hash = "sha256:dd47c42927d89ab911e606518907cc2d3a1f38bbd026385970643f9c5b8ecfeb"},
 ]
 parsec-cloud = [
-    {file = "parsec_cloud-2.14.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:04250c2f22dcaee4a0d7ce6bb499b7be1add75ef8b50112ebd23836b7adcf288"},
+    {file = "parsec_cloud-2.15.0rc1-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:af9806caaef1f60461a53909fa2ca5e08d22a59fa30700896aaae7f36a87735c"},
 ]
 pathspec = [
     {file = "pathspec-0.10.1-py3-none-any.whl", hash = "sha256:46846318467efc4556ccfd27816e004270a9eeeeb4d062ce5e6fc7a87c573f93"},

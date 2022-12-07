@@ -109,7 +109,7 @@ async def test_submit(antivirus_test_app, monkeypatch, sequester_service, orgid,
     monkeypatch.setattr("httpx.AsyncClient.get", fake_antivirus_http_get)
 
     response = await test_client.post(
-        f"/submit?organization_id={orgid.str}&service_id={sequester_service.service_id.str}",
+        f"/submit?organization_id={orgid.str}&service_id={sequester_service.service_id.hex}",
         data=b"a",
     )
     if is_malware:
@@ -128,7 +128,7 @@ async def test_submit_invalid_args(antivirus_test_app, sequester_service, orgid)
 
     # Invalid org id
     response = await test_client.post(
-        f"/submit?service_id={sequester_service.service_id.str}&organization_id=1-2+^",
+        f"/submit?service_id={sequester_service.service_id.hex}&organization_id=1-2+^",
         data=b"a",
     )
     assert response.status_code == 422
@@ -146,7 +146,7 @@ async def test_submit_invalid_args(antivirus_test_app, sequester_service, orgid)
 
     # Missing org id
     response = await test_client.post(
-        f"/submit?service_id={sequester_service.service_id.str}",
+        f"/submit?service_id={sequester_service.service_id.hex}",
         data=b"a",
     )
     assert response.status_code == 422
@@ -173,7 +173,7 @@ async def test_submit_invalid_args(antivirus_test_app, sequester_service, orgid)
 
     # Missing sequester blob
     response = await test_client.post(
-        f"/submit?service_id={sequester_service.service_id.str}&organization_id={orgid.str}",
+        f"/submit?service_id={sequester_service.service_id.hex}&organization_id={orgid.str}",
         data=b"",
     )
     assert response.status_code == 400
@@ -192,7 +192,7 @@ async def test_submit_deserialization_failure(
     test_client = antivirus_test_app.test_client()
 
     response = await test_client.post(
-        f"/submit?service_id={sequester_service.service_id.str}&organization_id={orgid.str}",
+        f"/submit?service_id={sequester_service.service_id.hex}&organization_id={orgid.str}",
         data=b"a",
     )
     assert response.status_code == 400
@@ -212,7 +212,7 @@ async def test_submit_reassembly_failure(antivirus_test_app, monkeypatch, seques
     test_client = antivirus_test_app.test_client()
 
     response = await test_client.post(
-        f"/submit?service_id={sequester_service.service_id.str}&organization_id={orgid.str}",
+        f"/submit?service_id={sequester_service.service_id.hex}&organization_id={orgid.str}",
         data=b"a",
     )
     assert response.status_code == 400
@@ -226,7 +226,7 @@ async def test_submit_unknwon_service_id(antivirus_test_app, orgid):
 
     # Invalid org id
     response = await test_client.post(
-        f"/submit?service_id={SequesterServiceID.new().str}&organization_id={orgid.str}",
+        f"/submit?service_id={SequesterServiceID.new().hex}&organization_id={orgid.str}",
         data=b"a",
     )
     assert response.status_code == 400
