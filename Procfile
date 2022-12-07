@@ -1,1 +1,1 @@
-web: ./bin/run.py
+web: resana_server
