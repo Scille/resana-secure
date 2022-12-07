@@ -1,8 +1,17 @@
 [tool.poetry]
-name = "antivirus_connector"
+name = "resana_server"
 version = "0.11.1"
 description = ""
 authors = ["Scille SAS"]
+packages = [
+    { include = "antivirus_connector" },
+    { include = "asgi_ip_filtering.py" },
+    { include = "resana_backend_run.py" },
+    { include = "resana_server_entrypoint.py" }
+]
+
+[tool.poetry.scripts]
+resana_server = 'resana_server_entrypoint:main'
 
 [tool.poetry.dependencies]
 python = "~3.9.0"
