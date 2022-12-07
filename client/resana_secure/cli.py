@@ -129,7 +129,10 @@ def run_cli(
         "--rie-server-addr",
         action="append",
         nargs="+",
-        default=[("resana-secure-interne.parsec.cloud", None)],
+        default=[
+            ("resana-secure-interne.parsec.cloud", None),
+            ("resana-secure-test.osc-secnum-fr1.scalingo.io", None),
+        ],
         type=_parse_host,
         help="Host or host:port for which mountpoints will be disabled",
     )
