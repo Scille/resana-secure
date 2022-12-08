@@ -16,7 +16,7 @@ import queue
 NOTIFICATION_BASE_MSG = f"Application `{os.environ.get('APP', '<unknown app>')}` (container `{os.environ.get('CONTAINER', '<unknown container>')}`) got error/warning log:\n> "
 
 
-def notify_webhook(line: str) -> None:
+def notify_webhook(args: argparse.Namespace, line: str) -> None:
     data = {"text": NOTIFICATION_BASE_MSG + line}
     req = Request(
         args.webhook_url,
@@ -32,7 +32,7 @@ def notify_webhook(line: str) -> None:
         print(f"Wehook error !!! cannot send message {data!r}, error: {exc!r}")
 
 
-def run_cmd_with_log_scan(cmd: List[str]) -> subprocess.Popen:
+def run_cmd_with_log_scan(args: argparse.Namespace, cmd: List[str]) -> subprocess.Popen:
     regex = re.compile(rb"warning|error", flags=re.IGNORECASE)
 
     def _listen_log_stream(stream_in, stream_out):
@@ -44,7 +44,7 @@ def run_cmd_with_log_scan(cmd: List[str]) -> subprocess.Popen:
             stream_out.write(line)
             stream_out.flush()
             if regex.search(line):
-                notify_webhook(line.decode("utf8", errors="replace"))
+                notify_webhook(args, line.decode("utf8", errors="replace"))
 
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     listen_stdout_thread = threading.Thread(
@@ -62,7 +62,7 @@ def run_cmd_with_log_scan(cmd: List[str]) -> subprocess.Popen:
     return proc
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--webhook-url", default=os.environ.get("WEBHOOK_ON_LOGS_URL"))
     args = parser.parse_args()
@@ -84,9 +84,9 @@ if __name__ == "__main__":
 
     # Run the services
 
-    parsec_proc = run_cmd_with_log_scan(["python", "-m", "resana_backend_run"])
+    parsec_proc = run_cmd_with_log_scan(args, ["python", "-m", "resana_backend_run"])
     antivirus_proc = run_cmd_with_log_scan(
-        ["python", "-m", "antivirus_connector", "--port", "5775"]
+        args, ["python", "-m", "antivirus_connector", "--port", "5775"]
     )
 
     # Run threads to monitor the service...
@@ -119,3 +119,7 @@ if __name__ == "__main__":
         ret |= proc.returncode
 
     raise SystemExit(ret)
+
+
+if __name__ == "__main__":
+    main()
