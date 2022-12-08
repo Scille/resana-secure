@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import trio
 from typing import (
     Optional,
     Tuple,
     Any,
     MutableMapping,
     Sequence,
+    List,
 )
 from pathlib import Path
 from functools import partial
@@ -15,19 +17,14 @@ import sys
 import logging
 import structlog
 
-from parsec.core.config import CoreConfig, BackendAddr
+from parsec.core.config import BackendAddr
 
 from .app import serve_app
+from .config import ResanaConfig, _CoreConfig
 from ._version import __version__
 
 
 logger = structlog.get_logger()
-
-
-class ResanaConfig(CoreConfig):
-    @property
-    def ipc_socket_file(self) -> Path:
-        return self.data_base_dir / "resana-secure.lock"
 
 
 def _cook_website_url(url: str) -> str:
@@ -95,6 +92,20 @@ def get_default_dirs() -> Tuple[Path, Path, Path]:
     return mountpoint_base_dir, data_base_dir, config_dir
 
 
+def _parse_host(s: str) -> Tuple[str, Optional[int]]:
+    # urllib.parse.urlparse doesn't do well without a scheme
+    # For `domain.com` for example, it considers it to be the path,
+    # not the hostname.
+
+    # Server addr can be given either by just the hostname (`domain.com`), or by the combination of
+    # the hostname and the port (`domain.com:1337`).
+
+    if ":" in s:
+        host, port = s.split(":")
+        return (host, int(port))
+    return (s, None)
+
+
 def run_cli(
     args: Sequence[str] | None = None,
     default_log_level: str = "INFO",
@@ -115,26 +126,52 @@ def run_cli(
     parser.add_argument("--disable-gui", action="store_true")
     parser.add_argument("--disable-mountpoint", action="store_true")
     parser.add_argument(
+        "--rie-server-addr",
+        action="append",
+        nargs="+",
+        default=[
+            ("resana-secure-interne.parsec.cloud", None),
+            ("resana-secure-test.osc-secnum-fr1.scalingo.io", None),
+        ],
+        type=_parse_host,
+        help="Host or host:port for which mountpoints will be disabled",
+    )
+    parser.add_argument(
         "--log-level", choices=("DEBUG", "INFO", "WARNING", "ERROR"), default=default_log_level
     )
     parser.add_argument("--log-file", type=Path, default=default_log_file)
     namespace = parser.parse_args(args=args)
+
+    rie_server_addrs = []
+    for host in namespace.rie_server_addr:
+        if isinstance(host, List):
+            rie_server_addrs.extend(host)
+        else:
+            rie_server_addrs.append(host)
+
+    if os.environ.get("RESANA_RIE_SERVER_ADDR"):
+        namespace.rie_server_addr.extend(
+            [_parse_host(h) for h in os.environ.get("RESANA_RIE_SERVER_ADDR", "").split(";")]
+        )
 
     (mountpoint_base_dir, default_data_base_dir, default_config_dir) = get_default_dirs()
     config_dir = namespace.config or default_config_dir
     data_base_dir = namespace.data or default_data_base_dir
 
     config = ResanaConfig(
-        config_dir=config_dir,
-        data_base_dir=data_base_dir,
-        # Only used on linux (Windows mounts with drive letters)
-        mountpoint_base_dir=mountpoint_base_dir,
-        # Use a mock to disable mountpoint instead of relying on this option
-        mountpoint_enabled=True,
-        ipc_win32_mutex_name="resana-secure",
-        preferred_org_creation_backend_addr=BackendAddr.from_url(
-            "parsec://localhost:6777?no_ssl=true"
+        core_config=_CoreConfig(
+            config_dir=config_dir,
+            data_base_dir=data_base_dir,
+            # Only used on linux (Windows mounts with drive letters)
+            mountpoint_base_dir=mountpoint_base_dir,
+            # Use a mock to disable mountpoint instead of relying on this option
+            mountpoint_enabled=True,
+            ipc_win32_mutex_name="resana-secure",
+            preferred_org_creation_backend_addr=BackendAddr.from_url(
+                "parsec://localhost:6777?no_ssl=true"
+            ),
         ),
+        rie_server_addrs=rie_server_addrs,
     )
 
     _setup_logging(namespace.log_level, namespace.log_file)
@@ -169,6 +206,8 @@ def run_cli(
         async def trio_main() -> None:
             async with quart_app_context() as app:
                 await app.serve()
+
+        trio.run(trio_main)
 
     else:
         # Inline import to avoid importing pyqt if gui is disabled

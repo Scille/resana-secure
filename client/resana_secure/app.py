@@ -12,13 +12,12 @@ from quart import current_app as quart_current_app
 from hypercorn.config import Config as HyperConfig
 from hypercorn.trio import serve as hypercorn_trio_serve
 
-from parsec.core.config import CoreConfig
-
 # Expose current_app as a ResanaApp for all modules
 if True:  # Hack to please flake8
     current_app = cast("ResanaApp", quart_current_app)
 
 from .ltcm import LTCM
+from .config import ResanaConfig
 from .cores_manager import CoresManager
 from .invites_manager import ClaimersManager, GreetersManager
 
@@ -39,7 +38,7 @@ class ResanaApp(QuartTrio):
     cores_manager: CoresManager
     greeters_manager: GreetersManager
     claimers_manager: ClaimersManager
-    core_config: CoreConfig
+    resana_config: ResanaConfig
     hyper_config: HyperConfig
 
     async def serve(self) -> None:
@@ -48,7 +47,8 @@ class ResanaApp(QuartTrio):
 
 @asynccontextmanager
 async def app_factory(
-    config: CoreConfig, client_allowed_origins: List[str]
+    config: ResanaConfig,
+    client_allowed_origins: List[str],
 ) -> AsyncIterator[ResanaApp]:
     app = ResanaApp(__name__, static_folder=None)
     app.config.from_mapping(
@@ -112,8 +112,11 @@ async def app_factory(
 
     async with LTCM.run() as ltcm:
         app.ltcm = ltcm
-        app.core_config = config
-        app.cores_manager = CoresManager(core_config=config, ltcm=ltcm)
+        app.resana_config = config
+        app.cores_manager = CoresManager(
+            config=config,
+            ltcm=ltcm,
+        )
         app.greeters_manager = GreetersManager()
         app.claimers_manager = ClaimersManager()
         yield app
@@ -123,7 +126,7 @@ async def app_factory(
 async def serve_app(
     host: str,
     port: int,
-    config: CoreConfig,
+    config: ResanaConfig,
     client_allowed_origins: List[str],
 ) -> AsyncIterator[ResanaApp]:
     hyper_config = HyperConfig.from_mapping(
@@ -134,6 +137,9 @@ async def serve_app(
         }
     )
 
-    async with app_factory(config=config, client_allowed_origins=client_allowed_origins) as app:
+    async with app_factory(
+        config=config,
+        client_allowed_origins=client_allowed_origins,
+    ) as app:
         app.hyper_config = hyper_config
         yield app

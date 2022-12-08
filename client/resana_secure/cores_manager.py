@@ -9,9 +9,8 @@ import structlog
 from PyQt5.QtWidgets import QApplication
 
 from parsec.core.core_events import CoreEvent
-from parsec.core.types import LocalDevice
+from parsec.core.types import LocalDevice, BackendOrganizationAddr
 from parsec.core.logged_core import logged_core_factory, LoggedCore
-from parsec.core.config import CoreConfig
 from parsec.core.local_device import (
     list_available_devices,
     load_device_with_password,
@@ -20,7 +19,7 @@ from parsec.core.local_device import (
 )
 from parsec.api.protocol import OrganizationID
 
-
+from .config import ResanaConfig
 from .crypto import decrypt_parsec_key, CryptoError
 from .ltcm import ComponentNotRegistered, LTCM
 
@@ -91,10 +90,27 @@ def device_has_encrypted_key(device: AvailableDevice) -> bool:
     return load_device_encrypted_key(device) is not None
 
 
+def is_org_hosted_on_rie(
+    org_addr: BackendOrganizationAddr, rie_server_addrs: List[Tuple[str, Optional[int]]]
+) -> bool:
+    # `rie_server_addrs` contains a list of tuple of either (domain, port) or (domain, None)
+    # We check if our org addr matches either of those.
+    # If `rie_server_addrs` we return True for the sake of compatibility
+    return (org_addr.hostname, None) in rie_server_addrs or (
+        org_addr.hostname,
+        org_addr.port,
+    ) in rie_server_addrs
+
+
 @asynccontextmanager
 async def start_core(
-    core_config: CoreConfig, device: LocalDevice, on_stopped: Callable[[], None]
+    config: ResanaConfig, device: LocalDevice, on_stopped: Callable[[], None]
 ) -> AsyncIterator[LoggedCore]:
+
+    core_config = config.core_config.evolve(
+        mountpoint_enabled=is_org_hosted_on_rie(device.organization_addr, config.rie_server_addrs)
+    )
+
     async with logged_core_factory(core_config, device) as core:
         try:
             core.event_bus.connect(
@@ -116,16 +132,16 @@ def _on_fs_sync_refused_by_sequester_service(
 ) -> None:
     if event == CoreEvent.FS_ENTRY_SYNC_REJECTED_BY_SEQUESTER_SERVICE:
         file_path = kwargs["file_path"]
-        instance = cast(ResanaGuiApp, QApplication.instance())
+        instance = cast("ResanaGuiApp", QApplication.instance())
         instance.file_rejected.emit(file_path)
 
 
 class CoresManager:
-    def __init__(self, core_config: CoreConfig, ltcm: LTCM):
+    def __init__(self, config: ResanaConfig, ltcm: LTCM):
         self._email_to_auth_token: Dict[Tuple[OrganizationID, str], str] = {}
         self._auth_token_to_component_handle: Dict[str, int] = {}
         self._login_lock = trio.Lock()
-        self.core_config = core_config
+        self.config = config
         self.ltcm = ltcm
 
     async def _authenticate(
@@ -181,7 +197,7 @@ class CoresManager:
             component_handle = await self.ltcm.register_component(
                 partial(
                     start_core,
-                    core_config=self.core_config,
+                    config=self.config,
                     device=loaded_device,
                     on_stopped=_on_stopped,
                 )
@@ -200,7 +216,7 @@ class CoresManager:
         organization_id: Optional[OrganizationID] = None,
     ) -> str:
         matching_devices = find_matching_devices(
-            self.core_config.config_dir, email=email, organization_id=organization_id
+            self.config.core_config.config_dir, email=email, organization_id=organization_id
         )
         if not matching_devices:
             raise CoreDeviceNotFoundError
@@ -263,7 +279,7 @@ class CoresManager:
         self, only_offline_available: bool = False
     ) -> dict[Tuple[OrganizationID, str], Tuple[AvailableDevice, Optional[str]]]:
         devices = {}
-        for available_device in list_available_devices(self.core_config.config_dir):
+        for available_device in list_available_devices(self.config.core_config.config_dir):
             if only_offline_available and not device_has_encrypted_key(available_device):
                 continue
             async with self._login_lock:

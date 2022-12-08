@@ -466,7 +466,7 @@ async def test_encrypted_key_auth(
 
     app = cast(ResanaApp, test_app.app)
 
-    devices = list_available_devices(app.core_config.config_dir)
+    devices = list_available_devices(app.resana_config.core_config.config_dir)
     assert len(devices) == 1
     device = devices[0]
     assert not (device.key_file_path.parent / f"{device.slughash}.enc_key").exists()

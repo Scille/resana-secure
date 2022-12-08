@@ -317,7 +317,7 @@ async def claimer_4_finalize(apitoken: str) -> tuple[dict[str, Any], int]:
                 raise APIException(409, {"error": "invalid_state"})
 
             save_device_with_password_in_config(
-                config_dir=current_app.core_config.config_dir,
+                config_dir=current_app.resana_config.core_config.config_dir,
                 device=new_device,
                 password=password,
             )

@@ -29,7 +29,7 @@ from hypercorn.typing import (
     ASGISendCallable,
     ASGI3Framework,
 )
-from hypercorn.typing import HTTPResponseStartEvent, HTTPResponseBodyEvent
+from hypercorn.typing import HTTPResponseStartEvent, HTTPResponseBodyEvent, WebsocketCloseEvent
 
 logger = get_logger()
 
@@ -83,22 +83,32 @@ class AsgiIpFilteringMiddleware:
             client = scope.get("client")
             if client is None:
                 logger.info("No client information is provided", **scope)
-                return await self.http_reject(receive, send)
+                return await self.http_reject(scope, send)
             host, _ = client
             if not self.is_authorized(host):
                 logger.info("A connection has been rejected", **scope)
-                return await self.http_reject(receive, send, host)
+                return await self.http_reject(scope, send, host)
         return await self.asgi_app(scope, receive, send)
 
     async def http_reject(
         self,
-        receive: ASGIReceiveCallable,
+        scope: Scope,
         send: ASGISendCallable,
         client_host: str = "<not provided>",
     ) -> None:
         """
         Reject the request with an `403` HTTP error code.
         """
+        if scope["type"] == "websocket":
+            close_event: WebsocketCloseEvent = {
+                "type": "websocket.close",
+                "code": 403,
+                "reason": None,
+            }
+            await send(close_event)
+            return
+
+        assert scope["type"] == "http"
         content = self.MESSAGE_REJECTED.format(client_host).encode()
         content_length = f"{len(content)}".encode()
         start_event: HTTPResponseStartEvent = {
@@ -133,7 +143,9 @@ def patch_hypercorn_trio_serve() -> None:
 # Testing
 try:
     import pytest
+    from quart import websocket
     from quart_trio import QuartTrio
+    from quart.testing.connections import WebsocketDisconnectError
 except ImportError:
     pass
 else:
@@ -143,12 +155,19 @@ else:
         app = QuartTrio(__name__)
 
         @app.route("/")
-        async def hello() -> str:  # type: ignore[misc]
+        async def http_route() -> str:  # type: ignore[misc]
             return "Hello World"
+
+        @app.websocket("/ws")
+        async def ws_route() -> None:  # type: ignore[misc]
+            await websocket.accept()
+            await websocket.send("WS event")
 
         app.asgi_app = AsgiIpFilteringMiddleware(app.asgi_app, "127.0.0.0/24 128.0.0.0/24")  # type: ignore[assignment]
 
         client = app.test_client()
+
+        # Regular route
         response = await client.get("/", scope_base={"client": ("127.0.0.1", 1234)})
         assert response.status_code == 200
         assert (await response.data).decode() == "Hello World"
@@ -162,3 +181,15 @@ else:
         assert response.content_type == "text/html; charset=UTF-8"
         expected = AsgiIpFilteringMiddleware.MESSAGE_REJECTED.format("129.0.0.1")
         assert (await response.data).decode() == expected
+
+        # Websocket route
+        async with client.websocket("/ws", scope_base={"client": ("127.0.0.1", 1234)}) as ws:  # type: ignore[call-arg]
+            assert await ws.receive() == "WS event"
+
+        async with client.websocket("/ws", scope_base={"client": ("128.0.0.1", 1234)}) as ws:  # type: ignore[call-arg]
+            assert await ws.receive() == "WS event"
+
+        with pytest.raises(WebsocketDisconnectError) as ctx:
+            async with client.websocket("/ws", scope_base={"client": ("129.0.0.1", 1234)}) as ws:  # type: ignore[call-arg]
+                await ws.receive()
+        assert ctx.value.args == (403,)
