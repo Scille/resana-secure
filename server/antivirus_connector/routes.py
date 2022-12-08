@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Optional
 from io import BytesIO
 import structlog
@@ -55,12 +57,11 @@ async def reassemble_file(manifest: FileManifest, organization_id: OrganizationI
             cleardata = block.key.decrypt(block_data)
         except Exception as exc:
             raise ReassemblyError(f"Failed to decrypt a block: {exc}") from exc
-
         try:
             if out.tell() != block.offset:
                 out.seek(block.offset)
             if block.size != len(cleardata):
-                out.write(cleardata[block.size])
+                out.write(cleardata[: block.size])
             else:
                 out.write(cleardata)
         except OSError as exc:
@@ -70,7 +71,7 @@ async def reassemble_file(manifest: FileManifest, organization_id: OrganizationI
 
 
 @bp.route("/submit", methods=["POST"])
-async def submit():
+async def submit() -> tuple[dict[str, str], int]:
     # 400 status should only used when detecting a malicious file, other 4xx/5xx should
     # be used in case bad arguments or temporary failure. This is because Parsec consider
     # 400 status as an indication to not save the vlob and other status as a "retry later"
@@ -78,7 +79,7 @@ async def submit():
     try:
         organization_id = OrganizationID(request.args.get("organization_id", ""))
         service_id = SequesterServiceID.from_hex(request.args.get("service_id", ""))
-        vlob = await request.get_data(cache=False)
+        vlob = await request.get_data(cache=False, as_text=False, parse_form_data=False)
     except RequestEntityTooLarge as exc:
         # Request body is too large
         logger.warning("Request too large", exc_info=exc)

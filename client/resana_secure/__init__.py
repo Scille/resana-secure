@@ -1,6 +1,6 @@
 # Early monkey patches
 
-from typing import Any
+from typing import Any, cast
 
 
 def _monkeypatch_parsec_version() -> None:
@@ -30,7 +30,7 @@ def _monkeypatch_greyed_dialog() -> None:
     # The dialog opens with a grey rectangle. In Parsec, it serves as a transparent
     # background that covers the whole window to prevent its use (makes the dialog modal).
     # In Resana, we have no window to cover so we don't draw the grey rectangle.
-    GreyedDialog.paintEvent = _paint_event  # type: ignore[assignment]
+    cast(Any, GreyedDialog).paintEvent = _paint_event
 
 
 _monkeypatch_user_agent()
