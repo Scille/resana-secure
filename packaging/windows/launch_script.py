@@ -3,9 +3,17 @@
 import os
 import sys
 import json
+import multiprocessing
 from pathlib import Path
 
-from resana_secure.cli import run_cli
+
+# Enable freeze support for supporting the multiprocessing module
+# This is useful for running qt dialogs in subprocesses.
+# We do this before even importing third parties in order to increase performance.
+multiprocessing.freeze_support()
+
+
+from resana_secure.cli import run_cli  # noqa: E402
 
 
 config_dir = (Path(os.environ["APPDATA"]) / "resana_secure").absolute()
