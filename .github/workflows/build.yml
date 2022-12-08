@@ -57,6 +57,9 @@ jobs:
       - name: '[Client] Install Project'
         run: poetry install -v
         working-directory: client
+      - name: '[Client] Check fuse'
+        run: poetry run python -c "import fuse"
+        working-directory: client
       - name: '[Client] Run Tests'
         run: poetry run py.test client_tests
         timeout-minutes: 10
