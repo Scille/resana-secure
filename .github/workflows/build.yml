@@ -46,6 +46,8 @@ jobs:
         uses: actions/setup-python@d09bd5e6005b175076f227b13d9730d56e9dcfcb  # pin@v4.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+      - name: 'Install fuse'
+        run: sudo apt-get install -y libfuse2
       - name: 'Install tools'
         working-directory: client
         run: |
