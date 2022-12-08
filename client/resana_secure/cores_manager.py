@@ -132,7 +132,7 @@ def _on_fs_sync_refused_by_sequester_service(
 ) -> None:
     if event == CoreEvent.FS_ENTRY_SYNC_REJECTED_BY_SEQUESTER_SERVICE:
         file_path = kwargs["file_path"]
-        instance = cast(ResanaGuiApp, QApplication.instance())
+        instance = cast("ResanaGuiApp", QApplication.instance())
         instance.file_rejected.emit(file_path)
 
 
