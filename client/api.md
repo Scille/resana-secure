@@ -76,7 +76,7 @@ Deux différentes options sont disponibles pour l'authentification :
     "organization": Optional<string>,
     "email": <string>,
     "encrypted_key": <base64>,
-    "user_password": <string>
+    "user_password": <string>, caractères spéciaux échapés
 }
 ```
 
