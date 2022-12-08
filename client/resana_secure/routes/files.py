@@ -9,7 +9,7 @@ from quart import Blueprint, request
 from base64 import b64decode
 
 from PyQt5.QtWidgets import QApplication
-from typing import Optional, Sequence, cast, TypedDict, Any
+from typing import Optional, Sequence, cast, TypedDict, Any, List
 
 from parsec._parsec import DateTime
 from parsec.core.logged_core import LoggedCore
@@ -37,6 +37,11 @@ class EntryInfo(TypedDict):
     created: DateTime
     updated: DateTime
     size: int
+
+
+def get_file_extension(filename: EntryName) -> str:
+    extension = filename.str.rsplit(".", 1)[-1]
+    return (extension if extension != filename.str else "").lower()
 
 
 # TODO: Parsec api should provide a way to do this
@@ -292,8 +297,6 @@ async def get_workspace_folder_content(
                 )
                 if child_stat["type"] == "folder":
                     continue
-                extension = child_name.str.rsplit(".", 1)[-1]
-                extension = extension if extension != child_name.str else ""
                 cooked_files.append(
                     {
                         "id": child_stat["id"].hex,
@@ -301,7 +304,7 @@ async def get_workspace_folder_content(
                         "created": child_stat["created"].to_rfc3339(),
                         "updated": child_stat["updated"].to_rfc3339(),
                         "size": child_stat["size"],
-                        "extension": extension,
+                        "extension": get_file_extension(child_name),
                     }
                 )
             cooked_files.sort(key=lambda x: x["name"])
@@ -454,3 +457,66 @@ def _open_item(fspath: PurePath) -> None:
         subprocess.call(["xdg-open", fspath])
     elif sys.platform == "win32":
         os.startfile(fspath)
+
+
+@files_bp.route("/workspaces/<string:workspace_id>/search", methods=["POST"])
+@authenticated
+async def search_workspace_item(
+    core: LoggedCore,
+    workspace_id: str,
+) -> tuple[dict[str, Any], int]:
+
+    try:
+        workspace_id_parsed = EntryID.from_hex(workspace_id)
+    except ValueError:
+        raise APIException(404, {"error": "unknown_workspace"})
+    async with check_data() as (data, bad_fields_set):
+        case_sensitive = data.get("case_sensitive", False)
+        if not isinstance(case_sensitive, bool):
+            bad_fields_set.add("case_sensitive")
+        exclude_folders = data.get("exclude_folders", False)
+        if not isinstance(exclude_folders, bool):
+            bad_fields_set.add("exclude_folders")
+        search_string = data.get("string")
+        if not isinstance(search_string, str):
+            bad_fields_set.add("string")
+
+    with backend_errors_to_api_exceptions():
+        workspace = core.user_fs.get_workspace(workspace_id_parsed)
+
+        def _matches(file_name: EntryName) -> bool:
+            return (case_sensitive and search_string in file_name.str) or (
+                not case_sensitive and search_string.lower() in file_name.str.lower()
+            )
+
+        async def _recursive_search(path: FsPath) -> List[dict[str, Any]]:
+            entry_info = cast(EntryInfo, await workspace.path_info(path=path))
+            files = []
+
+            if (
+                path != FsPath("/")
+                and (not exclude_folders or exclude_folders and entry_info["type"] != "folder")
+                and _matches(path.name)
+            ):
+
+                files.append(
+                    {
+                        "id": entry_info["id"].hex,
+                        "name": path.name.str,
+                        "path": str(path.parent),
+                        "type": entry_info["type"],
+                        "created": entry_info["created"].to_rfc3339(),
+                        "updated": entry_info["updated"].to_rfc3339(),
+                        "size": entry_info["size"] if entry_info["type"] != "folder" else 0,
+                        "extension": get_file_extension(path.name),
+                    }
+                )
+
+            if entry_info["type"] == "folder":
+                for child in entry_info["children"]:
+                    files.extend(await _recursive_search(path / child))
+            return files
+
+    files = await _recursive_search(FsPath("/"))
+
+    return {"files": files}, 200
