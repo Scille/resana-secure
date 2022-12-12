@@ -10,7 +10,11 @@ import concurrent.futures
 import time
 import urllib.parse
 import contextlib
+import uuid
 from dataclasses import dataclass
+
+
+from resana_secure.cli import get_default_dirs
 
 
 logger = logging.getLogger("test-resana")
@@ -18,7 +22,11 @@ logger = logging.getLogger("test-resana")
 DEFAULT_EMAIL = "gordon.freeman@blackmesa.nm"
 INVITEE_EMAIL = "eli.vance@blackmesa.nm"
 DEFAULT_PASSWORD = "P@ssw0rd"
-DEFAULT_WORKSPACE = "Resonance Cascade Incident"
+
+# Using a UUID in case of multiple launches in row,
+# so we can always have a unique name for the mountpoint
+# on the file system, instead of Parsec appending a number.
+DEFAULT_WORKSPACE = f"RCI_{uuid.uuid4()}"
 
 TESTS_STATUS: dict[str, bool] = {}
 
@@ -66,6 +74,8 @@ def make_request(method, url, auth_token=None, headers=None, data=None, files=No
 def test_workspaces(auth_token, resana_addr):
     VARIABLES = {}
 
+    MOUNTPOINT_DIR, _, _ = get_default_dirs()
+
     # List workspaces
     with run_test("List workspaces") as context:
         r = make_request("GET", f"{resana_addr}/workspaces", auth_token=auth_token)
@@ -79,7 +89,7 @@ def test_workspaces(auth_token, resana_addr):
             "POST",
             f"{resana_addr}/workspaces",
             auth_token=auth_token,
-            json={"name": "Resonance Cascade Incident"},
+            json={"name": DEFAULT_WORKSPACE},
         )
         context.request = r
         assert r.status_code == 201
@@ -92,6 +102,7 @@ def test_workspaces(auth_token, resana_addr):
         context.request = r
         assert r.status_code == 200
         assert r.json() == {"workspaces": [{"id": ANY, "name": DEFAULT_WORKSPACE, "role": "OWNER"}]}
+        assert (MOUNTPOINT_DIR / DEFAULT_WORKSPACE).is_dir()
 
     # Renaming our new workspace
     with run_test("Rename workspace") as context:
@@ -230,6 +241,8 @@ def test_files(auth_token, resana_addr):
     SMALL_FILE_SIZE = 1024
     LARGE_FILE_SIZE = 2**20 * 20  # 20mB
 
+    MOUNTPOINT_DIR, _, _ = get_default_dirs()
+
     # Get a workspace id
     with run_test("Get workspace id") as context:
         r = make_request("GET", f"{resana_addr}/workspaces", auth_token=auth_token)
@@ -254,6 +267,7 @@ def test_files(auth_token, resana_addr):
             "updated": ANY,
         }
         VARIABLES["root_folder_id"] = r.json()["id"]
+        assert [p for p in (MOUNTPOINT_DIR / DEFAULT_WORKSPACE).iterdir()] == []
 
     # Create a folder
     with run_test("Create a folder") as context:
@@ -270,6 +284,8 @@ def test_files(auth_token, resana_addr):
         assert r.status_code == 201
         assert r.json() == {"id": ANY}
         VARIABLES["sub_folder_id"] = r.json()["id"]
+        assert [p.name for p in (MOUNTPOINT_DIR / DEFAULT_WORKSPACE).iterdir()] == ["Folder"]
+        assert [p.name for p in (MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder").iterdir()] == []
 
     # List folders
     with run_test("List folder to check new folder") as context:
@@ -313,6 +329,13 @@ def test_files(auth_token, resana_addr):
         assert r.status_code == 201
         assert r.json() == {"id": ANY}
         VARIABLES["file1_id"] = r.json()["id"]
+        assert (MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test.txt").is_file()
+        assert (MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test.txt").stat().st_size == len(
+            file_content
+        )
+        assert (
+            MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test.txt"
+        ).read_bytes() == file_content
 
     # Post a small file with multipart
     with run_test("Post small file with multipart") as context:
@@ -328,6 +351,13 @@ def test_files(auth_token, resana_addr):
         assert r.status_code == 201
         assert r.json() == {"id": ANY}
         VARIABLES["file2_id"] = r.json()["id"]
+        assert (MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test2.txt").is_file()
+        assert (MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test2.txt").stat().st_size == len(
+            file_content
+        )
+        assert (
+            MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test2.txt"
+        ).read_bytes() == file_content
 
     # Post a large file with JSON
     with run_test("Post large file with JSON") as context:
@@ -346,6 +376,10 @@ def test_files(auth_token, resana_addr):
         assert r.status_code == 201
         assert r.json() == {"id": ANY}
         VARIABLES["file3_id"] = r.json()["id"]
+        assert (MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test3.txt").is_file()
+        assert (MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test3.txt").stat().st_size == len(
+            file_content
+        )
 
     # Post a large file with multipart
     with run_test("Post large file with multipart") as context:
@@ -361,6 +395,10 @@ def test_files(auth_token, resana_addr):
         assert r.status_code == 201
         assert r.json() == {"id": ANY}
         VARIABLES["file4_id"] = r.json()["id"]
+        assert (MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test4.txt").is_file()
+        assert (MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test4.txt").stat().st_size == len(
+            file_content
+        )
 
     # Check if the files were created
     with run_test("Check files created") as context:
@@ -407,6 +445,12 @@ def test_files(auth_token, resana_addr):
                 },
             ]
         }
+        assert [p.name for p in (MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder").iterdir()] == [
+            "test.txt",
+            "test2.txt",
+            "test3.txt",
+            "test4.txt",
+        ]
 
     # Rename the file
     with run_test("Rename a file") as context:
@@ -418,6 +462,8 @@ def test_files(auth_token, resana_addr):
         )
         context.request = r
         assert r.status_code == 200
+        assert not (MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test.txt").exists()
+        assert (MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test_renamed.txt").exists()
 
     # Check the folder
     with run_test("Check file renamed") as context:
@@ -464,6 +510,12 @@ def test_files(auth_token, resana_addr):
                 },
             ]
         }
+        assert [p.name for p in (MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder").iterdir()] == [
+            "test2.txt",
+            "test3.txt",
+            "test4.txt",
+            "test_renamed.txt",
+        ]
 
     # Delete the file
     with run_test("Delete a file") as context:
@@ -512,6 +564,11 @@ def test_files(auth_token, resana_addr):
                 },
             ]
         }
+        assert [p.name for p in (MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder").iterdir()] == [
+            "test2.txt",
+            "test3.txt",
+            "test4.txt",
+        ]
 
 
 def test_user_invitations(auth_token, resana_addr, org_id):
@@ -1063,7 +1120,7 @@ if __name__ == "__main__":
         "-p",
         "--parsec",
         type=str,
-        required=True,
+        default="parsec://localhost:6888?no_ssl=true",
         help="Parsec backend address",
     )
     parser.add_argument(
