@@ -13,6 +13,9 @@
 !define PROGRAM_WEB_SITE "https://resana.numerique.gouv.fr"
 !define APPGUID "918CE5EB-F66D-45EB-9A0A-F013B480A5BC"
 
+!define CHECK_ICON_GUID "{5449BC90-310B-40A8-9ABF-C5CFCEC7F430}"
+!define REFRESH_ICON_GUID "{FF552D5D-8272-41CD-B0A8-E01188EBA329}"
+
 # Detect version from file
 !define BUILD_DIR "build"
 !searchparse /file ${BUILD_DIR}/manifest.ini `target = "` PROGRAM_FREEZE_BUILD_DIR `"`
@@ -316,6 +319,16 @@ Section "WinFSP" Section2
     ${EndIf}
 SectionEnd
 
+Section "Icon overlay handlers" Section3
+    # Write the registry key and register the dll for icon overlayds
+
+    WriteRegStr HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers" "ICheckIconHandler" "${CHECK_ICON_GUID}"
+    WriteRegStr HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers" "IRefreshIconHandler" "${REFRESH_ICON_GUID}"
+    ExecWait '$SYSDIR\regsvr32.exe /s /n /i:user "$INSTDIR\check-icon-handler.dll"'
+    ExecWait '$SYSDIR\regsvr32.exe /s /n /i:user "$INSTDIR\refresh-icon-handler.dll"'
+SectionEnd
+
+
 # Hidden: Remove obsolete entries
 Section "-Remove obsolete entries" Section4
     # Remove obsolete parsec registry configuration
@@ -374,6 +387,13 @@ Section Uninstall
   DeleteRegKey HKCU "Software\Classes\Wow6432Node\CLSID\{${APPGUID}"
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\Desktop\NameSpace\{${APPGUID}"
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel\{${APPGUID}"
+
+  # Icon overlay handlers
+  DeleteRegKey HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\ICheckIconHandler"
+  DeleteRegKey HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\IRefreshIconHandler"
+ ExecWait '$SYSDIR\regsvr32.exe /s /n /u /i:user "$INSTDIR\check-icon-handler.dll"'
+ ExecWait '$SYSDIR\regsvr32.exe /s /n /u /i:user "$INSTDIR\refresh-icon-handler.dll"'
+
 
 SectionEnd
 
