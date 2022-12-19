@@ -95,6 +95,7 @@ async def test_app(core_config: ResanaConfig, client_origin: str):
     async with app_factory(
         config=core_config,
         client_allowed_origins=[client_origin],
+        with_rate_limiter=False,
     ) as app:
         async with app.test_app() as test_app:
             yield test_app
