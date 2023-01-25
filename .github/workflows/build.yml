@@ -22,11 +22,11 @@ jobs:
   Quality:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: actions/setup-python@v2
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - uses: pre-commit/action@v2.0.0
+      - uses: pre-commit/action@v3.0.0
         env:
           SKIP: mypy-client
 
@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 'Checkout'
-        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # pin@v3.0.2
+        uses: actions/checkout@v3 # pin@v3.0.2
         with:
             submodules: true
       - name: 'Set up Python'
@@ -74,7 +74,7 @@ jobs:
         timeout-minutes: 10
         working-directory: server
       - name: '[Quality] Run pre-commit with mypy-client'
-        uses: pre-commit/action@v2.0.0
+        uses: pre-commit/action@v3.0.0
 
 
 #################################################################################
@@ -85,7 +85,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: 'Checkout'
-        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # pin@v3.0.2
+        uses: actions/checkout@v3 # pin@v3.0.2
         with:
             submodules: true
       - name: 'Set up Python'
@@ -124,7 +124,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: 'Checkout'
-        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # pin@v3.0.2
+        uses: actions/checkout@v3 # pin@v3.0.2
         with:
             submodules: true
       - name: 'Set up Python'

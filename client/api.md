@@ -82,6 +82,8 @@ Deux différentes options sont disponibles pour l'authentification :
 
 `email` correspondant à l'email utilisé lors de l'enrôlement RESANA Secure.
 
+`user_password` doit être une chaîne de caractère échappé pour répondre aux normes json
+
 Response:
 
 ```python

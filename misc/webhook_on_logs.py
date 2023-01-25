@@ -39,6 +39,11 @@ def main(cmd: List[str]) -> None:
             if not line:
                 # Command has finished
                 return
+            if (
+                "Database connection lost (PostgreSQL notification query has been lost), retrying in 1.0 seconds"
+                in line
+            ):
+                continue
             stream_out.write(line)
             stream_out.flush()
             if regex.search(line):
