@@ -14,6 +14,7 @@ hypercorn = "^0.13.2"
 # Install parsec from the submodule
 parsec-cloud = { path = "./submodules/parsec-cloud", extras = ["backend", "core"], develop = false }
 cryptography = "^38.0.1"
+quart-rate-limiter = "^0.7.0"
 
 [tool.poetry.dev-dependencies]
 pyinstaller = "~=5.3.0"

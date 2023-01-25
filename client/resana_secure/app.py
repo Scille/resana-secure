@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 
 from quart_cors import cors
 from quart_trio import QuartTrio
+from quart_rate_limiter import RateLimiter
 from quart import current_app as quart_current_app
 from hypercorn.config import Config as HyperConfig
 from hypercorn.trio import serve as hypercorn_trio_serve
@@ -49,6 +50,7 @@ class ResanaApp(QuartTrio):
 async def app_factory(
     config: ResanaConfig,
     client_allowed_origins: List[str],
+    with_rate_limiter: bool = True,
 ) -> AsyncIterator[ResanaApp]:
     app = ResanaApp(__name__, static_folder=None)
     app.config.from_mapping(
@@ -67,6 +69,8 @@ async def app_factory(
     )
 
     cors(app)
+    if with_rate_limiter:
+        RateLimiter(app)
     app.register_blueprint(auth_bp)
     app.register_blueprint(humans_bp)
     app.register_blueprint(files_bp)
@@ -140,6 +144,7 @@ async def serve_app(
     async with app_factory(
         config=config,
         client_allowed_origins=client_allowed_origins,
+        with_rate_limiter=True,
     ) as app:
         app.hyper_config = hyper_config
         yield app

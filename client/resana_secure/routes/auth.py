@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import cast, Any
 from quart import Blueprint, session
+from datetime import timedelta
+from quart_rate_limiter import rate_limit
 import base64
 
 from parsec.api.protocol import OrganizationID
@@ -24,6 +26,9 @@ async def do_head(subpath: str) -> tuple[dict[str, Any], int]:
 
 
 @auth_bp.route("/auth", methods=["POST"])
+# Limited to 1 request per second, 10 per minute
+@rate_limit(1, timedelta(seconds=1))
+@rate_limit(10, timedelta(minutes=1))
 async def do_auth() -> tuple[dict[str, Any], int]:
     # Either send a non-encrypted Parsec Key using the field `key`
     # or send the encrypted Parsec Key with the field `encrypted_key` and
