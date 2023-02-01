@@ -104,11 +104,11 @@ async def greeter_3_check_trust(core: LoggedCore, apitoken: str) -> tuple[dict[s
         raise APIException(404, {"error": "unknown_token"})
 
     async with check_data() as (data, bad_fields):
-        claimer_sas = data.get("claimer_sas")
-        if not isinstance(claimer_sas, str):
+        claimer_sas_raw = data.get("claimer_sas")
+        if not isinstance(claimer_sas_raw, str):
             bad_fields.add("claimer_sas")
         try:
-            claimer_sas = SASCode(claimer_sas)
+            claimer_sas = SASCode(claimer_sas_raw)
         except ValueError:
             bad_fields.add("claimer_sas")
 
@@ -142,10 +142,10 @@ async def greeter_4_finalize(core: LoggedCore, apitoken: str) -> tuple[dict[str,
             claimer_email = data.get("claimer_email")
             if not isinstance(claimer_email, str):
                 bad_fields.add("claimer_email")
-            granted_profile = data.get("granted_profile")
-            if granted_profile == "ADMIN":
+            granted_profile_raw = data.get("granted_profile")
+            if granted_profile_raw == "ADMIN":
                 granted_profile = UserProfile.ADMIN
-            elif granted_profile == "STANDARD":
+            elif granted_profile_raw == "STANDARD":
                 granted_profile = UserProfile.STANDARD
             else:
                 bad_fields.add("granted_profile")
@@ -233,11 +233,11 @@ async def claimer_2_check_trust(apitoken: str) -> tuple[dict[str, Any], int]:
         raise APIException(404, {"error": "unknown_token"})
 
     async with check_data() as (data, bad_fields):
-        greeter_sas = data.get("greeter_sas")
-        if not isinstance(greeter_sas, str):
+        greeter_sas_raw = data.get("greeter_sas")
+        if not isinstance(greeter_sas_raw, str):
             bad_fields.add("greeter_sas")
         try:
-            greeter_sas = SASCode(greeter_sas)
+            greeter_sas = SASCode(greeter_sas_raw)
         except ValueError:
             bad_fields.add("greeter_sas")
 

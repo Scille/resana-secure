@@ -8,8 +8,10 @@ from quart.typing import TestClientProtocol
 from hypercorn.config import Config as HyperConfig
 from hypercorn.trio import serve
 from quart_trio.testing import TrioTestApp
+from typing import Optional
 
 from parsec.core.config import CoreConfig
+from parsec._parsec import DateTime
 
 
 def get_session_cookie(authenticated_client: TestClientProtocol) -> str:
@@ -38,7 +40,11 @@ class FilesTestBed:
         if mode == "json":
             response = await self.authenticated_client.post(
                 f"/workspaces/{wid}/files",
-                json={"name": name, "parent": parent, "content": b64encode(content).decode()},
+                json={
+                    "name": name,
+                    "parent": parent,
+                    "content": b64encode(content).decode(),
+                },
             )
             body = await response.get_json()
             assert response.status_code == expected_status_code
@@ -65,10 +71,17 @@ class FilesTestBed:
             else:
                 return body
 
-    async def create_folder(self, name, parent, wid=None, expected_status_code=201):
+    async def create_folder(
+        self,
+        name,
+        parent,
+        wid=None,
+        expected_status_code=201,
+    ):
         wid = wid if wid is not None else self.wid
         response = await self.authenticated_client.post(
-            f"/workspaces/{wid}/folders", json={"name": name, "parent": parent}
+            f"/workspaces/{wid}/folders",
+            json={"name": name, "parent": parent},
         )
         body = await response.get_json()
         assert response.status_code == expected_status_code
@@ -77,7 +90,14 @@ class FilesTestBed:
         else:
             return body
 
-    async def rename_folder(self, id, new_name, new_parent, wid=None, expected_status_code=200):
+    async def rename_folder(
+        self,
+        id,
+        new_name,
+        new_parent,
+        wid=None,
+        expected_status_code=200,
+    ):
         wid = wid if wid is not None else self.wid
         response = await self.authenticated_client.post(
             f"/workspaces/{wid}/folders/rename",
@@ -89,7 +109,14 @@ class FilesTestBed:
             assert body == {}
         return body
 
-    async def rename_file(self, id, new_name, new_parent, wid=None, expected_status_code=200):
+    async def rename_file(
+        self,
+        id,
+        new_name,
+        new_parent,
+        wid=None,
+        expected_status_code=200,
+    ):
         wid = wid if wid is not None else self.wid
         response = await self.authenticated_client.post(
             f"/workspaces/{wid}/files/rename",
@@ -126,9 +153,13 @@ class FilesTestBed:
         assert response.status_code == expected_status_code
         return body
 
-    async def get_files(self, folder_id, wid=None, expected_status_code=200):
+    async def get_files(
+        self, folder_id, wid=None, expected_status_code=200, timestamp: Optional[str] = None
+    ):
         wid = wid if wid is not None else self.wid
-        response = await self.authenticated_client.get(f"/workspaces/{wid}/files/{folder_id}")
+        response = await self.authenticated_client.get(
+            f"/workspaces/{wid}/files/{folder_id}", json={"timestamp": timestamp}
+        )
         body = await response.get_json()
         assert response.status_code == expected_status_code
         return body
@@ -643,3 +674,22 @@ async def test_search_files(testbed: FilesTestBed):
             }
         ]
     }
+
+
+@pytest.mark.trio
+async def test_routes_on_timestamped(testbed: FilesTestBed):
+    # Create folder
+    folder = await testbed.create_folder(
+        "foldy", parent=testbed.root_entry_id, expected_status_code=201
+    )
+    file1 = await testbed.create_file("file1.png", parent=folder, expected_status_code=201)
+
+    await trio.sleep(3)  # Otherwise the timestamp is too early
+    timestamp = DateTime.now().to_rfc3339()
+
+    file2 = await testbed.create_file("file2.png", parent=folder, expected_status_code=201)
+
+    files = (await testbed.get_files(folder))["files"]
+    files_ts = (await testbed.get_files(folder, timestamp=timestamp))["files"]
+    assert len(files) == 2 and files[0]["id"] == file1 and files[1]["id"] == file2
+    assert len(files_ts) == 1 and files_ts[0]["id"] == file1

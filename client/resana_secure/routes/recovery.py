@@ -54,13 +54,14 @@ async def export_device(core: LoggedCore) -> tuple[dict[str, Any], int]:
 @recovery_bp.route("/recovery/import", methods=["POST"])
 async def import_device() -> tuple[dict[str, Any], int]:
     async with check_data() as (data, bad_fields):
-        file_content = data.get("recovery_device_file_content")
-        if not isinstance(file_content, str):
+        file_content_raw = data.get("recovery_device_file_content")
+        if not isinstance(file_content_raw, str):
             bad_fields.add("recovery_device_file_content")
-        try:
-            file_content = b64decode(file_content)
-        except ValueError:
-            bad_fields.add("recovery_device_file_content")
+        else:
+            try:
+                file_content = b64decode(file_content_raw)
+            except ValueError:
+                bad_fields.add("recovery_device_file_content")
 
         passphrase = data.get("recovery_device_passphrase")
         if not isinstance(passphrase, str):

@@ -21,6 +21,7 @@ from .ltcm import LTCM
 from .config import ResanaConfig
 from .cores_manager import CoresManager
 from .invites_manager import ClaimersManager, GreetersManager
+from .converters import WorkspaceConverter
 
 from .routes.auth import auth_bp
 from .routes.humans import humans_bp
@@ -67,6 +68,8 @@ async def app_factory(
         QUART_CORS_ALLOW_CREDENTIALS="*" not in client_allowed_origins,
         QUART_CORS_ALLOW_ORIGIN=client_allowed_origins,
     )
+
+    app.url_map.converters["WorkspaceID"] = WorkspaceConverter
 
     cors(app)
     if with_rate_limiter:
