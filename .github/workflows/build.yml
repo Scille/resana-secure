@@ -144,7 +144,7 @@ jobs:
         run: python freeze_program.py ../../client
         working-directory: packaging/windows/
       - name: 'Upload installer as artifact'
-        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # pin v3.1.0
+        uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # pin v3.1.2
         with:
           name: ${{ runner.os }}-${{ runner.arch }}-installer-content
           path: |
