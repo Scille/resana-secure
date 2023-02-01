@@ -455,7 +455,7 @@ async def search_workspace_item(
 ) -> tuple[dict[str, Any], int]:
     timestamp = await check_if_timestamp()
     async with check_data() as (data, bad_fields_set):
-        case_sensitive = data.get("case_sensitive")
+        case_sensitive = data.get("case_sensitive", False)
         if not isinstance(case_sensitive, bool):
             bad_fields_set.add("case_sensitive")
         exclude_folders = data.get("exclude_folders", False)
