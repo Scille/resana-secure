@@ -14,8 +14,10 @@ from ..utils import (
     APIException,
     authenticated,
     requires_rie,
-    check_data,
+    get_data,
     check_if_timestamp,
+    parse_arg,
+    BadField,
     backend_errors_to_api_exceptions,
     get_workspace_type,
 )
@@ -46,14 +48,10 @@ async def list_workspaces(core: LoggedCore) -> tuple[dict[str, Any], int]:
 @workspaces_bp.route("/workspaces", methods=["POST"])
 @authenticated
 async def create_workspaces(core: LoggedCore) -> tuple[dict[str, Any], int]:
-    async with check_data() as (data, bad_fields):
-        name_raw = data.get("name")
-        if not isinstance(name_raw, str):
-            bad_fields.add("name")
-        try:
-            name = EntryName(name_raw)
-        except ValueError:
-            bad_fields.add("name")
+    data = await get_data()
+    name = parse_arg(data, "name", type=EntryName, convert=EntryName)
+    if isinstance(name, BadField):
+        raise APIException.from_bad_fields([name])
 
     with backend_errors_to_api_exceptions():
         workspace_id = await core.user_fs.workspace_create(name)
@@ -82,21 +80,11 @@ async def sync_workspaces(core: LoggedCore) -> tuple[dict[str, Any], int]:
 @workspaces_bp.route("/workspaces/<WorkspaceID:workspace_id>", methods=["PATCH"])
 @authenticated
 async def rename_workspaces(core: LoggedCore, workspace_id: EntryID) -> tuple[dict[str, Any], int]:
-    async with check_data() as (data, bad_fields):
-        old_name_raw = data.get("old_name")
-        if not isinstance(old_name_raw, str):
-            bad_fields.add("old_name")
-        try:
-            old_name = EntryName(old_name_raw)
-        except ValueError:
-            bad_fields.add("old_name")
-        new_name_raw = data.get("new_name")
-        if not isinstance(new_name_raw, str):
-            bad_fields.add("new_name")
-        try:
-            new_name = EntryName(new_name_raw)
-        except ValueError:
-            bad_fields.add("new_name")
+    data = await get_data()
+    old_name = parse_arg(data, "old_name", type=EntryName, convert=EntryName)
+    new_name = parse_arg(data, "new_name", type=EntryName, convert=EntryName)
+    if isinstance(old_name, BadField) or isinstance(new_name, BadField):
+        raise APIException.from_bad_fields([old_name, new_name])
 
     for entry in core.user_fs.get_user_manifest().workspaces:
         if entry.id == workspace_id:
@@ -138,18 +126,11 @@ async def get_workspace_share_info(
 @workspaces_bp.route("/workspaces/<WorkspaceID:workspace_id>/share", methods=["PATCH"])
 @authenticated
 async def share_workspace(core: LoggedCore, workspace_id: EntryID) -> tuple[dict[str, Any], int]:
-    async with check_data() as (data, bad_fields):
-        email = data.get("email")
-        if not isinstance(email, str):
-            bad_fields.add("email")
-        role = data.get("role")
-        if role is not None:
-            for choice in RealmRole.VALUES:
-                if choice.str == role:
-                    role = choice
-                    break
-            else:
-                bad_fields.add("role")
+    data = await get_data()
+    email = parse_arg(data, "email", type=str)
+    role = parse_arg(data, "role", type=RealmRole, convert=RealmRole.from_str, missing=None)
+    if isinstance(email, BadField) or isinstance(role, BadField):
+        raise APIException.from_bad_fields([email, role])
 
     with backend_errors_to_api_exceptions():
         results, _ = await core.find_humans(query=email, per_page=1)
@@ -243,10 +224,10 @@ async def toggle_offline_availability(
     except FSWorkspaceNotFoundError:
         raise APIException(404, {"error": "unknown_workspace"})
 
-    async with check_data() as (data, bad_fields):
-        enable = data.get("enable")
-        if not isinstance(enable, bool):
-            bad_fields.add("enable")
+    data = await get_data()
+    enable = parse_arg(data, "enable", type=bool)
+    if isinstance(enable, BadField):
+        raise APIException.from_bad_fields([enable])
 
     info = workspace_fs.get_remanence_manager_info()
     if enable and info.is_block_remanent:

@@ -13,7 +13,7 @@ from ..cores_manager import (
     CoreDeviceNotFoundError,
     CoreDeviceInvalidPasswordError,
 )
-from ..utils import check_data, APIException, get_auth_token
+from ..utils import APIException, get_auth_token, get_data, parse_arg, BadField
 from ..app import current_app
 
 
@@ -33,37 +33,41 @@ async def do_auth() -> tuple[dict[str, Any], int]:
     # Either send a non-encrypted Parsec Key using the field `key`
     # or send the encrypted Parsec Key with the field `encrypted_key` and
     # the user password with the field `user_password`.
-
-    async with check_data() as (data, bad_fields):
-        email = data.get("email")
-        if not isinstance(email, str):
-            bad_fields.add("email")
-        key = data.get("key")
-        encrypted_key = data.get("encrypted_key")
-        user_password = data.get("user_password")
-        if key and encrypted_key and user_password:
-            raise APIException(
-                400, {"error": "cannot use both authentication modes at the same time"}
-            )
-        # In this case we default to `key` being the required one
-        if not encrypted_key and not user_password:
-            if not isinstance(key, str):
-                bad_fields.add("key")
-        else:
-            try:
-                # Check if it's base64 but don't store the result
-                base64.b64decode(encrypted_key)
-            except (ValueError, TypeError):
-                bad_fields.add("encrypted_key")
-            if not isinstance(user_password, str):
-                bad_fields.add("user_password")
-
-        organization_id = data.get("organization")
-        if organization_id is not None:
-            try:
-                organization_id = OrganizationID(organization_id)
-            except (NameError, TypeError, ValueError):
-                bad_fields.add("organization")
+    data = await get_data()
+    email = parse_arg(data, "email", type=str)
+    key = parse_arg(data, "key", type=str, missing=None)
+    encrypted_key = parse_arg(data, "encrypted_key", type=str, missing=None)
+    user_password = parse_arg(data, "user_password", type=str, missing=None)
+    organization_id = parse_arg(
+        data, "organization", type=OrganizationID, convert=OrganizationID, missing=None
+    )
+    if (
+        isinstance(email, BadField)
+        or isinstance(key, BadField)
+        or isinstance(encrypted_key, BadField)
+        or isinstance(user_password, BadField)
+        or isinstance(organization_id, BadField)
+    ):
+        raise APIException.from_bad_fields([key, encrypted_key, user_password, organization_id])
+    if key and encrypted_key and user_password:
+        raise APIException(400, {"error": "cannot use both authentication modes at the same time"})
+    if not encrypted_key and not user_password:
+        if not isinstance(key, str):
+            raise APIException.from_bad_fields([BadField(name="key")])
+    elif encrypted_key and user_password:
+        try:
+            # Check if it's base64 but don't store the result
+            base64.b64decode(encrypted_key)
+        except (ValueError, TypeError):
+            raise APIException.from_bad_fields([BadField(name="encrypted_key")])
+        if not isinstance(user_password, str):
+            raise APIException.from_bad_fields([BadField(name="user_password")])
+    else:
+        raise APIException.from_bad_fields(
+            [BadField(name="encrypted_key")]
+            if not encrypted_key
+            else [BadField(name="user_password")]
+        )
 
     cores_manager = cast(CoresManager, current_app.cores_manager)
     try:

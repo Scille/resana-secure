@@ -16,7 +16,7 @@ from parsec.core.invite import (
 from parsec._parsec import SequesterVerifyKeyDer, save_device_with_password_in_config
 from parsec.core.types import BackendOrganizationBootstrapAddr
 from parsec.api.protocol import HumanHandle, DeviceLabel
-from ..utils import APIException, backend_errors_to_api_exceptions, check_data
+from ..utils import APIException, backend_errors_to_api_exceptions, get_data, parse_arg, BadField
 from ..app import current_app
 
 organization_bp = Blueprint("organization_api", __name__)
@@ -24,29 +24,35 @@ organization_bp = Blueprint("organization_api", __name__)
 
 @organization_bp.route("/organization/bootstrap", methods=["POST"])
 async def organization_bootstrap() -> tuple[dict[str, Any], int]:
-    async with check_data() as (data, bad_fields):
-        email = data.get("email")
+    data = await get_data()
+    email = parse_arg(data, "email", type=str)
+    password = parse_arg(data, "key", type=str)
+    backend_addr = parse_arg(
+        data,
+        "organization_url",
+        type=BackendOrganizationBootstrapAddr,
+        convert=BackendOrganizationBootstrapAddr.from_url,
+    )
+    sequester_key_raw = parse_arg(data, "sequester_verify_key", type=str, missing=None)
+    if (
+        isinstance(email, BadField)
+        or isinstance(password, BadField)
+        or isinstance(backend_addr, BadField)
+        or isinstance(sequester_key_raw, BadField)
+    ):
+        raise APIException.from_bad_fields([email, password, backend_addr, sequester_key_raw])
+
+    try:
+        human_handle = HumanHandle(label="-unknown-", email=email)
+    except (ValueError, TypeError):
+        raise APIException.from_bad_fields([BadField(name="email")])
+    if sequester_key_raw:
         try:
-            human_handle = HumanHandle(label="-unknown-", email=email)
-        except (ValueError, TypeError):
-            # We provide the label ourselve, error can only mean an invalid email
-            bad_fields.add("email")
-        password = data.get("key")
-        if not isinstance(password, str):
-            bad_fields.add("key")
-        organization_url = data.get("organization_url")
-        try:
-            backend_addr = BackendOrganizationBootstrapAddr.from_url(organization_url)
-        except ValueError:
-            bad_fields.add("organization_url")
-        sequester_key_raw = data.get("sequester_verify_key")
-        if sequester_key_raw:
-            try:
-                sequester_key = SequesterVerifyKeyDer(base64.b64decode(sequester_key_raw))
-            except (ValueError, TypeError, binascii.Error):
-                bad_fields.add("sequester_verify_key")
-        else:
-            sequester_key = None
+            sequester_key = SequesterVerifyKeyDer(base64.b64decode(sequester_key_raw))
+        except (ValueError, TypeError, binascii.Error):
+            raise APIException.from_bad_fields([BadField(name="sequester_verify_key")])
+    else:
+        sequester_key = None
 
     try:
         device_label = DeviceLabel(platform.node() or "-unknown-")

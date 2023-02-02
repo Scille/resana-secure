@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import Callable, AsyncIterator, Iterator, Optional, Any, TypeVar, Awaitable
+from typing import Callable, Iterator, Optional, Any, TypeVar, Awaitable, Type
 from typing_extensions import ParamSpec, Concatenate
 from functools import wraps
 from base64 import urlsafe_b64decode, urlsafe_b64encode
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import contextmanager
 from quart import jsonify, session, request
 from werkzeug.exceptions import HTTPException
 from werkzeug.routing import BaseConverter
@@ -59,6 +59,11 @@ class APIException(HTTPException):
         response.status_code = status_code
         super().__init__(response=response)
 
+    @classmethod
+    def from_bad_fields(cls, fields: list[Any]) -> APIException:
+        bad_fields = [field.name for field in fields if isinstance(field, BadField)]
+        return cls(status_code=400, data={"error": "bad_data", "fields": bad_fields})
+
 
 def get_auth_token() -> Optional[str]:
     authorization_header = request.headers.get("authorization")
@@ -105,36 +110,67 @@ def requires_rie(fn: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
     return wrapper
 
 
-async def check_if_timestamp() -> Optional[DateTime]:
-    data = await request.get_json(silent=True)
-    if data is None:
-        if request.mimetype == "":
-            # No content given
-            return None
+class BadField:
+    def __init__(self, name: str, reason: str | None = None):
+        self.name = name
+        self.reason = reason
+
+
+class NotProvided:
+    pass
+
+
+def parse_arg(
+    data: dict[str, Any],
+    name: str,
+    type: Type[T],
+    convert: Callable[[Any], T] | NotProvided = NotProvided(),
+    missing: T | NotProvided = NotProvided(),
+) -> T | BadField:
+    x = data.get(name)
+    if x is None:
+        if isinstance(missing, NotProvided):
+            return BadField(name, reason="missing")
         else:
-            raise APIException(400, {"error": "json_body_expected"})
-    timestamp_raw = data.get("timestamp")
-    if timestamp_raw is not None:
-        try:
-            timestamp = DateTime.from_rfc3339(timestamp_raw)
-        except (ValueError, TypeError):
-            raise APIException(400, {"error": "bad_data", "fields": ["timestamp"]})
-    else:
-        timestamp = None
+            return missing
+    if isinstance(convert, NotProvided):
+        if isinstance(x, type):
+            return x
+        else:
+            return BadField(name, reason="type")
+    try:
+        return convert(x)
+    except TypeError:
+        return BadField(name, reason="type")
+    except ValueError:
+        return BadField(name, reason="value")
+    except NameError:
+        return BadField(name, reason="name")
+    except Exception:
+        return BadField(name, reason="unknown")
+
+
+async def check_if_timestamp() -> Optional[DateTime]:
+    data = await get_data(allow_empty=True)
+    timestamp = parse_arg(
+        data, "timestamp", type=DateTime, convert=DateTime.from_rfc3339, missing=None
+    )
+    if isinstance(timestamp, BadField):
+        raise APIException.from_bad_fields([timestamp])
     return timestamp
 
 
-@asynccontextmanager
-async def check_data() -> AsyncIterator[tuple[Any, set[str]]]:
-    if not request.is_json:
-        raise APIException(400, {"error": "json_body_expected"})
+async def get_data(allow_empty: bool = False) -> dict[Any, str]:
     data = await request.get_json(silent=True)
     if data is None:
-        raise APIException(400, {"error": "json_body_expected"})
-    bad_fields: set[str] = set()
-    yield data, bad_fields
-    if bad_fields:
-        raise APIException(400, {"error": "bad_data", "fields": list(bad_fields)})
+        # With silent=True, get_json returns None if request is empty (= no mimetype) or with a format error
+        if not allow_empty:
+            raise APIException(400, {"error": "json_body_expected"})
+        elif request.mimetype != "":
+            raise APIException(400, {"error": "json_body_expected"})
+        else:
+            data = {}
+    return data
 
 
 def build_apitoken(

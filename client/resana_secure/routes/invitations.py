@@ -9,7 +9,9 @@ from parsec.api.protocol import InvitationType
 
 from ..utils import (
     authenticated,
-    check_data,
+    get_data,
+    parse_arg,
+    BadField,
     APIException,
     build_apitoken,
     apitoken_to_addr,
@@ -62,15 +64,17 @@ async def get_invitations(core: LoggedCore) -> tuple[GetInvitationReply, int]:
 @invitations_bp.route("/invitations", methods=["POST"])
 @authenticated
 async def create_invitation(core: LoggedCore) -> tuple[dict[str, Any], int]:
-    async with check_data() as (data, bad_fields):
-        type = data.get("type")
-        if type not in ("user", "device"):
-            bad_fields.add("type")
-        if type == "user":
-            claimer_email = data.get("claimer_email")
+    data = await get_data()
+    type = parse_arg(data, "type", type=str)
+    if type not in ("user", "device"):
+        raise APIException.from_bad_fields([BadField(name="type")])
+    if type == "user":
+        claimer_email = parse_arg(data, "claimer_email", type=str)
+        if isinstance(claimer_email, BadField):
+            raise APIException.from_bad_fields([claimer_email])
 
     with backend_errors_to_api_exceptions():
-        if type == "user":
+        if type == "user" and isinstance(claimer_email, str):
             addr, _ = await core.new_user_invitation(email=claimer_email, send_email=False)
         else:
             addr, _ = await core.new_device_invitation(send_email=False)
