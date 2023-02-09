@@ -7,7 +7,7 @@ from quart_trio.testing import TrioTestApp
 from parsec.api.protocol import OrganizationID
 from parsec.backend import BackendApp
 from parsec.core.types import BackendAddr, BackendOrganizationBootstrapAddr
-from parsec.core.local_device import list_available_devices
+from parsec._parsec import list_available_devices
 
 from .conftest import LocalDeviceTestbed
 

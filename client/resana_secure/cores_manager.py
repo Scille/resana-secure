@@ -1,5 +1,4 @@
 import trio
-from enum import Enum
 from uuid import uuid4
 from typing import TYPE_CHECKING, AsyncIterator, Callable, Dict, Optional, Tuple, List, cast
 from functools import partial
@@ -8,15 +7,14 @@ from contextlib import asynccontextmanager
 import structlog
 from PyQt5.QtWidgets import QApplication
 
-from parsec.core.core_events import CoreEvent
+from parsec._parsec import CoreEvent, list_available_devices
 from parsec.core.types import LocalDevice, BackendOrganizationAddr
 from parsec.core.logged_core import logged_core_factory, LoggedCore
 from parsec.core.local_device import (
-    list_available_devices,
-    load_device_with_password,
     LocalDeviceError,
     AvailableDevice,
 )
+from parsec.event_bus import EventCallback
 from parsec.api.protocol import OrganizationID
 
 from .config import ResanaConfig
@@ -66,7 +64,9 @@ def find_matching_devices(
 
 def load_device_or_error(available_device: AvailableDevice, password: str) -> Optional[LocalDevice]:
     try:
-        return load_device_with_password(key_file=available_device.key_file_path, password=password)
+        return LocalDevice.load_device_with_password(
+            key_file=available_device.key_file_path, password=password
+        )
     except LocalDeviceError:
         raise CoreDeviceInvalidPasswordError
 
@@ -115,19 +115,19 @@ async def start_core(
         try:
             core.event_bus.connect(
                 CoreEvent.FS_ENTRY_SYNC_REJECTED_BY_SEQUESTER_SERVICE,
-                _on_fs_sync_refused_by_sequester_service,
+                cast(EventCallback, _on_fs_sync_refused_by_sequester_service),
             )
             yield core
         finally:
             core.event_bus.disconnect(
                 CoreEvent.FS_ENTRY_SYNC_REJECTED_BY_SEQUESTER_SERVICE,
-                _on_fs_sync_refused_by_sequester_service,
+                cast(EventCallback, _on_fs_sync_refused_by_sequester_service),
             )
             on_stopped()
 
 
 def _on_fs_sync_refused_by_sequester_service(
-    event: Enum,
+    event: CoreEvent,
     **kwargs: object,
 ) -> None:
     if event == CoreEvent.FS_ENTRY_SYNC_REJECTED_BY_SEQUESTER_SERVICE:

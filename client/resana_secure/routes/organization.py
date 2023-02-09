@@ -13,10 +13,9 @@ from parsec.core.invite import (
     InviteNotFoundError,
     InviteAlreadyUsedError,
 )
-from parsec.sequester_crypto import SequesterVerifyKeyDer
+from parsec._parsec import SequesterVerifyKeyDer, save_device_with_password_in_config
 from parsec.core.types import BackendOrganizationBootstrapAddr
 from parsec.api.protocol import HumanHandle, DeviceLabel
-from parsec.core.local_device import save_device_with_password_in_config
 from ..utils import APIException, backend_errors_to_api_exceptions, check_data
 from ..app import current_app
 
