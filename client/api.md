@@ -1273,7 +1273,7 @@ Request:
 {
     "id": <id>
     "new_name": <string>,
-    "new_folder": <id or null>
+    "new_parent": <id or null>
 }
 ```
 
