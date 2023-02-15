@@ -912,7 +912,7 @@ HTTP 404
 }
 ```
 
-### `POST /workspaces<id>/toggle_offline_availability`
+### `POST /workspaces/<id>/toggle_offline_availability`
 
 Active ou désactive la rémanence des données d'un workspace. Si désactivé, les fichiers seront téléchargés de manière paresseuse, uniquement lorsqu'une demande de consultation est faite. Si activé, tout est mis en oeuvre pour télécharger tous les fichiers présents dans le workspace afin qu'ils soient autant que possible disponibles même en étant hors-ligne.
 
@@ -952,14 +952,14 @@ HTTP 400
 ou
 
 ```python
-HTTP 404
+HTTP 400
 {
     "error": "offline_availability_already_enabled"
 }
 ```
 
 
-### `GET /workspaces<id>/get_offline_availability_status`
+### `GET /workspaces/<id>/get_offline_availability_status`
 
 Récupère des informations sur l'état de la disponibilité hors-ligne de ce workspace.
 
