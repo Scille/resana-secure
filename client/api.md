@@ -912,6 +912,86 @@ HTTP 404
 }
 ```
 
+### `POST /workspaces/<id>/toggle_offline_availability`
+
+Active ou désactive la rémanence des données d'un workspace. Si désactivé, les fichiers seront téléchargés de manière paresseuse, uniquement lorsqu'une demande de consultation est faite. Si activé, tout est mis en oeuvre pour télécharger tous les fichiers présents dans le workspace afin qu'ils soient autant que possible disponibles même en étant hors-ligne.
+
+Request:
+```python
+{
+    "enable": <bool>
+}
+```
+
+Response:
+
+```python
+HTTP 200
+{
+}
+```
+
+ou
+
+```python
+HTTP 404
+{
+    "error": "unknown_workspace"
+}
+```
+
+ou
+
+```python
+HTTP 400
+{
+    "error": "offline_availability_already_disabled"
+}
+```
+
+ou
+
+```python
+HTTP 400
+{
+    "error": "offline_availability_already_enabled"
+}
+```
+
+
+### `GET /workspaces/<id>/get_offline_availability_status`
+
+Récupère des informations sur l'état de la disponibilité hors-ligne de ce workspace.
+
+Request:
+```python
+{
+}
+```
+
+Response:
+
+```python
+HTTP 200
+{
+    "is_running": <bool>,
+    "is_prepared": <bool>,
+    "is_available_offline": <bool>,
+    "total_size": <int>,
+    "remote_only_size": <int>,
+    "local_and_remote_size": <int>,
+}
+```
+
+ou
+
+```python
+HTTP 404
+{
+    "error": "unknown_workspace"
+}
+```
+
 ## Dossiers
 
 ### `GET /workspaces/<id>/folders`

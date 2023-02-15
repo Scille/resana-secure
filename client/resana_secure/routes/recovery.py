@@ -9,12 +9,14 @@ from quart import Blueprint
 from base64 import b64encode, b64decode
 
 from parsec.core.logged_core import LoggedCore
-from parsec.core.local_device import (
+from parsec._parsec import (
     save_recovery_device,
-    get_recovery_device_file_name,
     load_recovery_device,
     save_device_with_password_in_config,
-    LocalDeviceCryptoError,
+    LocalDeviceError,
+)
+from parsec.core.local_device import (
+    get_recovery_device_file_name,
 )
 
 from ..utils import APIException, authenticated, check_data
@@ -82,7 +84,8 @@ async def import_device() -> tuple[dict[str, Any], int]:
         path.write_bytes(file_content)
         try:
             new_device = await load_recovery_device(path, passphrase)
-        except LocalDeviceCryptoError:
+        # TODO: change it for LocalDeviceCryptoError once https://github.com/Scille/parsec-cloud/issues/4048 is done
+        except LocalDeviceError:
             raise APIException(400, {"error": "invalid_passphrase"})
     finally:
         path.unlink()

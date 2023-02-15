@@ -105,6 +105,25 @@ def test_workspaces(auth_token, resana_addr):
         assert r.json() == {"workspaces": [{"id": ANY, "name": DEFAULT_WORKSPACE, "role": "OWNER"}]}
         assert (MOUNTPOINT_DIR / DEFAULT_WORKSPACE).is_dir()
 
+    # Checking offline availability
+    with run_test("Check new workspace offline availability") as context:
+        r = make_request(
+            "GET",
+            f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/get_offline_availability_status",
+            auth_token=auth_token,
+        )
+        context.request = r
+        assert r.status_code == 200
+
+        assert r.json() == {
+            "is_running": True,
+            "is_prepared": True,
+            "is_available_offline": False,
+            "total_size": 0,
+            "remote_only_size": 0,
+            "local_and_remote_size": 0,
+        }
+
     # Renaming our new workspace
     with run_test("Rename workspace") as context:
         r = make_request(
@@ -250,6 +269,25 @@ def test_files(auth_token, resana_addr):
         context.request = r
         assert r.status_code == 200
         VARIABLES["workspace_id"] = r.json()["workspaces"][0]["id"]
+
+    # Checking offline availability
+    with run_test("Check new workspace offline availability") as context:
+        r = make_request(
+            "GET",
+            f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/get_offline_availability_status",
+            auth_token=auth_token,
+        )
+        context.request = r
+        assert r.status_code == 200
+
+        assert r.json() == {
+            "is_running": True,
+            "is_prepared": True,
+            "is_available_offline": False,
+            "total_size": 0,
+            "remote_only_size": 0,
+            "local_and_remote_size": 0,
+        }
 
     # Get folders
     with run_test("Get folders") as context:
@@ -458,6 +496,26 @@ def test_files(auth_token, resana_addr):
             "test4.txt",
         ]
 
+    # Wait for all files to be synced
+    count = 0
+    while count < 10:
+        try:
+            r = make_request(
+                "GET",
+                f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/get_offline_availability_status",
+                auth_token=auth_token,
+            )
+            assert r.status_code == 200
+            body = r.json()
+            assert body["local_and_remote_size"] == (SMALL_FILE_SIZE + LARGE_FILE_SIZE) * 2
+            count = 10
+        except AssertionError:
+            pass
+        finally:
+            # At most, even if it all fails, we're only waiting for 10s
+            count += 1
+            time.sleep(1)
+
     # Rename the file
     with run_test("Rename a file") as context:
         r = make_request(
@@ -575,6 +633,66 @@ def test_files(auth_token, resana_addr):
             "test3.txt",
             "test4.txt",
         ]
+
+    # Enable offline availability
+    with run_test("Enable offline availability") as context:
+        r = make_request(
+            "POST",
+            f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/toggle_offline_availability",
+            auth_token=auth_token,
+            json={"enable": True},
+        )
+        context.request = r
+        assert r.status_code == 200
+        assert r.json() == {}
+
+    # Check offline availability
+    with run_test("Check that offline availability has been enabled") as context:
+        r = make_request(
+            "GET",
+            f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/get_offline_availability_status",
+            auth_token=auth_token,
+        )
+        context.request = r
+        assert r.status_code == 200
+        assert r.json() == {
+            "is_running": True,
+            "is_prepared": True,
+            "is_available_offline": True,
+            "total_size": (SMALL_FILE_SIZE + LARGE_FILE_SIZE) * 2,
+            "remote_only_size": 0,
+            "local_and_remote_size": (SMALL_FILE_SIZE + LARGE_FILE_SIZE) * 2,
+        }
+
+    # Disable offline availability
+    with run_test("Disable offline availability") as context:
+        r = make_request(
+            "POST",
+            f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/toggle_offline_availability",
+            auth_token=auth_token,
+            json={"enable": False},
+        )
+        context.request = r
+        assert r.status_code == 200
+        assert r.json() == {}
+
+    # Check offline availability
+    with run_test("Check that offline availability has been disabled") as context:
+        r = make_request(
+            "GET",
+            f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/get_offline_availability_status",
+            auth_token=auth_token,
+        )
+        context.request = r
+        assert r.status_code == 200
+        assert r.json() == {
+            "is_running": True,
+            "is_prepared": True,
+            "is_available_offline": False,
+            "total_size": (SMALL_FILE_SIZE + LARGE_FILE_SIZE) * 2,
+            "remote_only_size": 0,
+            "local_and_remote_size": (SMALL_FILE_SIZE + LARGE_FILE_SIZE) * 2,
+        }
 
     # Mount workspace at previous timestamp
     with run_test("Mount timestamped workspace") as context:
@@ -1286,11 +1404,15 @@ if __name__ == "__main__":
     )
 
     ret_code = 0
-    if TESTS_STATUS:
+    if any(not v for _, v in TESTS_STATUS.items()):
         print("-----")
         for test_name, status in TESTS_STATUS.items():
             if not status:
                 ret_code = 1
                 print(f"FAILED -> {test_name}")
         print("-----")
+        print("Make sure that:")
+        print(" - Parsec backend is running")
+        print(" - Resana is running")
+        print(" - Resana has the --rie-server-addr option correctly set")
     raise SystemExit(ret_code)

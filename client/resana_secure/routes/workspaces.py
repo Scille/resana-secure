@@ -5,6 +5,7 @@ from typing import Any
 from quart import Blueprint
 
 from parsec.core.logged_core import LoggedCore
+from parsec.core.fs.workspacefs import WorkspaceFS
 from parsec.core.fs.exceptions import FSWorkspaceNotFoundError
 from parsec.api.data import EntryID, EntryName
 from parsec.api.protocol import RealmRole
@@ -143,7 +144,7 @@ async def share_workspace(core: LoggedCore, workspace_id: EntryID) -> tuple[dict
             bad_fields.add("email")
         role = data.get("role")
         if role is not None:
-            for choice in RealmRole.values():
+            for choice in RealmRole.VALUES:
                 if choice.str == role:
                     role = choice
                     break
@@ -226,3 +227,65 @@ async def unmount_workspace(core: LoggedCore, workspace_id: EntryID) -> tuple[di
         await core.mountpoint_manager.unmount_workspace(workspace_id, timestamp)
 
     return {}, 200
+
+
+@workspaces_bp.route(
+    "/workspaces/<WorkspaceID:workspace_id>/toggle_offline_availability", methods=["POST"]
+)
+@authenticated
+@requires_rie
+async def toggle_offline_availability(
+    core: LoggedCore, workspace_id: EntryID
+) -> tuple[dict[str, Any], int]:
+    workspace_fs: WorkspaceFS | None = None
+    try:
+        workspace_fs = core.user_fs.get_workspace(workspace_id)
+    except FSWorkspaceNotFoundError:
+        raise APIException(404, {"error": "unknown_workspace"})
+
+    async with check_data() as (data, bad_fields):
+        enable = data.get("enable")
+        if not isinstance(enable, bool):
+            bad_fields.add("enable")
+
+    info = workspace_fs.get_remanence_manager_info()
+    if enable and info.is_block_remanent:
+        raise APIException(400, {"error": "offline_availability_already_enabled"})
+    elif not enable and not info.is_block_remanent:
+        raise APIException(400, {"error": "offline_availability_already_disabled"})
+    try:
+        if enable:
+            await workspace_fs.enable_block_remanence()
+        else:
+            await workspace_fs.disable_block_remanence()
+        return {}, 200
+    except Exception:
+        if enable:
+            raise APIException(400, {"error": "failed_to_enable_offline_availability"})
+        else:
+            raise APIException(400, {"error": "failed_to_disable_offline_availability"})
+
+
+@workspaces_bp.route(
+    "/workspaces/<WorkspaceID:workspace_id>/get_offline_availability_status", methods=["GET"]
+)
+@authenticated
+@requires_rie
+async def get_offline_availability_status(
+    core: LoggedCore, workspace_id: EntryID
+) -> tuple[dict[str, Any], int]:
+    workspace_fs: WorkspaceFS | None = None
+    try:
+        workspace_fs = core.user_fs.get_workspace(workspace_id)
+    except FSWorkspaceNotFoundError:
+        raise APIException(404, {"error": "unknown_workspace"})
+    info = workspace_fs.get_remanence_manager_info()
+
+    return {
+        "is_running": info.is_running,
+        "is_prepared": info.is_prepared,
+        "is_available_offline": info.is_block_remanent,
+        "total_size": info.total_size,
+        "remote_only_size": info.remote_only_size,
+        "local_and_remote_size": info.local_and_remote_size,
+    }, 200

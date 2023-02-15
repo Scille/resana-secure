@@ -1,11 +1,12 @@
 import pytest
 import trio
-from unittest.mock import ANY
+from unittest.mock import ANY, Mock
 from collections import namedtuple
-from quart.typing import TestClientProtocol
+from quart.typing import TestClientProtocol, TestAppProtocol
 
 from .conftest import RemoteDeviceTestbed
 from parsec._parsec import DateTime
+from parsec.api.data import EntryID
 
 
 WorkspaceInfo = namedtuple("WorkspaceInfo", "id,name")
@@ -273,3 +274,220 @@ async def test_mount_unmount_workspace_timestamped(
     body = await response.get_json()
     assert response.status_code == 400
     assert body == {"error": "bad_data", "fields": ["timestamp"]}
+
+
+@pytest.mark.trio
+async def test_offline_availability_not_authenticated(
+    test_app: TestAppProtocol,
+    workspace: WorkspaceInfo,
+):
+    claimer_client = test_app.test_client()
+    response = await claimer_client.post(f"/workspaces/{workspace.id}/toggle_offline_availability")
+    assert response.status_code == 401
+    body = await response.get_json()
+    assert body == {"error": "authentication_requested"}
+
+    response = await claimer_client.get(
+        f"/workspaces/{workspace.id}/get_offline_availability_status"
+    )
+    assert response.status_code == 401
+    body = await response.get_json()
+    assert body == {"error": "authentication_requested"}
+
+
+@pytest.mark.trio
+async def test_toggle_offline_availability(
+    authenticated_client: TestClientProtocol, workspace: WorkspaceInfo
+):
+    # Missing argument
+    response = await authenticated_client.post(
+        f"/workspaces/{workspace.id}/toggle_offline_availability"
+    )
+    body = await response.get_json()
+    assert response.status_code == 400
+    assert body == {"error": "json_body_expected"}
+
+    # Invalid argument value
+    response = await authenticated_client.post(
+        f"/workspaces/{workspace.id}/toggle_offline_availability", json={"enable": "test"}
+    )
+    body = await response.get_json()
+    assert response.status_code == 400
+    assert body == {"error": "bad_data", "fields": ["enable"]}
+
+
+@pytest.mark.trio
+async def test_enable_offline_availability(
+    authenticated_client: TestClientProtocol,
+    workspace: WorkspaceInfo,
+    monkeypatch,
+    remanence_monitor_event,
+):
+    remanence_monitor_event.set()
+
+    # Non existing workspace
+    fake_id = EntryID.new()
+    response = await authenticated_client.post(
+        f"/workspaces/{fake_id.hex}/toggle_offline_availability", json={"enable": True}
+    )
+    body = await response.get_json()
+    assert response.status_code == 404
+    assert body == {"error": "unknown_workspace"}
+
+    # Fake an error when enabling
+    mock = Mock(side_effect=AttributeError)
+    with monkeypatch.context() as m:
+        m.setattr("parsec.core.fs.workspacefs.WorkspaceFS.enable_block_remanence", mock)
+        response = await authenticated_client.post(
+            f"/workspaces/{workspace.id}/toggle_offline_availability", json={"enable": True}
+        )
+        body = await response.get_json()
+        assert response.status_code == 400
+        assert body == {"error": "failed_to_enable_offline_availability"}
+
+    # Enable block remanence
+    response = await authenticated_client.post(
+        f"/workspaces/{workspace.id}/toggle_offline_availability", json={"enable": True}
+    )
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {}
+
+    # Try to enable it a second time
+    response = await authenticated_client.post(
+        f"/workspaces/{workspace.id}/toggle_offline_availability", json={"enable": True}
+    )
+    body = await response.get_json()
+    assert response.status_code == 400
+    assert body == {"error": "offline_availability_already_enabled"}
+
+
+@pytest.mark.trio
+async def test_disable_offline_availability(
+    authenticated_client: TestClientProtocol,
+    workspace: WorkspaceInfo,
+    monkeypatch,
+    remanence_monitor_event,
+):
+    remanence_monitor_event.set()
+
+    # Non existing workspace
+    fake_id = EntryID.new()
+    response = await authenticated_client.post(
+        f"/workspaces/{fake_id.hex}/toggle_offline_availability", json={"enable": False}
+    )
+    body = await response.get_json()
+    assert response.status_code == 404
+    assert body == {"error": "unknown_workspace"}
+
+    # Try to disable when remanence is not enabled
+    response = await authenticated_client.post(
+        f"/workspaces/{workspace.id}/toggle_offline_availability", json={"enable": False}
+    )
+    body = await response.get_json()
+    assert response.status_code == 400
+    assert body == {"error": "offline_availability_already_disabled"}
+
+    # Enable block remanence and then disable it
+    response = await authenticated_client.post(
+        f"/workspaces/{workspace.id}/toggle_offline_availability", json={"enable": True}
+    )
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {}
+
+    # Fake an error when disabling
+    mock = Mock(side_effect=AttributeError)
+    with monkeypatch.context() as m:
+        m.setattr("parsec.core.fs.workspacefs.WorkspaceFS.disable_block_remanence", mock)
+        response = await authenticated_client.post(
+            f"/workspaces/{workspace.id}/toggle_offline_availability", json={"enable": False}
+        )
+        body = await response.get_json()
+        assert response.status_code == 400
+        assert body == {"error": "failed_to_disable_offline_availability"}
+
+    response = await authenticated_client.post(
+        f"/workspaces/{workspace.id}/toggle_offline_availability", json={"enable": False}
+    )
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {}
+
+
+@pytest.mark.trio
+async def test_get_offline_availability_status(
+    authenticated_client: TestClientProtocol,
+    workspace: WorkspaceInfo,
+    monkeypatch,
+    remanence_monitor_event,
+):
+    remanence_monitor_event.set()
+
+    # Non existing workspace
+    fake_id = EntryID.new()
+    response = await authenticated_client.get(
+        f"/workspaces/{fake_id.hex}/get_offline_availability_status"
+    )
+    body = await response.get_json()
+    assert response.status_code == 404
+    assert body == {"error": "unknown_workspace"}
+
+    # Get info
+    response = await authenticated_client.get(
+        f"/workspaces/{workspace.id}/get_offline_availability_status"
+    )
+    body = await response.get_json()
+    assert response.status_code == 200
+    body == {
+        "is_running": False,
+        "is_prepared": False,
+        "is_available_offline": False,
+        "total_size": 0,
+        "remote_only_size": 0,
+        "local_and_remote_size": 0,
+    }
+
+    # Enable block remanence
+    response = await authenticated_client.post(
+        f"/workspaces/{workspace.id}/toggle_offline_availability", json={"enable": True}
+    )
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {}
+
+    response = await authenticated_client.get(
+        f"/workspaces/{workspace.id}/get_offline_availability_status"
+    )
+    body = await response.get_json()
+    assert response.status_code == 200
+    body == {
+        "is_running": False,
+        "is_prepared": False,
+        "is_available_offline": True,
+        "total_size": 0,
+        "remote_only_size": 0,
+        "local_and_remote_size": 0,
+    }
+
+    # Disable it again
+    response = await authenticated_client.post(
+        f"/workspaces/{workspace.id}/toggle_offline_availability", json={"enable": False}
+    )
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {}
+
+    response = await authenticated_client.get(
+        f"/workspaces/{workspace.id}/get_offline_availability_status"
+    )
+    body = await response.get_json()
+    assert response.status_code == 200
+    body == {
+        "is_running": False,
+        "is_prepared": False,
+        "is_available_offline": False,
+        "total_size": 0,
+        "remote_only_size": 0,
+        "local_and_remote_size": 0,
+    }

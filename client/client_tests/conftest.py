@@ -7,7 +7,7 @@ from hypercorn.config import Config as HyperConfig
 from hypercorn.trio.run import worker_serve
 from pathlib import Path
 
-from parsec._parsec import DateTime
+from parsec._parsec import DateTime, save_device_with_password_in_config
 from parsec.crypto import PrivateKey, SigningKey
 from parsec.api.data import UserCertificate, DeviceCertificate
 from parsec.api.protocol import (
@@ -20,7 +20,6 @@ from parsec.api.protocol import (
 )
 from parsec.core.types import BackendOrganizationBootstrapAddr, BackendAddr
 from parsec.core.invite import bootstrap_organization
-from parsec.core.local_device import save_device_with_password_in_config
 from parsec.backend import backend_app_factory, BackendApp
 from parsec.backend.asgi import app_factory as backend_asgi_app_factory
 from parsec.backend.user import User as BackendUser, Device as BackendDevice
@@ -132,6 +131,7 @@ async def running_backend(_backend_addr_register):
         forward_proto_enforce_https=None,
         organization_spontaneous_bootstrap=True,
         organization_bootstrap_webhook_url=None,
+        sse_keepalive=30,
     )
     async with backend_app_factory(config) as backend:
         async with trio.open_service_nursery() as nursery:
@@ -257,3 +257,17 @@ async def other_user(running_backend: BackendApp, local_device: LocalDeviceTestb
     )
     assert user.human_handle is not None
     return RemoteDeviceTestbed(device.device_id, email=user.human_handle.email)
+
+
+# Copied from parsec's test/core/conftest.py
+@pytest.fixture
+def remanence_monitor_event(monkeypatch):
+    event = trio.Event()
+
+    async def mockpoint() -> None:
+        await event.wait()
+
+    monkeypatch.setattr(
+        "parsec.core.remanence_monitor.freeze_remanence_monitor_mockpoint", mockpoint
+    )
+    return event
