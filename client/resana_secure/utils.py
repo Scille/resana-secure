@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable, Iterator, Optional, Any, TypeVar, Awaitable, Type
+from typing import Callable, Iterator, Optional, Any, TypeVar, Awaitable
 from typing_extensions import ParamSpec, Concatenate
 from functools import wraps
 from base64 import urlsafe_b64decode, urlsafe_b64encode
@@ -60,8 +60,7 @@ class APIException(HTTPException):
         super().__init__(response=response)
 
     @classmethod
-    def from_bad_fields(cls, fields: list[Any]) -> APIException:
-        bad_fields = [field.name for field in fields if isinstance(field, BadField)]
+    def from_bad_fields(cls, bad_fields: list[str]) -> APIException:
         return cls(status_code=400, data={"error": "bad_data", "fields": bad_fields})
 
 
@@ -110,57 +109,93 @@ def requires_rie(fn: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
     return wrapper
 
 
-class BadField:
-    def __init__(self, name: str, reason: str | None = None):
+class BadField(Exception):
+    def __init__(self, name: str):
         self.name = name
-        self.reason = reason
 
 
-class NotProvided:
-    pass
+class Argument:
+    def __init__(
+        self,
+        name: str,
+        type: Any | None = None,
+        converter: Callable[[Any], T] | None = None,
+        new_name: str | None = None,
+        default: T | None = None,
+        required: bool = False,
+    ):
+        self.name = name
+        self.new_name = new_name or name
+        self.type = type
+        self.converter = converter
+        self.default = default
+        self.required = required
 
 
-def parse_arg(
-    data: dict[str, Any],
-    name: str,
-    type: Type[T],
-    convert: Callable[[Any], T] | NotProvided = NotProvided(),
-    missing: T | NotProvided = NotProvided(),
-) -> T | BadField:
-    x = data.get(name)
-    if x is None:
-        if isinstance(missing, NotProvided):
-            return BadField(name, reason="missing")
-        else:
-            return missing
-    if isinstance(convert, NotProvided):
-        if isinstance(x, type):
-            return x
-        else:
-            return BadField(name, reason="type")
-    try:
-        return convert(x)
-    except TypeError:
-        return BadField(name, reason="type")
-    except ValueError:
-        return BadField(name, reason="value")
-    except NameError:
-        return BadField(name, reason="name")
-    except Exception:
-        return BadField(name, reason="unknown")
+class Parser:
+    def __init__(self) -> None:
+        self.arguments: list[Argument] = []
+
+    def add_argument(
+        self,
+        name: str,
+        type: Any | None = None,
+        converter: Callable[[Any], T] | None = None,
+        new_name: str | None = None,
+        default: T | None = None,
+        required: bool = False,
+    ) -> None:
+        assert not (required and default is not None), "Can't have required with default"
+        assert type or converter, "Type or converter is needed"
+        self.arguments.append(
+            Argument(
+                name,
+                type=type,
+                converter=converter,
+                new_name=new_name,
+                default=default,
+                required=required,
+            )
+        )
+
+    def parse_args(self, data: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+        args = {}
+        bad_fields = []
+        for arg in self.arguments:
+            try:
+                r = self._parse_arg(data, arg)
+                args[arg.new_name] = r
+            except BadField as f:
+                bad_fields.append(f.name)
+        return args, bad_fields
+
+    def _parse_arg(self, data: dict[str, Any], arg: Argument) -> Any:
+        val = data.get(arg.name)
+        if val is None:
+            if arg.required:
+                raise BadField(arg.name)
+            return arg.default
+        if arg.converter:
+            try:
+                return arg.converter(val)
+            except (ValueError, TypeError):
+                raise BadField(arg.name)
+        if arg.type and not isinstance(val, arg.type):
+            raise BadField(arg.name)
+        return val
 
 
 async def check_if_timestamp() -> Optional[DateTime]:
     data = await get_data(allow_empty=True)
-    timestamp = parse_arg(
-        data, "timestamp", type=DateTime, convert=DateTime.from_rfc3339, missing=None
-    )
-    if isinstance(timestamp, BadField):
-        raise APIException.from_bad_fields([timestamp])
-    return timestamp
+    parser = Parser()
+    parser.add_argument("timestamp", converter=DateTime.from_rfc3339)
+    args, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
+    return args["timestamp"]
 
 
-async def get_data(allow_empty: bool = False) -> dict[Any, str]:
+async def get_data(allow_empty: bool = False) -> dict[str, Any]:
     data = await request.get_json(silent=True)
     if data is None:
         # With silent=True, get_json returns None if request is empty (= no mimetype) or with a format error

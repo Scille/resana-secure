@@ -16,7 +16,7 @@ from parsec.core.invite import (
 from parsec._parsec import SequesterVerifyKeyDer, save_device_with_password_in_config
 from parsec.core.types import BackendOrganizationBootstrapAddr
 from parsec.api.protocol import HumanHandle, DeviceLabel
-from ..utils import APIException, backend_errors_to_api_exceptions, get_data, parse_arg, BadField
+from ..utils import APIException, backend_errors_to_api_exceptions, get_data, Parser
 from ..app import current_app
 
 organization_bp = Blueprint("organization_api", __name__)
@@ -25,32 +25,28 @@ organization_bp = Blueprint("organization_api", __name__)
 @organization_bp.route("/organization/bootstrap", methods=["POST"])
 async def organization_bootstrap() -> tuple[dict[str, Any], int]:
     data = await get_data()
-    email = parse_arg(data, "email", type=str)
-    password = parse_arg(data, "key", type=str)
-    backend_addr = parse_arg(
-        data,
+    parser = Parser()
+    parser.add_argument("email", type=str, required=True)
+    parser.add_argument("key", type=str, new_name="password", required=True)
+    parser.add_argument(
         "organization_url",
-        type=BackendOrganizationBootstrapAddr,
-        convert=BackendOrganizationBootstrapAddr.from_url,
+        converter=BackendOrganizationBootstrapAddr.from_url,
+        required=True,
     )
-    sequester_key_raw = parse_arg(data, "sequester_verify_key", type=str, missing=None)
-    if (
-        isinstance(email, BadField)
-        or isinstance(password, BadField)
-        or isinstance(backend_addr, BadField)
-        or isinstance(sequester_key_raw, BadField)
-    ):
-        raise APIException.from_bad_fields([email, password, backend_addr, sequester_key_raw])
+    parser.add_argument("sequester_verify_key", type=str)
+    args, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
 
     try:
-        human_handle = HumanHandle(label="-unknown-", email=email)
+        human_handle = HumanHandle(label="-unknown-", email=args["email"])
     except (ValueError, TypeError):
-        raise APIException.from_bad_fields([BadField(name="email")])
-    if sequester_key_raw:
+        raise APIException.from_bad_fields(["email"])
+    if args["sequester_verify_key"]:
         try:
-            sequester_key = SequesterVerifyKeyDer(base64.b64decode(sequester_key_raw))
+            sequester_key = SequesterVerifyKeyDer(base64.b64decode(args["sequester_verify_key"]))
         except (ValueError, TypeError, binascii.Error):
-            raise APIException.from_bad_fields([BadField(name="sequester_verify_key")])
+            raise APIException.from_bad_fields(["sequester_verify_key"])
     else:
         sequester_key = None
 
@@ -62,7 +58,7 @@ async def organization_bootstrap() -> tuple[dict[str, Any], int]:
     with backend_errors_to_api_exceptions():
         try:
             new_device = await bootstrap_organization(
-                backend_addr,
+                args["organization_url"],
                 human_handle=human_handle,
                 device_label=device_label,
                 sequester_authority_verify_key=sequester_key,
@@ -70,7 +66,7 @@ async def organization_bootstrap() -> tuple[dict[str, Any], int]:
             save_device_with_password_in_config(
                 config_dir=current_app.resana_config.core_config.config_dir,
                 device=new_device,
-                password=password,
+                password=args["password"],
             )
         except InviteAlreadyUsedError:
             raise APIException(400, {"error": "organization_already_bootstrapped"})

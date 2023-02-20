@@ -10,8 +10,7 @@ from parsec.api.protocol import InvitationType
 from ..utils import (
     authenticated,
     get_data,
-    parse_arg,
-    BadField,
+    Parser,
     APIException,
     build_apitoken,
     apitoken_to_addr,
@@ -65,17 +64,21 @@ async def get_invitations(core: LoggedCore) -> tuple[GetInvitationReply, int]:
 @authenticated
 async def create_invitation(core: LoggedCore) -> tuple[dict[str, Any], int]:
     data = await get_data()
-    type = parse_arg(data, "type", type=str)
-    if type not in ("user", "device"):
-        raise APIException.from_bad_fields([BadField(name="type")])
-    if type == "user":
-        claimer_email = parse_arg(data, "claimer_email", type=str)
-        if isinstance(claimer_email, BadField):
-            raise APIException.from_bad_fields([claimer_email])
+    parser = Parser()
+    parser.add_argument("type", type=str, required=True)
+    parser.add_argument("claimer_email", type=str)
+    args, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
+
+    if args["type"] not in ("user", "device"):
+        raise APIException.from_bad_fields(["type"])
+    if args["type"] == "user" and not args["claimer_email"]:
+        raise APIException.from_bad_fields(["claimer_email"])
 
     with backend_errors_to_api_exceptions():
-        if type == "user" and isinstance(claimer_email, str):
-            addr, _ = await core.new_user_invitation(email=claimer_email, send_email=False)
+        if args["type"] == "user":
+            addr, _ = await core.new_user_invitation(email=args["claimer_email"], send_email=False)
         else:
             addr, _ = await core.new_device_invitation(send_email=False)
 

@@ -16,8 +16,7 @@ from ..utils import (
     requires_rie,
     get_data,
     check_if_timestamp,
-    parse_arg,
-    BadField,
+    Parser,
     backend_errors_to_api_exceptions,
     get_workspace_type,
 )
@@ -49,12 +48,14 @@ async def list_workspaces(core: LoggedCore) -> tuple[dict[str, Any], int]:
 @authenticated
 async def create_workspaces(core: LoggedCore) -> tuple[dict[str, Any], int]:
     data = await get_data()
-    name = parse_arg(data, "name", type=EntryName, convert=EntryName)
-    if isinstance(name, BadField):
-        raise APIException.from_bad_fields([name])
+    parser = Parser()
+    parser.add_argument("name", converter=EntryName, required=True)
+    args, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
 
     with backend_errors_to_api_exceptions():
-        workspace_id = await core.user_fs.workspace_create(name)
+        workspace_id = await core.user_fs.workspace_create(args["name"])
 
     # TODO: should we do a `user_fs.sync()` ?
 
@@ -81,14 +82,16 @@ async def sync_workspaces(core: LoggedCore) -> tuple[dict[str, Any], int]:
 @authenticated
 async def rename_workspaces(core: LoggedCore, workspace_id: EntryID) -> tuple[dict[str, Any], int]:
     data = await get_data()
-    old_name = parse_arg(data, "old_name", type=EntryName, convert=EntryName)
-    new_name = parse_arg(data, "new_name", type=EntryName, convert=EntryName)
-    if isinstance(old_name, BadField) or isinstance(new_name, BadField):
-        raise APIException.from_bad_fields([old_name, new_name])
+    parser = Parser()
+    parser.add_argument("old_name", converter=EntryName, required=True)
+    parser.add_argument("new_name", converter=EntryName, required=True)
+    args, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
 
     for entry in core.user_fs.get_user_manifest().workspaces:
         if entry.id == workspace_id:
-            if entry.name != old_name:
+            if entry.name != args["old_name"]:
                 raise APIException(409, {"error": "precondition_failed"})
             else:
                 break
@@ -96,7 +99,7 @@ async def rename_workspaces(core: LoggedCore, workspace_id: EntryID) -> tuple[di
         raise APIException(404, {"error": "unknown_workspace"})
 
     with backend_errors_to_api_exceptions():
-        await core.user_fs.workspace_rename(workspace_id, new_name)
+        await core.user_fs.workspace_rename(workspace_id, args["new_name"])
 
     # TODO: should we do a `user_fs.sync()` ?
 
@@ -127,22 +130,27 @@ async def get_workspace_share_info(
 @authenticated
 async def share_workspace(core: LoggedCore, workspace_id: EntryID) -> tuple[dict[str, Any], int]:
     data = await get_data()
-    email = parse_arg(data, "email", type=str)
-    role = parse_arg(data, "role", type=RealmRole, convert=RealmRole.from_str, missing=None)
-    if isinstance(email, BadField) or isinstance(role, BadField):
-        raise APIException.from_bad_fields([email, role])
+    parser = Parser()
+    parser.add_argument("email", type=str, required=True)
+    parser.add_argument("role", converter=RealmRole.from_str)
+    args, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
 
     with backend_errors_to_api_exceptions():
-        results, _ = await core.find_humans(query=email, per_page=1)
+        results, _ = await core.find_humans(query=args["email"], per_page=1)
         try:
             # TODO: find_humans doesn't guarantee exact match on email
-            assert results[0].human_handle is not None and results[0].human_handle.email == email
+            assert (
+                results[0].human_handle is not None
+                and results[0].human_handle.email == args["email"]
+            )
             recipient = results[0].user_id
         except IndexError:
             raise APIException(404, {"error": "unknown_email"})
 
         await core.user_fs.workspace_share(
-            workspace_id=workspace_id, recipient=recipient, role=role
+            workspace_id=workspace_id, recipient=recipient, role=args["role"]
         )
 
     return {}, 200
@@ -225,23 +233,25 @@ async def toggle_offline_availability(
         raise APIException(404, {"error": "unknown_workspace"})
 
     data = await get_data()
-    enable = parse_arg(data, "enable", type=bool)
-    if isinstance(enable, BadField):
-        raise APIException.from_bad_fields([enable])
+    parser = Parser()
+    parser.add_argument("enable", type=bool, required=True)
+    args, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
 
     info = workspace_fs.get_remanence_manager_info()
-    if enable and info.is_block_remanent:
+    if args["enable"] and info.is_block_remanent:
         raise APIException(400, {"error": "offline_availability_already_enabled"})
-    elif not enable and not info.is_block_remanent:
+    elif not args["enable"] and not info.is_block_remanent:
         raise APIException(400, {"error": "offline_availability_already_disabled"})
     try:
-        if enable:
+        if args["enable"]:
             await workspace_fs.enable_block_remanence()
         else:
             await workspace_fs.disable_block_remanence()
         return {}, 200
     except Exception:
-        if enable:
+        if args["enable"]:
             raise APIException(400, {"error": "failed_to_enable_offline_availability"})
         else:
             raise APIException(400, {"error": "failed_to_disable_offline_availability"})

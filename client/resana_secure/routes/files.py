@@ -26,12 +26,11 @@ from parsec.core.fs.exceptions import (
 from ..utils import (
     APIException,
     authenticated,
-    parse_arg,
     get_data,
     check_if_timestamp,
     backend_errors_to_api_exceptions,
     get_workspace_type,
-    BadField,
+    Parser,
 )
 
 from resana_secure.gui import ResanaGuiApp
@@ -118,19 +117,26 @@ async def create_workspace_folder(
     core: LoggedCore, workspace_id: EntryID
 ) -> tuple[dict[str, Any], int]:
     data = await get_data()
-    name = parse_arg(data, "name", type=EntryName, convert=EntryName)
-    parent_entry_id = parse_arg(data, "parent", type=EntryID, convert=EntryID.from_hex)
-    if isinstance(name, BadField) or isinstance(parent_entry_id, BadField):
-        raise APIException.from_bad_fields([name, parent_entry_id])
+    parser = Parser()
+    parser.add_argument("name", converter=EntryName, required=True)
+    parser.add_argument(
+        "parent",
+        converter=EntryID.from_hex,
+        new_name="parent_entry_id",
+        required=True,
+    )
+    args, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
 
     with backend_errors_to_api_exceptions():
         workspace = core.user_fs.get_workspace(workspace_id)
 
-        result = await entry_id_to_path(workspace, parent_entry_id)
+        result = await entry_id_to_path(workspace, args["parent_entry_id"])
         if not result:
             raise APIException(404, {"error": "unknown_parent"})
         parent_path, _ = result
-        path = parent_path / name
+        path = parent_path / args["name"]
 
         entry_id = await workspace.transactions.folder_create(path)
 
@@ -149,36 +155,32 @@ async def _rename_workspace_entry(
     core: LoggedCore, workspace_id: EntryID, expected_entry_type: str
 ) -> tuple[dict[str, Any], int]:
     data = await get_data()
-    entry_id = parse_arg(data, "id", type=EntryID, convert=EntryID.from_hex)
-    new_name = parse_arg(data, "new_name", type=EntryName, convert=EntryName)
-    new_parent_entry_id = parse_arg(
-        data, "new_parent", type=EntryID, convert=EntryID.from_hex, missing=None
-    )
-    if (
-        isinstance(entry_id, BadField)
-        or isinstance(new_name, BadField)
-        or isinstance(new_parent_entry_id, BadField)
-    ):
-        raise APIException.from_bad_fields([entry_id, new_name, new_parent_entry_id])
+    parser = Parser()
+    parser.add_argument("id", converter=EntryID.from_hex, new_name="entry_id", required=True)
+    parser.add_argument("new_name", converter=EntryName, required=True)
+    parser.add_argument("new_parent", converter=EntryID.from_hex, new_name="new_parent_id")
+    args, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
 
     with backend_errors_to_api_exceptions():
         workspace = core.user_fs.get_workspace(workspace_id)
 
-        result = await entry_id_to_path(workspace, entry_id)
+        result = await entry_id_to_path(workspace, args["entry_id"])
         if not result:
             raise APIException(404, {"error": "unknown_source"})
         source_path, source_stat = result
         if source_stat["type"] != expected_entry_type:
             raise APIException(404, {"error": "unknown_source"})
 
-        if new_parent_entry_id:
-            result = await entry_id_to_path(workspace, new_parent_entry_id)
+        if args["new_parent_id"]:
+            result = await entry_id_to_path(workspace, args["new_parent_id"])
             if not result:
                 raise APIException(404, {"error": "unknown_destination_parent"})
             destination_parent_path, _ = result
-            destination_path = destination_parent_path / new_name
+            destination_path = destination_parent_path / args["new_name"]
         else:
-            destination_path = source_path.parent / new_name
+            destination_path = source_path.parent / args["new_name"]
 
         try:
             await workspace.move(source=source_path, destination=destination_path)
@@ -308,7 +310,7 @@ async def create_workspace_file(
         files = await request.files
         file = files.get("file")
         if not file:
-            raise APIException.from_bad_fields([BadField(name="file")])
+            raise APIException.from_bad_fields(["file"])
 
         bad_fields = []
 
@@ -316,14 +318,14 @@ async def create_workspace_file(
         try:
             name = EntryName(name)
         except (TypeError, ValueError):
-            bad_fields.append(BadField(name="name"))
+            bad_fields.append("name")
 
         form = await request.form
         parent_entry_id_raw = cast(str, form.get("parent", ""))
         try:
             parent_entry_id = EntryID.from_hex(parent_entry_id_raw)
         except (TypeError, ValueError):
-            bad_fields.append(BadField(name="parent"))
+            bad_fields.append("parent")
 
         content = file.stream
 
@@ -333,17 +335,18 @@ async def create_workspace_file(
     else:
         # Otherwise consider is has been sent as json
         data = await get_data()
-        name = parse_arg(data, "name", type=EntryName, convert=EntryName)
-        parent_entry_id_parsed = parse_arg(data, "parent", type=EntryID, convert=EntryID.from_hex)
-        content = parse_arg(data, "content", type=bytes, convert=b64decode)
-        if (
-            isinstance(name, BadField)
-            or isinstance(parent_entry_id_parsed, BadField)
-            or isinstance(content, BadField)
-        ):
-            raise APIException.from_bad_fields([name, parent_entry_id_parsed, content])
+        parser = Parser()
+        parser.add_argument("name", converter=EntryName, required=True)
+        parser.add_argument("parent", converter=EntryID.from_hex, required=True)
+        parser.add_argument("content", converter=b64decode, required=True)
+        args, bad_fields = parser.parse_args(data)
+        if bad_fields:
+            raise APIException.from_bad_fields(bad_fields)
         else:
-            parent_entry_id = parent_entry_id_parsed
+            name = args["name"]
+            parent_entry_id = args["parent"]
+            content = args["content"]
+
     with backend_errors_to_api_exceptions():
         workspace = core.user_fs.get_workspace(workspace_id)
 
@@ -438,28 +441,22 @@ async def search_workspace_item(
     workspace_id: EntryID,
 ) -> tuple[dict[str, Any], int]:
     data = await get_data()
-    case_sensitive = parse_arg(data, "case_sensitive", type=bool, missing=False)
-    exclude_folders = parse_arg(data, "exclude_folders", type=bool, missing=False)
-    search_string = parse_arg(data, "string", type=str)
-    timestamp = parse_arg(
-        data, "timestamp", type=DateTime, convert=DateTime.from_rfc3339, missing=None
-    )
-    if (
-        isinstance(case_sensitive, BadField)
-        or isinstance(exclude_folders, BadField)
-        or isinstance(search_string, BadField)
-        or isinstance(timestamp, BadField)
-    ):
-        raise APIException.from_bad_fields(
-            [case_sensitive, exclude_folders, search_string, timestamp]
-        )
+    parser = Parser()
+    parser.add_argument("case_sensitive", type=bool, default=False)
+    parser.add_argument("exclude_folders", type=bool, default=False)
+    parser.add_argument("string", type=str, new_name="search_string", required=True)
+    parser.add_argument("timestamp", converter=DateTime.from_rfc3339)
+    args, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
+
     with backend_errors_to_api_exceptions():
-        workspace = get_workspace_type(core, workspace_id, timestamp)
+        workspace = get_workspace_type(core, workspace_id, args["timestamp"])
 
         def _matches(file_name: EntryName) -> bool:
-            assert isinstance(search_string, str)
-            return (case_sensitive and search_string in file_name.str) or (
-                not case_sensitive and search_string.lower() in file_name.str.lower()
+            return (args["case_sensitive"] and args["search_string"] in file_name.str) or (
+                not args["case_sensitive"]
+                and args["search_string"].lower() in file_name.str.lower()
             )
 
         async def _recursive_search(path: FsPath) -> List[dict[str, Any]]:
@@ -468,7 +465,11 @@ async def search_workspace_item(
 
             if (
                 path != FsPath("/")
-                and (not exclude_folders or exclude_folders and entry_info["type"] != "folder")
+                and (
+                    not args["exclude_folders"]
+                    or args["exclude_folders"]
+                    and entry_info["type"] != "folder"
+                )
                 and _matches(path.name)
             ):
 
