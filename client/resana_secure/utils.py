@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable, Iterator, Optional, Any, TypeVar, Awaitable
+from typing import Callable, Iterator, Any, TypeVar, Awaitable
 from typing_extensions import ParamSpec, Concatenate
 from functools import wraps
 from base64 import urlsafe_b64decode, urlsafe_b64encode
@@ -64,7 +64,7 @@ class APIException(HTTPException):
         return cls(status_code=400, data={"error": "bad_data", "fields": bad_fields})
 
 
-def get_auth_token() -> Optional[str]:
+def get_auth_token() -> str | None:
     authorization_header = request.headers.get("authorization")
     if authorization_header is None:
         auth_token = session.get("logged_in")
@@ -118,11 +118,11 @@ class Argument:
     def __init__(
         self,
         name: str,
-        type: Any | None = None,
-        converter: Callable[[Any], T] | None = None,
-        new_name: str | None = None,
-        default: T | None = None,
-        required: bool = False,
+        type: Any | None,
+        converter: Callable[[Any], T] | None,
+        new_name: str | None,
+        default: T | None,
+        required: bool,
     ):
         self.name = name
         self.new_name = new_name or name
@@ -185,7 +185,7 @@ class Parser:
         return val
 
 
-async def check_if_timestamp() -> Optional[DateTime]:
+async def check_if_timestamp() -> DateTime | None:
     data = await get_data(allow_empty=True)
     parser = Parser()
     parser.add_argument("timestamp", converter=DateTime.from_rfc3339)
@@ -229,7 +229,7 @@ def apitoken_to_addr(apitoken: str) -> BackendInvitationAddr:
 
 
 def get_workspace_type(
-    core: LoggedCore, workspace_id: EntryID, timestamp: Optional[DateTime] = None
+    core: LoggedCore, workspace_id: EntryID, timestamp: DateTime | None = None
 ) -> WorkspaceFS | WorkspaceFSTimestamped:
     workspace = core.user_fs.get_workspace(workspace_id)
     if timestamp:
@@ -237,7 +237,7 @@ def get_workspace_type(
     return workspace
 
 
-def split_workspace_timestamp(workspace_id: str) -> tuple[EntryID, Optional[DateTime]]:
+def split_workspace_timestamp(workspace_id: str) -> tuple[EntryID, DateTime | None]:
     timestamp_parsed = None
     if "_" in workspace_id:
         workspace_id_temp, *others = workspace_id.split("_")

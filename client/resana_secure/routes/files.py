@@ -9,7 +9,7 @@ from quart import Blueprint, request
 from base64 import b64decode
 
 from PyQt5.QtWidgets import QApplication
-from typing import Optional, Sequence, cast, TypedDict, Any, List
+from typing import Sequence, cast, TypedDict, Any, List
 
 from parsec._parsec import DateTime
 from parsec.core.logged_core import LoggedCore
@@ -83,9 +83,7 @@ async def get_workspace_folders_tree(
     with backend_errors_to_api_exceptions():
         workspace = get_workspace_type(core, workspace_id, timestamp)
 
-        async def _recursive_build_tree(
-            path: str, name: Optional[EntryName]
-        ) -> dict[str, Any] | None:
+        async def _recursive_build_tree(path: str, name: EntryName | None) -> dict[str, Any] | None:
             entry_info = cast(EntryInfo, await workspace.path_info(path=path))
             if entry_info["type"] != "folder":
                 return None

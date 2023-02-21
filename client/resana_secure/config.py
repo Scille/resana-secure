@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import attr
 from pathlib import Path
-from typing import List, Tuple, Optional, Any
+from typing import List, Tuple, Any
 
 from parsec.core.config import CoreConfig
 
@@ -16,7 +16,7 @@ class _CoreConfig(CoreConfig):
 @attr.s(slots=True, frozen=True, auto_attribs=True, kw_only=True)
 class ResanaConfig:
     core_config: _CoreConfig
-    rie_server_addrs: List[Tuple[str, Optional[int]]] = []
+    rie_server_addrs: List[Tuple[str, int | None]] = []
 
     def evolve(self, **kwargs: Any) -> ResanaConfig:
         return attr.evolve(self, **kwargs)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import trio
 from trio_typing import TaskStatus
-from typing import Callable, Dict, Optional, AsyncIterator, AsyncContextManager, Awaitable
+from typing import Callable, Dict, AsyncIterator, AsyncContextManager, Awaitable
 from contextlib import asynccontextmanager
 
 
@@ -86,7 +86,7 @@ class ComponentNotRegistered(Exception):
 class ManagedComponent:
     def __init__(self, component: object, stop_component: Callable[[], Awaitable[None]]) -> None:
         self._rwlock = ReadWriteLock()
-        self._component: Optional[object] = component
+        self._component: object | None = component
         self._stop_component_callback = stop_component
 
     @classmethod
