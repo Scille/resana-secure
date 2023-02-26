@@ -246,9 +246,17 @@ HTTP 200
     ],
     "device": <null> or {
             "token": <uuid>,
-            "created_on" <datetime>,
+            "created_on": <datetime>,
+            "status": <string>
+        },
+    "shamir_recoveries": [
+        {
+            "token": <uuid>,
+            "created_on": <datetime>,
+            "claimer_email": <string>,
             "status": <string>
         }
+    ]
 }
 ```
 
@@ -283,6 +291,15 @@ ou pour un device
 ```python
 {
     "type": "device"
+}
+```
+
+ou pour une récupération par partage de Shamir
+
+```python
+{
+    "type": "shamir_recovery",
+    "claimer_email": <UserID>
 }
 ```
 
@@ -474,6 +491,13 @@ ou pour un enrôlement de user:
 `granted_profile` peut être: `ADMIN` ou `STANDARD`
 (seuls les profiles `ADMIN` peuvent à leur tour inviter de nouveaux utilisateurs)
 
+ou pour un enrôlement de récupération de Shamir:
+
+```python
+{
+}
+```
+
 Response:
 
 ```python
@@ -509,10 +533,38 @@ Response:
 ```python
 HTTP 200
 {
-    "type": <string>,
+    "type": "DEVICE",
+}
+```
+
+ou
+
+```python
+HTTP 200
+{
+    "type": "USER",
     "greeter_email": <string>,
 }
 ```
+
+ou
+
+```python
+HTTP 200
+{
+    "type": "SHAMIR_RECOVERY",
+    "threshold": <integer>,
+    "recipients": [
+        {
+            "email": <string>,
+            "shares": <integer>
+        }
+    ]
+}
+```
+
+`threshold` étant le nombre de shares minimum à réunir pour pouvoir réaliser la récupération.
+`recipients.shares` étant le nombre de shares que possède l'utilisateur donné.
 
 ou
 
@@ -520,10 +572,7 @@ ou
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
 - HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
-`type` est `DEVICE` ou `USER`
-`candidate_greeter_sas` est une liste de quatre codes dont un seul correspond
-au code SAS du pair. L'utilisateur est donc obligé de se concerter avec le pair
-pour déterminer lequel est le bon.
+`type` est `DEVICE` ou `USER` ou `SHAMIR_RECOVERY`
 
 ### `POST /invitations/<token>/claimer/1-wait-peer-ready`
 
@@ -531,9 +580,18 @@ Attend que le pair qui enrôle ait rejoint le serveur Parsec.
 
 Request:
 
+pour un enrôlement de user/device:
+
 ```python
 {
-    "token": <uuid>
+}
+```
+
+ou pour un enrôlement de récupération de Shamir:
+
+```python
+{
+    "greeter_user_email": <string>
 }
 ```
 
@@ -552,7 +610,6 @@ ou
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
 - HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
-`type` est `DEVICE` ou `USER`
 `candidate_greeter_sas` est une liste de quatre codes dont un seul correspond
 au code SAS du pair. L'utilisateur est donc obligé de se concerter avec le pair
 pour déterminer lequel est le bon.
@@ -563,8 +620,19 @@ Vérifie le code SAS fourni par le pair.
 
 Request:
 
+pour un enrôlement de user/device:
+
 ```python
 {
+    "greeter_sas": <string>
+}
+```
+
+ou pour un enrôlement de récupération de Shamir:
+
+```python
+{
+    "greeter_user_email": <string>
     "greeter_sas": <string>
 }
 ```
@@ -594,8 +662,18 @@ Attend que le pair ait validé le code SAS qui lui a été fourni.
 
 Request:
 
+pour un enrôlement de user/device:
+
 ```python
 {
+}
+```
+
+ou pour un enrôlement de récupération de Shamir:
+
+```python
+{
+    "greeter_user_email": <string>
 }
 ```
 
@@ -616,13 +694,24 @@ ou
 
 ### `POST /invitations/<token>/claimer/4-finalize`
 
-Ajoute le pair dans Parsec
+Dans le cas de l'enrôlement user/device: ajoute le pair dans Parsec
 
-Request:
+Dans le cas de l'enrôlement de récupération de Shamir: récupère les shares détenues
+par le pair.
+
+pour un enrôlement de user/device:
 
 ```python
 {
     "key": <base64>
+}
+```
+
+ou pour un enrôlement de récupération de Shamir:
+
+```python
+{
+    "greeter_user_email": <string>
 }
 ```
 
@@ -642,6 +731,34 @@ ou
 - HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 `key` est utilisé pour chiffrer le fichier de clé de Device résultant de l'opération d'enrôlement.
+
+### `POST /invitations/<token>/claimer/5-shamir-recovery-finalize`
+
+Ajoute le pair dans Parsec
+
+```python
+{
+    "key": <base64>
+}
+```
+
+Response:
+
+```python
+HTTP 200
+{
+}
+```
+
+ou
+
+- HTTP 404 si le token est inconnu
+- HTTP 409 si le threshold de shares récupérés n'a pas été atteint (i.e. le client
+  doit réaliser les opérations 1 à 4 avec des paires additionnels)
+- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+
+`key` est utilisé pour chiffrer le fichier de clé de Device résultant de l'opération de récupération de compte.
 
 ## Workspace
 
@@ -1579,5 +1696,51 @@ ou
 HTTP 400
 {
     "error": "invalid_passphrase"
+}
+```
+
+### `POST /recovery/setup-shamir`
+
+Créé un nouveau partage de Shamir contenant un device de récupération.
+
+Request:
+
+```python
+{
+    "threshold": <integer>,
+    "per_recipient_shares": {
+        <string>: <integer>
+    }
+}
+```
+
+`threshold` est le nombre minimum de shares à réunir pour procéder à la récupération du device.
+`per_recipient_shares` contient les email en clé et le nombre de share pour l'utilisateur correspondant en valeur.
+Cela permet d'avoir donner plus de poids à un utilisateur (ex: la récupération du compte peux être faite par
+deux utilisateurs normaux ayant chacun une share, ou bien par un seul utilisateur ayant 2 shares)
+
+Response:
+
+```python
+HTTP 200
+{
+}
+```
+
+ou si les valeurs de shares/threshold ne correspondents pas
+
+```python
+HTTP 400
+{
+    "error": "inconsistent_shamir_setup"
+}
+```
+
+ou
+
+```python
+HTTP 404
+{
+    "error": "unknown_recipient"
 }
 ```
