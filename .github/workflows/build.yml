@@ -12,6 +12,8 @@ on:
 # Global Settings
 env:
   PYTHON_VERSION: "3.9"
+  # TODO: cannot update to 1.4 yet, see https://github.com/python-poetry/poetry/issues/7611
+  POETRY_VERSION: "1.3.2"
   WINFSP_VERSION: "1.8.20304"
   FORCE_MATURIN_RELEASE: 1
 
@@ -55,7 +57,7 @@ jobs:
           set -eux
           python --version
           python -m pip install --user pipx
-          pipx install poetry
+          pipx install poetry==${{ env.POETRY_VERSION }}
           poetry --version
       - name: '[Client] Install Project'
         run: poetry install -v
@@ -99,7 +101,7 @@ jobs:
           set -eux
           python --version
           python -m pip install --user pipx
-          pipx install poetry
+          pipx install poetry==${{ env.POETRY_VERSION }}
           poetry --version
         working-directory: client
       - name: 'Install WinFSP'
@@ -138,7 +140,7 @@ jobs:
           set -eux
           python --version
           python -m pip install --user pipx
-          pipx install poetry
+          pipx install poetry==${{ env.POETRY_VERSION }}
           poetry --version
         working-directory: client
       - name: Freeze Parsec
