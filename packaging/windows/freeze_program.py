@@ -62,7 +62,8 @@ def main(program_source):
         print("### Create tool virtualenv ###")
         run(f"python -m venv {TOOLS_VENV_DIR}")
         run(f"{ TOOLS_VENV_DIR / 'Scripts/python' } -m pip install pip --upgrade")
-        run(f"{ TOOLS_VENV_DIR / 'Scripts/python' } -m pip install poetry --upgrade")
+        # TODO: cannot update to 1.4 yet, see https://github.com/python-poetry/poetry/issues/7611
+        run(f"{ TOOLS_VENV_DIR / 'Scripts/python' } -m pip install poetry==1.3.1")
 
     # Bootstrap PyInstaller virtualenv
     pyinstaller_venv_dir = BUILD_DIR / "pyinstaller_venv"
