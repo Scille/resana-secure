@@ -1,24 +1,34 @@
 #! /usr/bin/env python3
+"""
+Export packages versions from a "poetry.lock" or "Cargo.lock" file
+"""
 
 import argparse
 import re
+import sys
+
+PYTHON_PREFIX = "PIP"
+PYTHON_OUTPUT = "pip_package_list.txt"
+
+RUST_PREFIX = "RUST"
+RUST_OUTPUT = "rust_package_list.txt"
 
 
 def main(pathfile: str) -> None:
-    is_python = False
-    is_rust = False
     if re.match("^.*poetry.lock$", pathfile):
-        is_python = True
+        output, prefix = PYTHON_OUTPUT, PYTHON_PREFIX
     elif re.match("^.*Cargo.lock$", pathfile):
-        is_rust = True
+        output, prefix = RUST_OUTPUT, RUST_PREFIX
     else:
-        print("Only poetry.lock and Cargo.lock files are accepted")
-        return
+        sys.exit("Error: Only 'poetry.lock' and 'Cargo.lock' files are accepted")
 
-    with open(pathfile, mode="r") as file:
-        filename_output = "pip_package_list.txt" if is_python else "rust_package_list.txt"
-        with open(filename_output, mode="w") as output:
-            content = "".join(file.readlines())
+    export_package_versions(pathfile, output, prefix)
+
+
+def export_package_versions(filename_lock: str, filename_output: str, prefix: str) -> None:
+    with open(filename_lock, mode="r", encoding="utf8") as lockfile:
+        with open(filename_output, mode="w", encoding="utf8") as output:
+            content = "".join(lockfile.readlines())
             sections = content.split("\n\n")
             package_regex = re.compile(
                 '^.*name = "(?P<package>.*)"\nversion = "(?P<version>.*)".*$', re.MULTILINE
@@ -29,15 +39,12 @@ def main(pathfile: str) -> None:
                     if m:
                         package = m.group("package")
                         version = m.group("version")
-                        if is_python:
-                            output.write(f"PIP:{package}|{version}\n")
-                        if is_rust:
-                            output.write(f"RUST:{package}|{version}\n")
+                        output.write(f"{prefix}:{package}|{version}\n")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("filename")
+    parser.add_argument("filename", help="a 'poetry.lock' or 'Cargo.lock' file")
     args = parser.parse_args()
 
     main(args.filename)
