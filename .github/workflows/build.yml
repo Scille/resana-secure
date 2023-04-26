@@ -2,21 +2,21 @@ name: CI build
 on:
   push:
     branches:
-    - master
+      - master
   pull_request:
     branches:
-    - master
+      - master
 
 
 # Global Settings
 env:
   PYTHON_VERSION: "3.9"
-  WINFSP_VERSION: "1.8.20304"
+  WINFSP_VERSION: 1.8.20304
   FORCE_MATURIN_RELEASE: 1
 
 jobs:
 
-    # Github PR merging is configured to only require this job to pass
+  # Github PR merging is configured to only require this job to pass
   ci-is-happy:
     name: ⭐ CI is happy ⭐
     needs:
@@ -51,27 +51,28 @@ jobs:
       - name: It's showtime
         run: echo "My job here is done !"
 
-#################################################################################
-
+  #################################
+  #           Linux               #
+  #################################
 
   linux-check-test-build:
-    name: '🐧 Linux check, test & build'
+    name: 🐧 Linux check, test & build
     runs-on: ubuntu-latest
     steps:
-      - name: 'Checkout'
+      - name: Checkout
         uses: actions/checkout@v3 # pin@v3.0.2
         with:
-            submodules: true
+          submodules: true
 
-      - name: 'Set up Python'
+      - name: Set up Python
         uses: actions/setup-python@v4  # pin@v4.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: 'Install fuse'
+      - name: Install fuse
         run: sudo apt-get install -y libfuse2
 
-      - name: 'Install tools'
+      - name: Install tools
         working-directory: client
         run: |
           set -eux
@@ -80,50 +81,51 @@ jobs:
           pipx install poetry
           poetry --version
 
-      - name: '[Client] Install Project'
+      - name: "[Client] Install Project"
         run: poetry install -v
         working-directory: client
 
-      - name: '[Client] Check fuse'
+      - name: "[Client] Check fuse"
         run: poetry run python -c "import fuse"
         working-directory: client
 
-      - name: '[Client] Run Tests'
+      - name: "[Client] Run Tests"
         run: poetry run py.test client_tests
         timeout-minutes: 10
         working-directory: client
 
-      - name: '[Server] Install Project'
+      - name: "[Server] Install Project"
         run: poetry install -v
         working-directory: server
 
-      - name: '[Server] Run Tests'
+      - name: "[Server] Run Tests"
         run: poetry run py.test server_tests
         timeout-minutes: 10
         working-directory: server
 
-      - name: '[Quality] Run pre-commit with mypy-client'
+      - name: "[Quality] Run pre-commit with mypy-client"
         uses: pre-commit/action@v3.0.0
 
 
-#################################################################################
-
+  #################################
+  #           Windows             #
+  #################################
 
   windows-build:
-    name: '🏁 Windows build'
+    name: 🏁 Windows build
     runs-on: windows-latest
     steps:
-      - name: 'Checkout'
+      - name: Checkout
         uses: actions/checkout@v3 # pin@v3.0.2
         with:
-            submodules: true
+          submodules: true
 
-      - name: 'Set up Python'
+      - name: Set up Python
         uses: actions/setup-python@v4  # pin@v4.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: 'Setup env'
+      - name: Setup env
         shell: bash
         run: |
           set -eux
@@ -133,41 +135,37 @@ jobs:
           poetry --version
         working-directory: client
 
-      - name: 'Install WinFSP'
+      - name: Install WinFSP
         shell: bash
         run: |
           set -eux
           choco install -y --limit-output winfsp --version=${{ env.WINFSP_VERSION }}
         working-directory: client
 
-      - name: 'Install project'
+      - name: Install project
         run: poetry install -v
         working-directory: client
 
-      - name: 'Run tests'
+      - name: Run tests
         run: poetry run py.test client_tests
         timeout-minutes: 10
         working-directory: client
 
-
-#################################################################################
-
-
   windows-packaging:
-    name: '🏁 Windows packaging'
+    name: 🏁 Windows packaging
     runs-on: windows-latest
     steps:
-      - name: 'Checkout'
+      - name: Checkout
         uses: actions/checkout@v3 # pin@v3.0.2
         with:
-            submodules: true
+          submodules: true
 
-      - name: 'Set up Python'
+      - name: Set up Python
         uses: actions/setup-python@v4  # pin@v4.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: 'Setup env'
+      - name: Setup env
         shell: bash
         run: |
           set -eux
@@ -181,7 +179,7 @@ jobs:
         run: python freeze_program.py ../../client
         working-directory: packaging/windows/
 
-      - name: 'Upload installer as artifact'
+      - name: Upload installer as artifact
         uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # pin v3.1.2
         with:
           name: ${{ runner.os }}-${{ runner.arch }}-installer-content
