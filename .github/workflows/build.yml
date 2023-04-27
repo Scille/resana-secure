@@ -167,6 +167,9 @@ jobs:
   windows-build:
     name: 🏁 Windows build
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: client
     steps:
       - name: Checkout
         uses: actions/checkout@v3 # pin@v3.0.2
@@ -203,16 +206,13 @@ jobs:
         run: |
           set -eux
           choco install -y --limit-output winfsp --version=${{ env.WINFSP_VERSION }}
-        working-directory: client
 
       - name: Install project
         run: poetry install -v
-        working-directory: client
 
       - name: Run tests
         run: poetry run py.test client_tests
         timeout-minutes: 10
-        working-directory: client
 
   windows-packaging:
     name: 🏁 Windows packaging
