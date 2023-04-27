@@ -21,7 +21,8 @@ jobs:
   ci-is-happy:
     name: ⭐ CI is happy ⭐
     needs:
-      - linux-check-test-build
+      - linux-check-test-build-client
+      - linux-server
       - windows-build
       - windows-packaging
     runs-on: ubuntu-latest
@@ -56,7 +57,7 @@ jobs:
   #           Linux               #
   #################################
 
-  linux-check-test-build:
+  linux-check-test-build-client:
     name: 🐧 Linux check, test & build
     runs-on: ubuntu-latest
     steps:
@@ -96,31 +97,68 @@ jobs:
           python --version
           poetry --version
 
-      - name: "[Client] Install Project"
+      - name: Install Project
         run: poetry install -v
         working-directory: client
 
-      - name: "[Client] Check fuse"
+      - name: Check fuse
         run: poetry run python -c "import fuse"
         working-directory: client
 
-      - name: "[Client] Run Tests"
+      - name: Run Tests
         run: poetry run py.test client_tests
         timeout-minutes: 10
         working-directory: client
 
-      - name: "[Server] Install Project"
-        run: poetry install -v
-        working-directory: server
-
-      - name: "[Server] Run Tests"
-        run: poetry run py.test server_tests
-        timeout-minutes: 10
-        working-directory: server
-
       - name: "[Quality] Run pre-commit with mypy-client"
         uses: pre-commit/action@v3.0.0
 
+  linux-server:
+    name: 🐧 Linux server
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3 # pin@v3.0.2
+        with:
+          submodules: true
+
+      - name: Install poetry-${{ env.POETRY_VERSION }}
+        shell: bash
+        run: |
+          set -eux
+          set -o pipefail
+          export POETRY_HOME="$HOME/.poetry"
+          mkdir -p "$POETRY_HOME"
+          if ! curl -sSL https://install.python-poetry.org | python3 - --version=${{ env.POETRY_VERSION }}; then
+            tail -n +0 ${{ github.workspace }}/poetry-installer*.log
+            exit 3
+          fi
+          echo "$POETRY_HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Set up Python
+        uses: actions/setup-python@57ded4d7d5e986d7296eab16560982c6dd7c923b  # pin@v4.6.0
+        id: setup-python
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Configure poetry to use the installed python
+        shell: bash
+        run: poetry env use ${{ steps.setup-python.outputs.python-path }}
+
+      - name: Debug python & poetry versions
+        run: |
+          python --version
+          poetry --version
+
+      - name: Install Project
+        run: poetry install -v
+
+      - name: Run Tests
+        run: poetry run py.test server_tests
+        timeout-minutes: 10
 
   #################################
   #           Windows             #
