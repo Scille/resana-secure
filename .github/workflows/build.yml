@@ -91,11 +91,30 @@ jobs:
       - name: Configure poetry to use the installed python
         shell: bash
         run: poetry env use ${{ steps.setup-python.outputs.python-path }}
+        working-directory: client
 
       - name: Debug python & poetry versions
         run: |
           python --version
           poetry --version
+          poetry env info
+        working-directory: client
+
+      - name: Generate cache key
+        id: cache-key
+        run: |
+          echo "key=linux-client-${{ hashFiles('client/poetry.lock') }}" >> $GITHUB_OUTPUT
+          echo "restore-keys=linux-client-" >> $GITHUB_OUTPUT
+
+      # Using this workaround to cache `poetry` dependencies until
+      # https://github.com/actions/setup-python/issues/476 is resolved
+      - name: Restore python dependencies
+        uses: actions/cache/restore@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8  # pin v3.3.1
+        id: restore
+        with:
+          key: ${{ steps.cache-key.outputs.key }}
+          restore-keys: ${{ steps.cache-key.outputs.restore-keys }}
+          path: /home/runner/.cache/pypoetry/virtualenvs/resana-secure-*
 
       - name: Install Project
         run: poetry install -v
@@ -109,6 +128,15 @@ jobs:
         run: poetry run py.test client_tests
         timeout-minutes: 10
         working-directory: client
+
+      # Using this workaround to cache `poetry` dependencies until
+      # https://github.com/actions/setup-python/issues/476 is resolved
+      - name: Save python dependencies before `pre-commit`
+        uses: actions/cache/save@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8  # pin v3.3.1
+        if: steps.restore.outputs.cache-hit != 'true'
+        with:
+          key: ${{ steps.cache-key.outputs.key }}
+          path: /home/runner/.cache/pypoetry/virtualenvs/resana-secure-*
 
       - name: "[Quality] Run pre-commit with mypy-client"
         uses: pre-commit/action@v3.0.0
@@ -152,6 +180,16 @@ jobs:
         run: |
           python --version
           poetry --version
+          poetry env info
+
+      # Using this workaround to cache `poetry` dependencies until
+      # https://github.com/actions/setup-python/issues/476 is resolved
+      - name: Cache python dependencies
+        uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8  # pin v3.3.1
+        with:
+          key: linux-server-${{ hashFiles('client/poetry.lock') }}
+          restore-keys: linux-server-
+          path: /home/runner/.cache/pypoetry/virtualenvs/resana-server-*
 
       - name: Install Project
         run: poetry install -v
@@ -200,12 +238,22 @@ jobs:
         run: |
           python --version
           poetry --version
+          poetry env info
 
       - name: Install WinFSP
         shell: bash
         run: |
           set -eux
           choco install -y --limit-output winfsp --version=${{ env.WINFSP_VERSION }}
+
+      # Using this workaround to cache `poetry` dependencies until
+      # https://github.com/actions/setup-python/issues/476 is resolved
+      - name: Cache python dependencies
+        uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8  # pin v3.3.1
+        with:
+          key: windows-build-${{ hashFiles('client/poetry.lock') }}
+          restore-keys: windows-build-
+          path: C:\Users\runneradmin\AppData\Local\pypoetry\Cache\virtualenvs\resana-secure-*
 
       - name: Install project
         run: poetry install -v
@@ -223,30 +271,23 @@ jobs:
         with:
           submodules: true
 
-      - name: Install poetry-${{ env.POETRY_VERSION }}
-        shell: bash
-        run: |
-          set -eux
-          export POETRY_HOME=${APPDATA}/.poetry
-          curl -sSL https://install.python-poetry.org \
-            | python3 - --version=${{ env.POETRY_VERSION }}
-          echo "${APPDATA}\.poetry\bin" >> "$GITHUB_PATH"
-
       - name: Set up Python
         uses: actions/setup-python@57ded4d7d5e986d7296eab16560982c6dd7c923b  # pin@v4.6.0
         id: setup-python
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Configure poetry to use the installed python
-        shell: pwsh
-        run: poetry env use ${{ steps.setup-python.outputs.python-path }}
-
-      - name: Debug python & poetry versions
-        shell: bash
-        run: |
-          python --version
-          poetry --version
+      # Using this workaround to cache `poetry` dependencies until
+      # https://github.com/actions/setup-python/issues/476 is resolved
+      # Here we restore only since we use the same dependencies has `windows-build`
+      - name: Restore cache from `windows-build`
+        uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8  # pin v3.3.1
+        with:
+          key: windows-packaging-${{ hashFiles('client/poetry.lock') }}
+          restore-keys: windows-packaging-
+          path: |
+            packaging/windows/build/tools_venv
+            packaging/windows/build/pyinstaller_venv
 
       - name: Freeze Parsec
         run: python freeze_program.py ../../client
