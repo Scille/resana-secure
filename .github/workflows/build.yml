@@ -29,8 +29,8 @@ jobs:
     timeout-minutes: 2
     steps:
       # The Needs context value contains only:
-      # - the final state a jobs (if it fails or not)
-      # - it's output (actually none of our jobs are configuring outputs variable)
+      # - the final state of a job (if it fails or not)
+      # - its output (currently, none of our jobs are configuring outputs variable)
       #
       # https://docs.github.com/en/actions/learn-github-actions/contexts#needs-context
       - name: Debug the needs context values
