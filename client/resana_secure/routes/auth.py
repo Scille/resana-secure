@@ -53,8 +53,8 @@ async def do_auth() -> tuple[dict[str, Any], int]:
         try:
             # Check if it's base64 but don't store the result
             base64.b64decode(args["encrypted_key"])
-        except (ValueError, TypeError):
-            raise APIException.from_bad_fields(["encrypted_key"])
+        except (ValueError, TypeError) as exc:
+            raise APIException.from_bad_fields(["encrypted_key"]) from exc
         if not isinstance(args["user_password"], str):
             raise APIException.from_bad_fields(["user_password"])
     else:

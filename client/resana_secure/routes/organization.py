@@ -40,13 +40,13 @@ async def organization_bootstrap() -> tuple[dict[str, Any], int]:
 
     try:
         human_handle = HumanHandle(label="-unknown-", email=args["email"])
-    except (ValueError, TypeError):
-        raise APIException.from_bad_fields(["email"])
+    except (ValueError, TypeError) as exc:
+        raise APIException.from_bad_fields(["email"]) from exc
     if args["sequester_verify_key"]:
         try:
             sequester_key = SequesterVerifyKeyDer(base64.b64decode(args["sequester_verify_key"]))
-        except (ValueError, TypeError, binascii.Error):
-            raise APIException.from_bad_fields(["sequester_verify_key"])
+        except (ValueError, TypeError, binascii.Error) as exc:
+            raise APIException.from_bad_fields(["sequester_verify_key"]) from exc
     else:
         sequester_key = None
 

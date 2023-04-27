@@ -30,7 +30,7 @@ recovery_bp = Blueprint("recovery_api", __name__)
 async def export_device(core: LoggedCore) -> tuple[dict[str, Any], int]:
     data = await get_data()
     if data.keys():
-        raise APIException.from_bad_fields([key for key in data.keys()])
+        raise APIException.from_bad_fields(list(data.keys()))
 
     fp, raw_path = tempfile.mkstemp(suffix=".psrk")
     # Closing the open file returned by mkstemp

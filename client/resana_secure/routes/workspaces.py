@@ -93,8 +93,7 @@ async def rename_workspaces(core: LoggedCore, workspace_id: EntryID) -> tuple[di
         if entry.id == workspace_id:
             if entry.name != args["old_name"]:
                 raise APIException(409, {"error": "precondition_failed"})
-            else:
-                break
+            break
     else:
         raise APIException(404, {"error": "unknown_workspace"})
 
@@ -242,7 +241,7 @@ async def toggle_offline_availability(
     info = workspace_fs.get_remanence_manager_info()
     if args["enable"] and info.is_block_remanent:
         raise APIException(400, {"error": "offline_availability_already_enabled"})
-    elif not args["enable"] and not info.is_block_remanent:
+    if not args["enable"] and not info.is_block_remanent:
         raise APIException(400, {"error": "offline_availability_already_disabled"})
     try:
         if args["enable"]:

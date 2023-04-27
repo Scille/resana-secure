@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from typing import Callable, Iterator, Any, TypeVar, Awaitable
 from typing_extensions import ParamSpec, Concatenate
+from dataclasses import dataclass
 from functools import wraps
 from base64 import urlsafe_b64decode, urlsafe_b64encode
 from contextlib import contextmanager
 from quart import jsonify, session, request
 from werkzeug.exceptions import HTTPException
-from werkzeug.routing import BaseConverter
 
 from parsec._parsec import DateTime
 from parsec.core.logged_core import LoggedCore
@@ -43,14 +43,6 @@ from parsec.core.fs.workspacefs import WorkspaceFS, WorkspaceFSTimestamped
 from .cores_manager import CoreNotLoggedError
 from .invites_manager import LongTermCtxNotStarted
 from .app import current_app
-
-
-class EntryIDConverter(BaseConverter):
-    def to_python(self, value: str) -> Any:
-        return super().to_python(value)
-
-    def to_url(self, value: Any) -> str:
-        return super().to_url(value)
 
 
 class APIException(HTTPException):
@@ -114,22 +106,18 @@ class BadField(Exception):
         self.name = name
 
 
+@dataclass
 class Argument:
-    def __init__(
-        self,
-        name: str,
-        type: Any | None,
-        converter: Callable[[Any], T] | None,
-        new_name: str | None,
-        default: T | None,
-        required: bool,
-    ):
-        self.name = name
-        self.new_name = new_name or name
-        self.type = type
-        self.converter = converter
-        self.default = default
-        self.required = required
+    name: str
+    type: Any | None
+    converter: Callable[[Any], T] | None
+    new_name: str | None
+    default: Any | None
+    required: bool
+
+    def __post_init__(self) -> None:
+        assert not (self.required and self.default is not None), "Can't have required with default"
+        assert self.type or self.converter, "Type or converter is needed"
 
 
 class Parser:
@@ -145,8 +133,6 @@ class Parser:
         default: T | None = None,
         required: bool = False,
     ) -> None:
-        assert not (required and default is not None), "Can't have required with default"
-        assert type or converter, "Type or converter is needed"
         self.arguments.append(
             Argument(
                 name,
@@ -164,7 +150,8 @@ class Parser:
         for arg in self.arguments:
             try:
                 r = self._parse_arg(data, arg)
-                args[arg.new_name] = r
+                name = arg.new_name or arg.name
+                args[name] = r
             except BadField as f:
                 bad_fields.append(f.name)
         return args, bad_fields
@@ -178,8 +165,8 @@ class Parser:
         if arg.converter:
             try:
                 return arg.converter(val)
-            except (ValueError, TypeError):
-                raise BadField(arg.name)
+            except (ValueError, TypeError) as exc:
+                raise BadField(arg.name) from exc
         if arg.type and not isinstance(val, arg.type):
             raise BadField(arg.name)
         return val
@@ -201,10 +188,9 @@ async def get_data(allow_empty: bool = False) -> dict[str, Any]:
         # With silent=True, get_json returns None if request is empty (= no mimetype) or with a format error
         if not allow_empty:
             raise APIException(400, {"error": "json_body_expected"})
-        elif request.mimetype != "":
+        if request.mimetype != "":
             raise APIException(400, {"error": "json_body_expected"})
-        else:
-            data = {}
+        data = {}
     return data
 
 
