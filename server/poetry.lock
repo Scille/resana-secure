@@ -1029,20 +1029,20 @@ testing = ["argcomplete", "attrs (>=19.2.0)", "hypothesis (>=3.56)", "mock", "no
 
 [[package]]
 name = "pytest-trio"
-version = "0.7.0"
+version = "0.8.0"
 description = "Pytest plugin for trio"
 category = "dev"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.7"
 files = [
-    {file = "pytest-trio-0.7.0.tar.gz", hash = "sha256:c01b741819aec2c419555f28944e132d3c711dae1e673d63260809bf92c30c31"},
+    {file = "pytest-trio-0.8.0.tar.gz", hash = "sha256:8363db6336a79e6c53375a2123a41ddbeccc4aa93f93788651641789a56fb52e"},
+    {file = "pytest_trio-0.8.0-py3-none-any.whl", hash = "sha256:e6a7e7351ae3e8ec3f4564d30ee77d1ec66e1df611226e5618dbb32f9545c841"},
 ]
 
 [package.dependencies]
-async_generator = ">=1.9"
-outcome = "*"
-pytest = ">=3.6"
-trio = ">=0.15.0"
+outcome = ">=1.1.0"
+pytest = ">=7.2.0"
+trio = ">=0.22.0"
 
 [[package]]
 name = "pytest-xdist"
@@ -1497,4 +1497,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = "~3.9.0"
-content-hash = "240993d859ae46ddd15f15fc63e82c919354cc41f99870a6f5d7158e37a6d8ec"
+content-hash = "80e763f6c225c6c1510a58f313363b4e67488b233d83ae81d790f4c96af74f30"
