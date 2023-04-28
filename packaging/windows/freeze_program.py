@@ -16,6 +16,7 @@ BUILD_DIR = Path("build").resolve()
 WINFSP_URL = "https://github.com/billziss-gh/winfsp/releases/download/v1.8/winfsp-1.8.20304.msi"
 WINFSP_HASH = "8d6f2c519f3f064881b576452fbbd35fe7ad96445aa15d9adcea1e76878b4f00"
 TOOLS_VENV_DIR = BUILD_DIR / "tools_venv"
+PYINSTALLER_VENV_DIR = BUILD_DIR / "pyinstaller_venv"
 WHEELS_DIR = BUILD_DIR / "wheels"
 
 PYTHON_VERSION = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
@@ -29,9 +30,10 @@ def get_archslug():
 
 def run(cmd, **kwargs):
     print(f">>> {cmd}")
-    ret = subprocess.run(cmd, shell=True, **kwargs)
-    assert ret.returncode == 0, ret.returncode
-    return ret
+    # Need to flush stdout & stderr before executing the command to have the output correctly ordered
+    sys.stdout.flush()
+    sys.stderr.flush()
+    return subprocess.check_call(cmd, shell=True, **kwargs)
 
 
 def main(program_source):
@@ -65,16 +67,15 @@ def main(program_source):
         run(f"{ TOOLS_VENV_DIR / 'Scripts/python' } -m pip install poetry --upgrade")
 
     # Bootstrap PyInstaller virtualenv
-    pyinstaller_venv_dir = BUILD_DIR / "pyinstaller_venv"
-    if not pyinstaller_venv_dir.is_dir():
+    if not PYINSTALLER_VENV_DIR.is_dir():
         print(
             "### Installing Resana Secure, Parsec, dependencies & PyInstaller in temporary virtualenv ###"
         )
-        run(f"{ PYTHON_EXECUTABLE } -m venv {pyinstaller_venv_dir}")
+        run(f"{ PYTHON_EXECUTABLE } -m venv {PYINSTALLER_VENV_DIR}")
     run(
-        f"{ TOOLS_VENV_DIR.absolute() / 'Scripts/python' } -m poetry install --no-interaction",
+        f"{ TOOLS_VENV_DIR.absolute() / 'Scripts/python' } -m poetry install --with=packaging --no-interaction",
         cwd=program_source.absolute(),
-        env={**os.environ, "VIRTUAL_ENV": str(pyinstaller_venv_dir.absolute())},
+        env={**os.environ, "VIRTUAL_ENV": str(PYINSTALLER_VENV_DIR.absolute())},
     )
 
     pyinstaller_build = BUILD_DIR / "pyinstaller_build"
@@ -83,7 +84,7 @@ def main(program_source):
         print("### Use Pyinstaller to generate distribution ###")
         spec_file = Path(__file__).joinpath("..", "pyinstaller.spec").resolve()
         run(
-            f"{ pyinstaller_venv_dir / 'Scripts/python' } -m PyInstaller {spec_file} --distpath {pyinstaller_dist} --workpath {pyinstaller_build}"
+            f"{ PYINSTALLER_VENV_DIR / 'Scripts/python' } -m PyInstaller {spec_file} --distpath {pyinstaller_dist} --workpath {pyinstaller_build}"
         )
 
     target_dir = BUILD_DIR / f"resana_secure-{program_version}-{get_archslug()}"
