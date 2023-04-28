@@ -14,6 +14,9 @@ env:
   POETRY_VERSION: 1.3.2
   WINFSP_VERSION: 1.8.20304
   FORCE_MATURIN_RELEASE: 1
+  PYTEST_ARGS: >-
+    --numprocesses=auto
+    --verbose
 
 jobs:
 
@@ -125,7 +128,7 @@ jobs:
         working-directory: client
 
       - name: Run Tests
-        run: poetry run py.test client_tests
+        run: poetry run py.test client_tests ${{ env.PYTEST_ARGS }}
         timeout-minutes: 10
         working-directory: client
 
@@ -195,7 +198,7 @@ jobs:
         run: poetry install -v
 
       - name: Run Tests
-        run: poetry run py.test server_tests
+        run: poetry run py.test server_tests ${{ env.PYTEST_ARGS }}
         timeout-minutes: 10
 
   #################################
@@ -259,7 +262,7 @@ jobs:
         run: poetry install -v
 
       - name: Run tests
-        run: poetry run py.test client_tests
+        run: poetry run py.test client_tests ${{ env.PYTEST_ARGS }}
         timeout-minutes: 10
 
   windows-packaging:
