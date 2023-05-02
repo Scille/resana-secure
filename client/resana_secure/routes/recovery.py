@@ -19,7 +19,7 @@ from parsec.core.local_device import (
     get_recovery_device_file_name,
 )
 
-from ..utils import APIException, authenticated, check_data
+from ..utils import APIException, authenticated, get_data, Parser
 from ..app import current_app
 
 recovery_bp = Blueprint("recovery_api", __name__)
@@ -28,8 +28,9 @@ recovery_bp = Blueprint("recovery_api", __name__)
 @recovery_bp.route("/recovery/export", methods=["POST"])
 @authenticated
 async def export_device(core: LoggedCore) -> tuple[dict[str, Any], int]:
-    async with check_data() as (data, bad_fields):
-        bad_fields |= data.keys()  # No fields allowed
+    data = await get_data()
+    if data.keys():
+        raise APIException.from_bad_fields(list(data.keys()))
 
     fp, raw_path = tempfile.mkstemp(suffix=".psrk")
     # Closing the open file returned by mkstemp
@@ -55,35 +56,30 @@ async def export_device(core: LoggedCore) -> tuple[dict[str, Any], int]:
 
 @recovery_bp.route("/recovery/import", methods=["POST"])
 async def import_device() -> tuple[dict[str, Any], int]:
-    async with check_data() as (data, bad_fields):
-        file_content_raw = data.get("recovery_device_file_content")
-        if not isinstance(file_content_raw, str):
-            bad_fields.add("recovery_device_file_content")
-        else:
-            try:
-                file_content = b64decode(file_content_raw)
-            except ValueError:
-                bad_fields.add("recovery_device_file_content")
-
-        passphrase = data.get("recovery_device_passphrase")
-        if not isinstance(passphrase, str):
-            bad_fields.add("recovery_device_passphrase")
-
-        # Note password is supposed to be base64 data, however we need a string
-        # to save the device. Hence we "cheat" by using the content without
-        # deserializing back from base64.
-        password = data.get("new_device_key")
-        if not isinstance(password, str):
-            bad_fields.add("new_device_key")
+    data = await get_data()
+    parser = Parser()
+    parser.add_argument(
+        "recovery_device_file_content",
+        converter=b64decode,
+        new_name="file_content",
+        required=True,
+    )
+    parser.add_argument(
+        "recovery_device_passphrase", type=str, new_name="passphrase", required=True
+    )
+    parser.add_argument("new_device_key", type=str, new_name="password", required=True)
+    args, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
 
     fp, raw_path = tempfile.mkstemp(suffix=".psrk")
     # Closing the open file returned by mkstemp
     os.close(fp)
     path = Path(raw_path)
     try:
-        path.write_bytes(file_content)
+        path.write_bytes(args["file_content"])
         try:
-            new_device = await load_recovery_device(path, passphrase)
+            new_device = await load_recovery_device(path, args["passphrase"])
         # TODO: change it for LocalDeviceCryptoError once https://github.com/Scille/parsec-cloud/issues/4048 is done
         except LocalDeviceError:
             raise APIException(400, {"error": "invalid_passphrase"})
@@ -93,7 +89,7 @@ async def import_device() -> tuple[dict[str, Any], int]:
     save_device_with_password_in_config(
         config_dir=current_app.resana_config.core_config.config_dir,
         device=new_device,
-        password=password,
+        password=args["password"],
     )
 
     return {}, 200

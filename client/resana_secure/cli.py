@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import trio
 from typing import (
-    Optional,
     Tuple,
     Any,
     MutableMapping,
@@ -36,7 +35,7 @@ def _cook_website_url(url: str) -> str:
 _cook_website_url.__name__ = "http[s] url"  # Used by argparse for help output
 
 
-def _setup_logging(log_level: str, log_file: Optional[Path]) -> None:
+def _setup_logging(log_level: str, log_file: Path | None) -> None:
     # The infamous logging configuration...
 
     def _structlog_renderer(_arg1: Any, _arg2: str, event_dict: MutableMapping[str, Any]) -> Any:
@@ -92,7 +91,7 @@ def get_default_dirs() -> Tuple[Path, Path, Path]:
     return mountpoint_base_dir, data_base_dir, config_dir
 
 
-def _parse_host(s: str) -> Tuple[str, Optional[int]]:
+def _parse_host(s: str) -> Tuple[str, int | None]:
     # urllib.parse.urlparse doesn't do well without a scheme
     # For `domain.com` for example, it considers it to be the path,
     # not the hostname.
@@ -109,7 +108,7 @@ def _parse_host(s: str) -> Tuple[str, Optional[int]]:
 def run_cli(
     args: Sequence[str] | None = None,
     default_log_level: str = "INFO",
-    default_log_file: Optional[Path] = None,
+    default_log_file: Path | None = None,
 ) -> None:
     parser = argparse.ArgumentParser(description="Process some integers.")
     parser.add_argument("--port", type=int, default=5775)

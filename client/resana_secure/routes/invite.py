@@ -30,7 +30,8 @@ from parsec.core.invite import (
 
 from ..utils import (
     authenticated,
-    check_data,
+    get_data,
+    Parser,
     APIException,
     apitoken_to_addr,
     backend_errors_to_api_exceptions,
@@ -103,14 +104,12 @@ async def greeter_3_check_trust(core: LoggedCore, apitoken: str) -> tuple[dict[s
     except ValueError:
         raise APIException(404, {"error": "unknown_token"})
 
-    async with check_data() as (data, bad_fields):
-        claimer_sas_raw = data.get("claimer_sas")
-        if not isinstance(claimer_sas_raw, str):
-            bad_fields.add("claimer_sas")
-        try:
-            claimer_sas = SASCode(claimer_sas_raw)
-        except ValueError:
-            bad_fields.add("claimer_sas")
+    data = await get_data()
+    parser = Parser()
+    parser.add_argument("claimer_sas", converter=SASCode, required=True)
+    args, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
 
     with backend_errors_to_api_exceptions():
         async with current_app.greeters_manager.retreive_ctx(addr) as lifetime_ctx:
@@ -120,7 +119,7 @@ async def greeter_3_check_trust(core: LoggedCore, apitoken: str) -> tuple[dict[s
             ):
                 raise APIException(409, {"error": "invalid_state"})
 
-            if in_progress_ctx.claimer_sas != claimer_sas:
+            if in_progress_ctx.claimer_sas != args["claimer_sas"]:
                 raise APIException(400, {"error": "bad_claimer_sas"})
 
             in_progress_ctx = await in_progress_ctx.do_signify_trust()
@@ -137,18 +136,22 @@ async def greeter_4_finalize(core: LoggedCore, apitoken: str) -> tuple[dict[str,
     except ValueError:
         raise APIException(404, {"error": "unknown_token"})
 
-    async with check_data() as (data, bad_fields):
-        if addr.invitation_type == InvitationType.USER:
-            claimer_email = data.get("claimer_email")
-            if not isinstance(claimer_email, str):
-                bad_fields.add("claimer_email")
-            granted_profile_raw = data.get("granted_profile")
-            if granted_profile_raw == "ADMIN":
-                granted_profile = UserProfile.ADMIN
-            elif granted_profile_raw == "STANDARD":
-                granted_profile = UserProfile.STANDARD
-            else:
-                bad_fields.add("granted_profile")
+    if addr.invitation_type == InvitationType.USER:
+        data = await get_data()
+        parser = Parser()
+        parser.add_argument("claimer_email", type=str, required=True)
+        parser.add_argument("granted_profile", type=str, required=True)
+        args, bad_fields = parser.parse_args(data)
+        if bad_fields:
+            raise APIException.from_bad_fields(bad_fields)
+
+        if args["granted_profile"] not in ("ADMIN", "STANDARD"):
+            raise APIException.from_bad_fields(["granted_profile"])
+        granted_profile = (
+            UserProfile.ADMIN if args["granted_profile"] == "ADMIN" else UserProfile.STANDARD
+        )
+    else:
+        granted_profile = None
 
     with backend_errors_to_api_exceptions():
         async with current_app.greeters_manager.retreive_ctx(addr) as lifetime_ctx:
@@ -156,11 +159,12 @@ async def greeter_4_finalize(core: LoggedCore, apitoken: str) -> tuple[dict[str,
             in_progress_4_ctx: UserGreetInProgress4Ctx | DeviceGreetInProgress4Ctx
 
             if isinstance(in_progress_ctx, UserGreetInProgress3Ctx):
+                assert isinstance(granted_profile, UserProfile)
                 in_progress_4_ctx = await in_progress_ctx.do_get_claim_requests()
                 await in_progress_4_ctx.do_create_new_user(
                     author=core.device,
                     device_label=in_progress_4_ctx.requested_device_label,
-                    human_handle=HumanHandle(email=claimer_email, label="-unknown-"),
+                    human_handle=HumanHandle(email=args["claimer_email"], label="-unknown-"),
                     profile=granted_profile,
                 )
 
@@ -232,14 +236,12 @@ async def claimer_2_check_trust(apitoken: str) -> tuple[dict[str, Any], int]:
     except ValueError:
         raise APIException(404, {"error": "unknown_token"})
 
-    async with check_data() as (data, bad_fields):
-        greeter_sas_raw = data.get("greeter_sas")
-        if not isinstance(greeter_sas_raw, str):
-            bad_fields.add("greeter_sas")
-        try:
-            greeter_sas = SASCode(greeter_sas_raw)
-        except ValueError:
-            bad_fields.add("greeter_sas")
+    data = await get_data()
+    parser = Parser()
+    parser.add_argument("greeter_sas", converter=SASCode, required=True)
+    args, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
 
     with backend_errors_to_api_exceptions():
         async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
@@ -249,7 +251,7 @@ async def claimer_2_check_trust(apitoken: str) -> tuple[dict[str, Any], int]:
             ):
                 raise APIException(409, {"error": "invalid_state"})
 
-            if in_progress_ctx.greeter_sas != greeter_sas:
+            if in_progress_ctx.greeter_sas != args["greeter_sas"]:
                 raise APIException(400, {"error": "bad_greeter_sas"})
 
             in_progress_2_ctx = await in_progress_ctx.do_signify_trust()
@@ -287,13 +289,15 @@ async def claimer_4_finalize(apitoken: str) -> tuple[dict[str, Any], int]:
     except ValueError:
         raise APIException(404, {"error": "unknown_token"})
 
-    async with check_data() as (data, bad_fields):
-        # Note password is supposed to be base64 data, however we need a string
-        # to save the device. Hence we "cheat" by using the content without
-        # deserializing back from base64.
-        password = data.get("key")
-        if not isinstance(password, str):
-            bad_fields.add("key")
+    data = await get_data()
+    parser = Parser()
+    # Note password is supposed to be base64 data, however we need a string
+    # to save the device. Hence we "cheat" by using the content without
+    # deserializing back from base64.
+    parser.add_argument("key", type=str, new_name="password", required=True)
+    args, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
 
     with backend_errors_to_api_exceptions():
         async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
@@ -319,7 +323,7 @@ async def claimer_4_finalize(apitoken: str) -> tuple[dict[str, Any], int]:
             save_device_with_password_in_config(
                 config_dir=current_app.resana_config.core_config.config_dir,
                 device=new_device,
-                password=password,
+                password=args["password"],
             )
             lifetime_ctx.mark_as_terminated()
 

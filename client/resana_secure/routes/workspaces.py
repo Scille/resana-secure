@@ -14,8 +14,9 @@ from ..utils import (
     APIException,
     authenticated,
     requires_rie,
-    check_data,
+    get_data,
     check_if_timestamp,
+    Parser,
     backend_errors_to_api_exceptions,
     get_workspace_type,
 )
@@ -46,17 +47,15 @@ async def list_workspaces(core: LoggedCore) -> tuple[dict[str, Any], int]:
 @workspaces_bp.route("/workspaces", methods=["POST"])
 @authenticated
 async def create_workspaces(core: LoggedCore) -> tuple[dict[str, Any], int]:
-    async with check_data() as (data, bad_fields):
-        name_raw = data.get("name")
-        if not isinstance(name_raw, str):
-            bad_fields.add("name")
-        try:
-            name = EntryName(name_raw)
-        except ValueError:
-            bad_fields.add("name")
+    data = await get_data()
+    parser = Parser()
+    parser.add_argument("name", converter=EntryName, required=True)
+    args, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
 
     with backend_errors_to_api_exceptions():
-        workspace_id = await core.user_fs.workspace_create(name)
+        workspace_id = await core.user_fs.workspace_create(args["name"])
 
     # TODO: should we do a `user_fs.sync()` ?
 
@@ -82,33 +81,24 @@ async def sync_workspaces(core: LoggedCore) -> tuple[dict[str, Any], int]:
 @workspaces_bp.route("/workspaces/<WorkspaceID:workspace_id>", methods=["PATCH"])
 @authenticated
 async def rename_workspaces(core: LoggedCore, workspace_id: EntryID) -> tuple[dict[str, Any], int]:
-    async with check_data() as (data, bad_fields):
-        old_name_raw = data.get("old_name")
-        if not isinstance(old_name_raw, str):
-            bad_fields.add("old_name")
-        try:
-            old_name = EntryName(old_name_raw)
-        except ValueError:
-            bad_fields.add("old_name")
-        new_name_raw = data.get("new_name")
-        if not isinstance(new_name_raw, str):
-            bad_fields.add("new_name")
-        try:
-            new_name = EntryName(new_name_raw)
-        except ValueError:
-            bad_fields.add("new_name")
+    data = await get_data()
+    parser = Parser()
+    parser.add_argument("old_name", converter=EntryName, required=True)
+    parser.add_argument("new_name", converter=EntryName, required=True)
+    args, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
 
     for entry in core.user_fs.get_user_manifest().workspaces:
         if entry.id == workspace_id:
-            if entry.name != old_name:
+            if entry.name != args["old_name"]:
                 raise APIException(409, {"error": "precondition_failed"})
-            else:
-                break
+            break
     else:
         raise APIException(404, {"error": "unknown_workspace"})
 
     with backend_errors_to_api_exceptions():
-        await core.user_fs.workspace_rename(workspace_id, new_name)
+        await core.user_fs.workspace_rename(workspace_id, args["new_name"])
 
     # TODO: should we do a `user_fs.sync()` ?
 
@@ -138,30 +128,28 @@ async def get_workspace_share_info(
 @workspaces_bp.route("/workspaces/<WorkspaceID:workspace_id>/share", methods=["PATCH"])
 @authenticated
 async def share_workspace(core: LoggedCore, workspace_id: EntryID) -> tuple[dict[str, Any], int]:
-    async with check_data() as (data, bad_fields):
-        email = data.get("email")
-        if not isinstance(email, str):
-            bad_fields.add("email")
-        role = data.get("role")
-        if role is not None:
-            for choice in RealmRole.VALUES:
-                if choice.str == role:
-                    role = choice
-                    break
-            else:
-                bad_fields.add("role")
+    data = await get_data()
+    parser = Parser()
+    parser.add_argument("email", type=str, required=True)
+    parser.add_argument("role", converter=RealmRole.from_str)
+    args, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
 
     with backend_errors_to_api_exceptions():
-        results, _ = await core.find_humans(query=email, per_page=1)
+        results, _ = await core.find_humans(query=args["email"], per_page=1)
         try:
             # TODO: find_humans doesn't guarantee exact match on email
-            assert results[0].human_handle is not None and results[0].human_handle.email == email
+            assert (
+                results[0].human_handle is not None
+                and results[0].human_handle.email == args["email"]
+            )
             recipient = results[0].user_id
         except IndexError:
             raise APIException(404, {"error": "unknown_email"})
 
         await core.user_fs.workspace_share(
-            workspace_id=workspace_id, recipient=recipient, role=role
+            workspace_id=workspace_id, recipient=recipient, role=args["role"]
         )
 
     return {}, 200
@@ -243,24 +231,26 @@ async def toggle_offline_availability(
     except FSWorkspaceNotFoundError:
         raise APIException(404, {"error": "unknown_workspace"})
 
-    async with check_data() as (data, bad_fields):
-        enable = data.get("enable")
-        if not isinstance(enable, bool):
-            bad_fields.add("enable")
+    data = await get_data()
+    parser = Parser()
+    parser.add_argument("enable", type=bool, required=True)
+    args, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
 
     info = workspace_fs.get_remanence_manager_info()
-    if enable and info.is_block_remanent:
+    if args["enable"] and info.is_block_remanent:
         raise APIException(400, {"error": "offline_availability_already_enabled"})
-    elif not enable and not info.is_block_remanent:
+    if not args["enable"] and not info.is_block_remanent:
         raise APIException(400, {"error": "offline_availability_already_disabled"})
     try:
-        if enable:
+        if args["enable"]:
             await workspace_fs.enable_block_remanence()
         else:
             await workspace_fs.disable_block_remanence()
         return {}, 200
     except Exception:
-        if enable:
+        if args["enable"]:
             raise APIException(400, {"error": "failed_to_enable_offline_availability"})
         else:
             raise APIException(400, {"error": "failed_to_disable_offline_availability"})
