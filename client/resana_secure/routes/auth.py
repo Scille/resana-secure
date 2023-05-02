@@ -44,23 +44,23 @@ async def do_auth() -> tuple[dict[str, Any], int]:
     if bad_fields:
         raise APIException.from_bad_fields(bad_fields)
 
-    if args["key"] and args["encrypted_key"] and args["user_password"]:
+    if (
+        args["key"] is not None
+        and args["encrypted_key"] is not None
+        and args["user_password"] is not None
+    ):
         raise APIException(400, {"error": "cannot use both authentication modes at the same time"})
-    if not args["encrypted_key"] and not args["user_password"]:
-        if not isinstance(args["key"], str):
-            raise APIException.from_bad_fields(["key"])
-    elif args["encrypted_key"] and args["user_password"]:
-        try:
-            # Check if it's base64 but don't store the result
-            base64.b64decode(args["encrypted_key"])
-        except (ValueError, TypeError) as exc:
-            raise APIException.from_bad_fields(["encrypted_key"]) from exc
-        if not isinstance(args["user_password"], str):
-            raise APIException.from_bad_fields(["user_password"])
-    else:
-        raise APIException.from_bad_fields(
-            ["encrypted_key"] if not args["encrypted_key"] else ["user_password"]
-        )
+    if args["key"] is None:
+        if not (args["encrypted_key"] and args["user_password"]):
+            raise APIException.from_bad_fields(
+                ["encrypted_key"] if not args["encrypted_key"] else ["user_password"]
+            )
+        else:
+            try:
+                # Check if it's base64 but don't store the result
+                base64.b64decode(args["encrypted_key"])
+            except (ValueError, TypeError) as exc:
+                raise APIException.from_bad_fields(["encrypted_key"]) from exc
 
     cores_manager = cast(CoresManager, current_app.cores_manager)
     try:
