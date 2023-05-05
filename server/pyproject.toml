@@ -19,7 +19,7 @@ quart = "^0.18.1"
 quart-trio = "^0.10.0"
 quart-cors = "^0.5"
 hypercorn = "^0.13.2"
-httpx = "0.16.0"
+httpx = "0.24.0"
 # install parsec from pypi for linux, or from git for windows & macos
 parsec-cloud = [
     { markers = "sys_platform == 'linux'", version = "^2.15.0rc1", extras = ["backend"] },
