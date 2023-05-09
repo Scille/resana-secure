@@ -255,6 +255,21 @@ class CoresManager:
         except ComponentNotRegistered as exc:
             raise CoreNotLoggedError from exc
 
+    async def logout_all(self) -> None:
+        """
+        Raises:
+            CoreNotLoggedError
+        """
+        while self._auth_token_to_component_handle.keys():
+            auth_token = next(iter(self._auth_token_to_component_handle))
+            component_handle = self._auth_token_to_component_handle[auth_token]
+
+            try:
+                await self.ltcm.unregister_component(component_handle)
+
+            except ComponentNotRegistered as exc:
+                raise CoreNotLoggedError from exc
+
     @asynccontextmanager
     async def get_core(self, auth_token: str) -> AsyncIterator[LoggedCore]:
         """

@@ -175,6 +175,31 @@ async def local_device(
     )
 
 
+@pytest.fixture
+async def other_local_device(
+    running_backend: BackendApp, backend_addr: BackendAddr, core_config_dir: Path
+):
+    organization_id = OrganizationID("AwesomeOrg")
+    device_label = DeviceLabel("bob's desktop")
+    password = "P@ssw0rd."
+    human_handle = HumanHandle(email="bob@example.com", label="Bob")
+    bootstrap_addr = BackendOrganizationBootstrapAddr.build(
+        backend_addr=backend_addr,
+        organization_id=organization_id,
+        token=None,
+    )
+
+    new_device = await bootstrap_organization(
+        addr=bootstrap_addr, human_handle=human_handle, device_label=device_label
+    )
+    save_device_with_password_in_config(
+        config_dir=core_config_dir, device=new_device, password=password
+    )
+    return LocalDeviceTestbed(
+        device=new_device, email=human_handle.email, key=password, organization=organization_id
+    )
+
+
 RemoteDeviceTestbed = namedtuple("RemoteDeviceTestbed", "device_id,email")
 
 

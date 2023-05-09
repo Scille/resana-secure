@@ -95,3 +95,15 @@ async def remove_auth() -> tuple[dict[str, Any], int]:
         pass
 
     return {}, 200
+
+
+@auth_bp.route("/auth/all", methods=["DELETE"])
+async def remove_all_auth() -> tuple[dict[str, Any], int]:
+    cores_manager = cast(CoresManager, current_app.cores_manager)
+    try:
+        await cores_manager.logout_all()
+
+    except CoreNotLoggedError:
+        pass
+
+    return {}, 200

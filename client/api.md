@@ -121,6 +121,18 @@ Set-Cookie: session=; Expires=Thu, 01-Jan-1970 00:00:00 GMT; Max-Age=0; Path=/
 }
 ```
 
+### `DELETE /auth/all`
+
+Met fin à toutes les authentifications auprès du client Parsec et invalide tous les tokens d'authentification.
+
+Response:
+
+```python
+HTTP 200
+{
+}
+```
+
 ### `POST /organization/bootstrap`
 
 Le boostrap est la phase d'enregistrement du premier utilisateur d'une organisation
