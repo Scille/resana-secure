@@ -181,6 +181,51 @@ async def test_logout_without_session_cookie(
 
 
 @pytest.mark.trio
+async def test_logout_all_session(
+    test_app: TrioTestApp, local_device: LocalDeviceTestbed, other_local_device: LocalDeviceTestbed
+):
+    test_client = test_app.test_client()
+
+    # First auth
+    response = await test_client.post(
+        "/auth",
+        json={
+            "email": local_device.email,
+            "key": local_device.key,
+            "organization": local_device.organization.str,
+        },
+    )
+    body = await response.get_json()
+    assert response.status_code == 200
+    token_1 = body["token"]
+
+    # Second auth
+    response = await test_client.post(
+        "/auth",
+        json={
+            "email": other_local_device.email,
+            "key": other_local_device.key,
+            "organization": other_local_device.organization.str,
+        },
+    )
+    body = await response.get_json()
+    assert response.status_code == 200
+    token_2 = body["token"]
+    assert token_2 != token_1
+
+    # logout
+    test_client_without_cookie = test_app.test_client()
+    response = await test_client_without_cookie.delete("/auth/all")
+    body = await response.get_json()
+    assert response.status_code == 200
+
+    response = await test_client.get("/workspaces", headers={"Authorization": f"Bearer {token_1}"})
+    assert response.status_code == 401
+    response = await test_client.get("/workspaces", headers={"Authorization": f"Bearer {token_2}"})
+    assert response.status_code == 401
+
+
+@pytest.mark.trio
 async def test_authentication_unknown_email(
     test_app: TrioTestApp, local_device: LocalDeviceTestbed
 ):
@@ -351,7 +396,7 @@ async def test_authenticated_routes(test_app: TrioTestApp, routes_samples: List[
             assert response.status_code == 400
         elif route == "/organization/bootstrap" and method == "POST":
             assert response.status_code == 400
-        elif route == "/auth" and method == "DELETE":
+        elif route.startswith("/auth") and method == "DELETE":
             assert response.status_code == 200
         else:
             assert response.status_code == 401
