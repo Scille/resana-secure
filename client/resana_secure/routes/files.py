@@ -321,7 +321,7 @@ async def create_workspace_file(
         form = await request.form
         parent_entry_id_raw = cast(str, form.get("parent", ""))
         try:
-            parent_entry_id = EntryID.from_hex(parent_entry_id_raw)
+            parent_entry_id = EntryID.from_hex(parent_entry_id_raw.strip())
         except (TypeError, ValueError):
             bad_fields.append("parent")
 

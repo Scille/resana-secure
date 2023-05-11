@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - master
+      - "[0-9]+.[0-9]+"
   pull_request:
     branches:
       - master
@@ -11,6 +12,7 @@ on:
 # Global Settings
 env:
   PYTHON_VERSION: "3.9"
+  # TODO: cannot update to 1.4 yet, see https://github.com/python-poetry/poetry/issues/7611
   POETRY_VERSION: 1.3.2
   WINFSP_VERSION: 1.8.20304
   FORCE_MATURIN_RELEASE: 1
@@ -291,6 +293,14 @@ jobs:
           path: |
             packaging/windows/build/tools_venv
             packaging/windows/build/pyinstaller_venv
+
+      # Building OpenSSL requires a perl interpreter.
+      # The default one does not provide windows-style filesystem
+      # paths so we have to switch to Strawberry.
+      - name: Use strawberry perl
+        shell: bash
+        run: echo OPENSSL_SRC_PERL=C:/Strawberry/perl/bin/perl >> $GITHUB_ENV
+        timeout-minutes: 1
 
       - name: Freeze Parsec
         run: python freeze_program.py ../../client

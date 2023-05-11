@@ -7,8 +7,7 @@ from hypercorn.config import Config as HyperConfig
 from hypercorn.trio.run import worker_serve
 from pathlib import Path
 
-from parsec._parsec import DateTime, save_device_with_password_in_config
-from parsec.crypto import PrivateKey, SigningKey
+from parsec._parsec import DateTime, save_device_with_password_in_config, PrivateKey, SigningKey
 from parsec.api.data import UserCertificate, DeviceCertificate
 from parsec.api.protocol import (
     OrganizationID,

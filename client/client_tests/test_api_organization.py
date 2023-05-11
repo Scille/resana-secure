@@ -1,5 +1,4 @@
 import pytest
-import oscrypto.asymmetric as crypto
 import base64
 from pathlib import Path
 from quart.typing import TestAppProtocol
@@ -7,7 +6,7 @@ from quart.typing import TestAppProtocol
 from parsec.api.protocol import OrganizationID
 from parsec.backend import BackendApp
 from parsec.backend.organization import generate_bootstrap_token
-from parsec._parsec import list_available_devices, SequesterVerifyKeyDer
+from parsec._parsec import list_available_devices, SequesterSigningKeyDer
 from parsec.core.types import BackendAddr, BackendOrganizationBootstrapAddr
 
 
@@ -280,8 +279,7 @@ async def test_bootstrap_organization_with_sequester_key(
     running_backend: BackendApp,
 ):
     test_client = test_app.test_client()
-    pub_key, _ = crypto.generate_pair("rsa", bit_size=1024)
-    seq_verify_key = SequesterVerifyKeyDer(crypto.dump_public_key(pub_key, encoding="der"))
+    _, seq_verify_key = SequesterSigningKeyDer.generate_pair(size_in_bits=1024)
 
     response = await test_client.post(
         "/organization/bootstrap",
