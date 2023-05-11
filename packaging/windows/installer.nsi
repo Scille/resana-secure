@@ -13,6 +13,10 @@
 !define PROGRAM_WEB_SITE "https://resana.numerique.gouv.fr"
 !define APPGUID "918CE5EB-F66D-45EB-9A0A-F013B480A5BC"
 
+# Icon overlays GUIDS
+!define CHECK_ICON_GUID "{5449BC90-310B-40A8-9ABF-C5CFCEC7F430}"
+!define REFRESH_ICON_GUID "{41e71dd9-368d-46b2-bb9d-4359599bbbc3}"
+
 # Detect version from file
 !define BUILD_DIR "build"
 !searchparse /file ${BUILD_DIR}/manifest.ini `target = "` PROGRAM_FREEZE_BUILD_DIR `"`
@@ -160,6 +164,7 @@ FunctionEnd
 
 # Check for running program instance.
 Function .onInit
+    SetRegView 64
     Call checkProgramAlreadyRunning
 
     ReadRegStr $R0 HKLM \
@@ -208,6 +213,7 @@ Function un.onUninstSuccess
 FunctionEnd
 
 Function un.onInit
+    SetRegView 64
     MessageBox MB_ICONQUESTION|MB_YESNO|MB_DEFBUTTON2 "Do you want to completely remove $(^Name)?" /SD IDYES IDYES +2
     Abort
 FunctionEnd
@@ -269,8 +275,22 @@ InstallDir "$PROGRAMFILES\Resana Secure"
 ShowInstDetails hide
 ShowUnInstDetails hide
 
+# When upgrading or uninstalling, shell extensions may be loaded by `explorer.exe`
+# thus windows will prevent us to delete or modify the dll extensions. The trick
+# here is to move the loaded dll somewhere else (like in a temp folder) and then resume
+# the upgrade/uninstall process as usual.
+!macro MoveParsecShellExtension
+    RmDir /r "$TEMP\resana_secure_tmp"
+    CreateDirectory "$TEMP\resana_secure_tmp"
+    Rename "$INSTDIR\check-icon-handler.dll" "$TEMP\resana_secure_tmp\check-icon-handler.dll.old"
+    Rename "$INSTDIR\refresh-icon-handler.dll" "$TEMP\resana_secure_tmp\refresh-icon-handler.dll.old"
+    Rename "$INSTDIR\vcruntime140.dll" "$TEMP\resana_secure_tmp\vcruntime140.dll.old"
+    Rename "$INSTDIR\vcruntime140_1.dll" "$TEMP\resana_secure_tmp\vcruntime140_1.dll.old"
+!macroend
+
 # Install main application
 Section "Resana Secure Cloud Sharing" Section1
+    !insertmacro MoveParsecShellExtension
     SectionIn RO
     !include "${BUILD_DIR}\install_files.nsh"
 
@@ -286,6 +306,14 @@ Section "Resana Secure Cloud Sharing" Section1
         CreateShortCut "$SMPROGRAMS\$StartMenuFolder\Uninstall Resana Secure.lnk" ${PROGRAM_UNINST_FILENAME}
         SetShellVarContext current
     !insertmacro MUI_STARTMENU_WRITE_END
+
+    # Call regsvr32
+    ExecWait '$SYSDIR\regsvr32.exe /s /n /i:user "$INSTDIR\check-icon-handler.dll"'
+    ExecWait '$SYSDIR\regsvr32.exe /s /n /i:user "$INSTDIR\refresh-icon-handler.dll"'
+
+    # Write Icons overlays to register
+    WriteRegStr HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\CheckIconHandler" "" "${CHECK_ICON_GUID}"
+    WriteRegStr HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\RefreshIconHandler" "" "${REFRESH_ICON_GUID}"
 SectionEnd
 
 !macro InstallWinFSP
@@ -347,6 +375,7 @@ SectionEnd
 
 # --- Uninstallation section ---
 Section Uninstall
+    !insertmacro MoveParsecShellExtension
     # Delete program files.
     Delete "$INSTDIR\homepage.url"
     Delete ${PROGRAM_UNINST_FILENAME}
@@ -375,6 +404,11 @@ Section Uninstall
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\Desktop\NameSpace\{${APPGUID}"
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel\{${APPGUID}"
 
+  DeleteRegKey HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\ICheckIconHandler"
+  DeleteRegKey HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\IRefreshIconHandler"
+
+  ExecWait '$SYSDIR\regsvr32.exe /s /u /i:user "$INSTDIR\check-icon-handler.dll"'
+  ExecWait '$SYSDIR\regsvr32.exe /s /u /i:user "$INSTDIR\refresh-icon-handler.dll"'
 SectionEnd
 
 # Add version info to installer properties.
