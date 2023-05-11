@@ -6,9 +6,8 @@ from quart.typing import TestAppProtocol
 from parsec.api.protocol import OrganizationID
 from parsec.backend import BackendApp
 from parsec.backend.organization import generate_bootstrap_token
-from parsec._parsec import list_available_devices, SequesterVerifyKeyDer
+from parsec._parsec import list_available_devices, SequesterSigningKeyDer
 from parsec.core.types import BackendAddr, BackendOrganizationBootstrapAddr
-from parsec._parsec import SequesterSigningKeyDer
 
 
 @pytest.fixture
