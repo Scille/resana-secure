@@ -141,6 +141,7 @@ async def serve_app(
             "bind": [f"{host}:{port}"],
             "accesslog": logging.getLogger("hypercorn.access"),
             "errorlog": logging.getLogger("hypercorn.error"),
+            "include_server_header": False,
         }
     )
 
