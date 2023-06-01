@@ -34,7 +34,7 @@ class ReassemblyError(Exception):
 async def load_manifest(key: oscrypto.asymmetric.PrivateKey, vlob: bytes) -> Optional[FileManifest]:
     try:
         # decrypted_vlob = sequester_service_decrypt(key, vlob)
-        decrypted_vlob = SequesterPrivateKeyDer.decryption_key.decrypt(vlob)
+        decrypted_vlob = SequesterPrivateKeyDer.decrypt(vlob)
         # Connector does not care if data is signed or not
         manifest = manifest_unverified_load(decrypted_vlob)
         if not isinstance(manifest, FileManifest):

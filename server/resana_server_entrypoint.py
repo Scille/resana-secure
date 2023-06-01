@@ -69,7 +69,7 @@ def main():
 
     if not args.webhook_url:
 
-        def noop(line: str) -> None:
+        def noop(args: argparse.Namespace, line: str) -> None:
             pass
 
         globals()["notify_webhook"] = noop
