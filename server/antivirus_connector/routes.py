@@ -7,7 +7,8 @@ import oscrypto
 from quart import Blueprint, request, current_app
 from werkzeug.exceptions import RequestEntityTooLarge
 
-from parsec.sequester_crypto import sequester_service_decrypt
+# from parsec.sequester_crypto import sequester_service_decrypt
+from parsec._parsec import SequesterPrivateKeyDer
 from parsec.api.data import FileManifest
 from parsec.api.data.manifest import manifest_unverified_load
 from parsec.api.protocol import SequesterServiceID, OrganizationID
@@ -32,7 +33,8 @@ class ReassemblyError(Exception):
 
 async def load_manifest(key: oscrypto.asymmetric.PrivateKey, vlob: bytes) -> Optional[FileManifest]:
     try:
-        decrypted_vlob = sequester_service_decrypt(key, vlob)
+        # decrypted_vlob = sequester_service_decrypt(key, vlob)
+        decrypted_vlob = SequesterPrivateKeyDer.decryption_key.decrypt(vlob)
         # Connector does not care if data is signed or not
         manifest = manifest_unverified_load(decrypted_vlob)
         if not isinstance(manifest, FileManifest):
