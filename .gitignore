@@ -1,8 +1,8 @@
 /venv*
 /client/venv*
 /server/venv*
-/.vscode
-/.mypy_cache
+.vscode
+.mypy_cache
 /.pytest_cache
 *.pyc
 __pycache__
