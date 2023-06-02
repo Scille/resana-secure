@@ -16,6 +16,8 @@ parsec-cloud = { path = "./submodules/parsec-cloud", extras = ["backend", "core"
 cryptography = "^39.0.1"
 quart-rate-limiter = "^0.7.0"
 oscrypto = "^1.3.0"
+pyqt5 = "^5.15.9"
+pyqt5-sip = "12.11.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.0"

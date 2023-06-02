@@ -59,11 +59,11 @@ logger = get_logger()
 class Systray(QSystemTrayIcon):
     device_clicked = pyqtSignal(AvailableDevice, object)
 
-    def __init__(self, nursery: trio.Nursery, quart_app: ResanaApp, **kwargs: Any):
+    def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
 
-        self.nursery = nursery
-        self.quart_app = quart_app
+        self._nursery: trio.Nursery | None = None
+        self._quart_app: ResanaApp | None = None
 
         self.setToolTip(f"Resana Secure v{RESANA_VERSION}")
         self.menu = QMenu()
@@ -85,6 +85,16 @@ class Systray(QSystemTrayIcon):
 
         self.setContextMenu(self.menu)
         self.activated.connect(self.on_activated)
+
+    @property
+    def nursery(self) -> trio.Nursery:
+        assert self._nursery is not None
+        return self._nursery
+
+    @property
+    def quart_app(self) -> ResanaApp:
+        assert self._quart_app is not None
+        return self._quart_app
 
     def _on_device_clicked(self, device: AvailableDevice, token: str | None) -> Callable[[], None]:
         def _internal_on_device_clicked() -> None:
@@ -124,26 +134,29 @@ class ResanaGuiApp(QApplication):
 
     def __init__(
         self,
-        cancel_scope: trio.CancelScope,
-        nursery: trio.Nursery,
-        quart_app: ResanaApp,
         config: ResanaConfig,
         resana_website_url: str,
     ):
         super().__init__([])
         self.config: ResanaConfig = config
-        self.nursery: trio.Nursery = nursery
         self.resana_website_url: str = resana_website_url
-        self.tray = Systray(self.nursery, quart_app, parent=self)
-        self.tray.close_clicked.connect(self.quit)
+
+        self.tray = Systray(parent=self)
+
+        self.tray.close_clicked.connect(self.close)
         self.tray.open_clicked.connect(self._on_open_clicked)
         self.tray.device_clicked.connect(self._on_device_clicked)
+
         self.save_file_requested.connect(self._on_save_file_requested)
-        self._cancel_scope: trio.CancelScope = cancel_scope
-        self.quart_app = quart_app
+
+        self._nursery: trio.Nursery | None = None
+        self._cancel_scope: trio.CancelScope | None = None
+        self._quart_app: ResanaApp | None = None
+
         self.setApplicationName("Resana Secure")
         self.setApplicationDisplayName("Resana Secure")
         self.setApplicationVersion(RESANA_VERSION)
+
         with resources.path("resana_secure", "icon.png") as icon_path:
             icon = QIcon(str(icon_path))
             self.tray.setIcon(icon)
@@ -156,6 +169,38 @@ class ResanaGuiApp(QApplication):
 
         # Show the tray only after setting an icon to avoid a warning
         self.tray.show()
+
+    @property
+    def nursery(self) -> trio.Nursery:
+        assert self._nursery is not None
+        return self._nursery
+
+    @property
+    def cancel_scope(self) -> trio.CancelScope:
+        assert self._cancel_scope is not None
+        return self._cancel_scope
+
+    @property
+    def quart_app(self) -> ResanaApp:
+        assert self._quart_app is not None
+        return self._quart_app
+
+    # Mypy don't support completely property, see https://github.com/python/mypy/issues/1465
+    @nursery.setter  # type: ignore[no-redef,attr-defined]
+    def nursery(self, nursery: trio.Nursery) -> None:
+        self._nursery = nursery
+        self.tray._nursery = nursery
+
+    # Mypy don't support completely property, see https://github.com/python/mypy/issues/1465
+    @cancel_scope.setter  # type: ignore[no-redef,attr-defined]
+    def cancel_scope(self, cancel_scope: trio.CancelScope) -> None:
+        self._cancel_scope = cancel_scope
+
+    # Mypy don't support completely property, see https://github.com/python/mypy/issues/1465
+    @quart_app.setter  # type: ignore[no-redef,attr-defined]
+    def quart_app(self, quart_app: ResanaApp) -> None:
+        self._quart_app = quart_app
+        self.tray._quart_app = quart_app
 
     def _on_file_rejected(self, file_path: FsPath) -> None:
         self.message_requested.emit(
@@ -231,7 +276,8 @@ class ResanaGuiApp(QApplication):
                             await dest_fd.write(data)
             except Exception:
                 self.message_requested.emit(
-                    "Erreur", f"Impossible de télécharger le fichier {file_path.name.str}."
+                    "Erreur",
+                    f"Impossible de télécharger le fichier {file_path.name.str}.",
                 )
                 logger.exception("Failed to save the file with mountpoints deactivated")
             else:
@@ -240,7 +286,9 @@ class ResanaGuiApp(QApplication):
                 )
 
         dest, _ = QDialogInProcess.getSaveFileName(
-            None, f"Sauvegarde du fichier {path.name.str}", str(Path.home() / path.name.str)
+            None,
+            f"Sauvegarde du fichier {path.name.str}",
+            str(Path.home() / path.name.str),
         )
         if dest:
             self.nursery.start_soon(_save_file, dest, workspace_fs, path)
@@ -248,11 +296,9 @@ class ResanaGuiApp(QApplication):
     def _on_open_clicked(self) -> None:
         QDesktopServices.openUrl(QUrl(self.resana_website_url))
 
-    def quit(self) -> None:  # type: ignore[override]
-        self.tray.hide()
-        # Overwrite quit so that it closes the trio loop (that will itself
-        # trigger the actual closing of the application)
-        self._cancel_scope.cancel()
+    def close(self) -> None:
+        self.closeAllWindows()
+        self.cancel_scope.cancel()
 
 
 @asynccontextmanager
@@ -321,28 +367,28 @@ def _patch_cores_manager(cores_manager: CoresManager) -> None:
 
 
 async def _qtrio_run(
+    app: ResanaGuiApp,
     quart_app_context: Callable[[], AbstractAsyncContextManager[ResanaApp]],
     config: ResanaConfig,
     resana_website_url: str,
 ) -> None:
-    with trio.CancelScope() as cancel_scope:
+    # Mypy don't support property setter ?
+    with trio.CancelScope() as app.cancel_scope:  # type: ignore[misc]
         # Exits gracefully with a Ctrl+C
-        signal.signal(signal.SIGINT, lambda *_: cancel_scope.cancel())
-        async with _run_ipc_server(cancel_scope, config.core_config, resana_website_url):
-            async with trio.open_nursery() as nursery:
-                async with quart_app_context() as quart_app:
 
-                    _patch_cores_manager(quart_app.cores_manager)
+        signal.signal(signal.SIGINT, lambda *_: app.close())
 
-                    app = ResanaGuiApp(
-                        cancel_scope=cancel_scope,
-                        nursery=nursery,
-                        quart_app=quart_app,
-                        config=config,
-                        resana_website_url=resana_website_url,
-                    )
+        async with _run_ipc_server(app.cancel_scope, config.core_config, resana_website_url):
+            # Mypy don't support property setter ?
+            async with trio.open_nursery() as app.nursery:  # type: ignore[misc]
+
+                # Mypy don't support property setter ?
+                async with quart_app_context() as app.quart_app:  # type: ignore[misc]
+
+                    _patch_cores_manager(app.quart_app.cores_manager)
+
                     app.setQuitOnLastWindowClosed(False)
-                    await quart_app.serve()
+                    await app.quart_app.serve()
 
 
 def run_gui(
@@ -355,6 +401,7 @@ def run_gui(
     # but it seems to make absolutely no difference.
     # Keeping the comments here just in case
 
+    # from PyQt5.QtCore import Qt
     # QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
     # QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
     # QApplication.setHighDpiScaleFactorRoundingPolicy(
@@ -364,4 +411,8 @@ def run_gui(
     multiprocessing.set_start_method("spawn")
 
     with QDialogInProcess.manage_pools():
-        qtrio.run(_qtrio_run, quart_app_context, config, resana_website_url)
+        app = ResanaGuiApp(
+            config=config,
+            resana_website_url=resana_website_url,
+        )
+        qtrio.run(_qtrio_run, app, quart_app_context, config, resana_website_url)
