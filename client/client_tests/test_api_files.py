@@ -310,7 +310,9 @@ async def test_folder_operations(testbed: FilesTestBed):
 
 @pytest.mark.trio
 @pytest.mark.parametrize("file_create_mode", ("json", "multipart"))
-async def test_file_operations(testbed: FilesTestBed, file_create_mode: str):
+async def test_file_operations(
+    testbed: FilesTestBed, file_create_mode: str, authenticated_client: TestClientProtocol
+):
     # Create a files
     foo_id = await testbed.create_file(
         "foo.tar.gz", parent=testbed.root_entry_id, mode=file_create_mode
@@ -323,24 +325,31 @@ async def test_file_operations(testbed: FilesTestBed, file_create_mode: str):
     subfolder_id = await testbed.create_folder("spam", parent=testbed.root_entry_id)
     await testbed.create_file("foo", parent=subfolder_id, mode=file_create_mode)
 
+    response = await authenticated_client.post("/workspaces/sync")
+    assert response.status_code == 200
+
     # Check files in a given folder
     assert await testbed.get_files(folder_id=testbed.root_entry_id) == {
         "files": [
             {
                 "created": ANY,
+                "created_by": "alice@example.com",
                 "extension": "txt",
                 "id": bar_id,
                 "name": "bar.txt",
                 "size": 0,
                 "updated": ANY,
+                "updated_by": "alice@example.com",
             },
             {
                 "created": ANY,
+                "created_by": "alice@example.com",
                 "extension": "gz",
                 "id": foo_id,
                 "name": "foo.tar.gz",
                 "size": 0,
                 "updated": ANY,
+                "updated_by": "alice@example.com",
             },
         ]
     }
@@ -351,19 +360,23 @@ async def test_file_operations(testbed: FilesTestBed, file_create_mode: str):
         "files": [
             {
                 "created": ANY,
+                "created_by": "alice@example.com",
                 "extension": "md",
                 "id": bar_id,
                 "name": "bar.md",
                 "size": 0,
                 "updated": ANY,
+                "updated_by": "alice@example.com",
             },
             {
                 "created": ANY,
+                "created_by": "alice@example.com",
                 "extension": "gz",
                 "id": foo_id,
                 "name": "foo.tar.gz",
                 "size": 0,
                 "updated": ANY,
+                "updated_by": "alice@example.com",
             },
         ]
     }
@@ -374,11 +387,13 @@ async def test_file_operations(testbed: FilesTestBed, file_create_mode: str):
         "files": [
             {
                 "created": ANY,
+                "created_by": "alice@example.com",
                 "extension": "gz",
                 "id": foo_id,
                 "name": "foo.tar.gz",
                 "size": 0,
                 "updated": ANY,
+                "updated_by": "alice@example.com",
             }
         ]
     }
@@ -681,7 +696,9 @@ async def test_search_files(testbed: FilesTestBed):
 
 
 @pytest.mark.trio
-async def test_routes_on_timestamped(testbed: FilesTestBed):
+async def test_routes_on_timestamped(
+    testbed: FilesTestBed, authenticated_client: TestClientProtocol
+):
     # Create folder
     folder = await testbed.create_folder(
         "foldy", parent=testbed.root_entry_id, expected_status_code=201
@@ -692,6 +709,9 @@ async def test_routes_on_timestamped(testbed: FilesTestBed):
     timestamp = DateTime.now().to_rfc3339()
 
     file2 = await testbed.create_file("file2.png", parent=folder, expected_status_code=201)
+
+    response = await authenticated_client.post("/workspaces/sync")
+    assert response.status_code == 200
 
     files = (await testbed.get_files(folder))["files"]
     files_ts = (await testbed.get_files(folder, timestamp=timestamp))["files"]
