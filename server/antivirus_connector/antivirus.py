@@ -2,6 +2,8 @@ import httpx
 import trio
 import structlog
 import json
+import tempfile
+import os
 from typing import List
 
 from .config import AppConfig
@@ -17,6 +19,9 @@ class AntivirusError(Exception):
 async def check_for_malwares(content_stream, config: AppConfig) -> List[str]:
     url = config.antivirus_api_url
     api_key = config.antivirus_api_key
+    api_cert = tempfile.NamedTemporaryFile(delete=False)
+    api_cert.write(config.antivirus_api_cert)
+    api_cert.close()
 
     async with httpx.AsyncClient() as client:
         headers = {"X-Auth-Token": api_key}
@@ -27,8 +32,10 @@ async def check_for_malwares(content_stream, config: AppConfig) -> List[str]:
                 url=f"{url}/submit",
                 headers=headers,
                 files=form,
+                cert=api_cert
             )
         except httpx.ConnectError as exc:
+            os.unlink(api_cert.name)
             raise AntivirusError("Could not connect to the antivirus service") from exc
 
         logger.debug(f"Antivirus API answered {r.status_code}")
@@ -55,12 +62,15 @@ async def check_for_malwares(content_stream, config: AppConfig) -> List[str]:
                 r = await client.get(
                     f"{url}/results/{analysis_id}",
                     headers=headers,
+                    cert=api_cert
                 )
             except httpx.ConnectError as exc:
+                os.unlink(api_cert.name)
                 raise AntivirusError("Could not connect to the antivirus service") from exc
             try:
                 data = r.json()
             except json.decoder.JSONDecodeError as exc:
+                os.unlink(api_cert.name)
                 raise AntivirusError(
                     f"Unexpected response {r.status_code}: Invalid JSON body"
                 ) from exc
@@ -72,10 +82,12 @@ async def check_for_malwares(content_stream, config: AppConfig) -> List[str]:
                 or not isinstance(data.get("done"), bool)
                 or not isinstance(data.get("is_malware"), bool)
             ):
+                os.unlink(api_cert.name)
                 raise AntivirusError(f"Unexpected response {r.status_code}: {data!r}")
 
             if data["done"]:
                 # Analysis is finished, check if a malware has been detected
+                os.unlink(api_cert.name)
                 if data["is_malware"]:
                     if not isinstance(data.get("malwares"), list) or not all(
                         isinstance(m, str) for m in data["malwares"]
