@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import click
 import os
 from typing import Optional, Tuple, List
@@ -109,6 +111,15 @@ def _parse_sequester_service_private_key_param(
 )
 @click.option("--antivirus-api-url", envvar="ANTIVIRUS_CONNECTOR_API_URL", type=str, required=True)
 @click.option("--antivirus-api-key", envvar="ANTIVIRUS_CONNECTOR_API_KEY", type=str, required=True)
+@click.option(
+    "--antivirus-api-cert", envvar="ANTIVIRUS_CONNECTOR_API_CERT", type=str, required=True
+)
+@click.option(
+    "--antivirus-api-cert-request-key",
+    envvar="ANTIVIRUS_CONNECTOR_API_CERT_REQUEST_KEY",
+    type=str,
+    required=True,
+)
 @click.option("--db", envvar="ANTIVIRUS_CONNECTOR_DB", type=str, required=False)
 @click.option(
     "--db-min-connections",
@@ -143,6 +154,8 @@ def run_cli(
     sequester_service_private_key: List[Tuple[SequesterServiceID, oscrypto.asymmetric.PrivateKey]],
     antivirus_api_url: str,
     antivirus_api_key: str,
+    antivirus_api_cert: str,
+    antivirus_api_cert_request_key: str,
     db: str,
     db_min_connections: int,
     db_max_connections: int,
@@ -172,6 +185,8 @@ def run_cli(
         sequester_services_decryption_key=dict(sequester_service_private_key),
         antivirus_api_url=antivirus_api_url,
         antivirus_api_key=antivirus_api_key,
+        antivirus_api_cert=antivirus_api_cert,
+        antivirus_api_cert_request_key=antivirus_api_cert_request_key,
         blockstore_config=blockstore,
         db_url=db,
         db_min_connections=db_min_connections,

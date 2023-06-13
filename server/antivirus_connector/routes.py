@@ -7,11 +7,10 @@ import oscrypto
 from quart import Blueprint, request, current_app
 from werkzeug.exceptions import RequestEntityTooLarge
 
-# from parsec.sequester_crypto import sequester_service_decrypt
-from parsec._parsec import SequesterPrivateKeyDer
 from parsec.api.data import FileManifest
 from parsec.api.data.manifest import manifest_unverified_load
 from parsec.api.protocol import SequesterServiceID, OrganizationID
+from parsec._parsec import CryptoError, SecretKey
 
 from .antivirus import check_for_malwares, AntivirusError
 from .config import AppConfig
@@ -31,10 +30,32 @@ class ReassemblyError(Exception):
     pass
 
 
+def sequester_service_decrypt(decryption_key: oscrypto.asymmetric.PrivateKey, data: bytes) -> bytes:
+    # Encryption format:
+    #   <algorithm name>:<encrypted secret key with RSA key><encrypted data with secret key>
+    ENCRYPTION_ALGORITHM = b"RSAES-OAEP-XSALSA20-POLY1305"
+    try:
+        algo, cipherkey_and_ciphertext = data.split(b":", 1)
+        if algo != ENCRYPTION_ALGORITHM:
+            raise ValueError
+    except ValueError as exc:
+        raise CryptoError("Unsupported algorithm") from exc
+
+    cipherkey = cipherkey_and_ciphertext[: decryption_key.byte_size]
+    ciphertext = cipherkey_and_ciphertext[decryption_key.byte_size :]
+
+    try:
+        clearkey = SecretKey(oscrypto.asymmetric.rsa_oaep_decrypt(decryption_key, cipherkey))
+    except OSError as exc:
+        raise CryptoError(str(exc)) from exc
+
+    cleartext = clearkey.decrypt(ciphertext)
+    return cleartext
+
+
 async def load_manifest(key: oscrypto.asymmetric.PrivateKey, vlob: bytes) -> Optional[FileManifest]:
     try:
-        # decrypted_vlob = sequester_service_decrypt(key, vlob)
-        decrypted_vlob = SequesterPrivateKeyDer.decrypt(vlob)
+        decrypted_vlob = sequester_service_decrypt(key, vlob)
         # Connector does not care if data is signed or not
         manifest = manifest_unverified_load(decrypted_vlob)
         if not isinstance(manifest, FileManifest):

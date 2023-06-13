@@ -25,7 +25,7 @@ git pull
 git checkout -b MAJOR.MINOR
 ```
 
-1) Modify version in `renasa_secure/_version.py`
+1) Modify version in `resana_secure/_version.py`
 3) Modify version in `pyproject.toml`
 4) Create the release commit
 

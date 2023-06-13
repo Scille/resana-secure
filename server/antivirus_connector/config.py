@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Dict
 from dataclasses import dataclass
 import oscrypto
@@ -11,6 +13,8 @@ class AppConfig:
     sequester_services_decryption_key: Dict[SequesterServiceID, oscrypto.asymmetric.PrivateKey]
     antivirus_api_url: str
     antivirus_api_key: str
+    antivirus_api_cert: str
+    antivirus_api_cert_request_key: str
     blockstore_config: BaseBlockStoreConfig
     db_url: str
     db_min_connections: int

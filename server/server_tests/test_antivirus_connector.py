@@ -2,7 +2,7 @@ import pytest
 from io import BytesIO
 from unittest.mock import AsyncMock, MagicMock
 import httpx
-import oscrypto
+from oscrypto import asymmetric
 from dataclasses import dataclass
 
 from parsec.api.protocol import OrganizationID, SequesterServiceID
@@ -15,13 +15,13 @@ from antivirus_connector.routes import ManifestError, ReassemblyError
 @dataclass
 class SequesterServiceFullData:
     service_id: SequesterServiceID
-    encryption_key: oscrypto.asymmetric.PublicKey
-    decryption_key: oscrypto.asymmetric.PrivateKey
+    encryption_key: asymmetric.PublicKey
+    decryption_key: asymmetric.PrivateKey
 
 
 @pytest.fixture
 async def sequester_service():
-    encryption_key, decryption_key = oscrypto.asymmetric.generate_pair("rsa", bit_size=1024)
+    encryption_key, decryption_key = asymmetric.generate_pair("rsa", bit_size=1024)
     return SequesterServiceFullData(
         service_id=SequesterServiceID.new(),
         encryption_key=encryption_key,
@@ -42,6 +42,8 @@ async def antivirus_test_app(sequester_service):
         },
         antivirus_api_url="http://antivirus.localhost",
         antivirus_api_key="1234",
+        antivirus_api_cert="",
+        antivirus_api_cert_request_key="",
         blockstore_config=MockedBlockStoreConfig(),
         db_url="postgresql://db.localhost",
         db_min_connections=5,
@@ -85,7 +87,8 @@ async def test_submit(antivirus_test_app, monkeypatch, sequester_service, orgid,
         assert files["file"]
         antivirus_state = "work_started"
         return httpx.Response(
-            200, json={"status": True, "uuid": "d8b5a554-04b8-4af6-9e08-524d76ec8d12"}
+            200,
+            json={"status": True, "sha256": "d8b5a554-04b8-4af6-9e08-524d76ec8d12", "done": False},
         )
 
     monkeypatch.setattr("httpx.AsyncClient.post", fake_antivirus_http_post)
@@ -93,7 +96,7 @@ async def test_submit(antivirus_test_app, monkeypatch, sequester_service, orgid,
     async def fake_antivirus_http_get(self, url, headers):
         nonlocal antivirus_state
         assert antivirus_state in ("work_started", "work_continued")
-        assert url.endswith("/results/d8b5a554-04b8-4af6-9e08-524d76ec8d12")
+        assert url.endswith("/cache/d8b5a554-04b8-4af6-9e08-524d76ec8d12")
         assert headers["X-Auth-Token"]
         if antivirus_state == "work_started":
             antivirus_state = "work_continued"

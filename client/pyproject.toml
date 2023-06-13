@@ -5,7 +5,7 @@ description = ""
 authors = ["Scille SAS"]
 
 [tool.poetry.dependencies]
-python = "~3.9.0"
+python = "~3.9.10"
 quart = "^0.18.1"
 quart-trio = "^0.10.0"
 quart-cors = "^0.5"
@@ -24,7 +24,7 @@ pytest = "^7.0"
 black = "^22.6.0"
 pytest-trio = "^0.8"
 pytest-xdist = "^3.2.1"
-httpx = "0.16.0"
+httpx = "0.24.1"
 PyQt5_stubs = "^5.15"
 mypy = "^0.991"
 
