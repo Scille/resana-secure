@@ -16,6 +16,7 @@ import sys
 import logging
 import structlog
 
+from parsec.core.cli.run import parsec_quick_access_context
 from parsec.core.config import BackendAddr
 
 from .app import serve_app
@@ -161,10 +162,12 @@ def run_cli(
         core_config=_CoreConfig(
             config_dir=config_dir,
             data_base_dir=data_base_dir,
-            # Only used on linux (Windows mounts with drive letters)
+            # Used on Linux always. On Windows, only if mountpoint_in_directory
             mountpoint_base_dir=mountpoint_base_dir,
             # Use a mock to disable mountpoint instead of relying on this option
             mountpoint_enabled=True,
+            # On Windows, mount in directory instead of drive letters
+            mountpoint_in_directory=True,
             ipc_win32_mutex_name="resana-secure",
             preferred_org_creation_backend_addr=BackendAddr.from_url(
                 "parsec://localhost:6777?no_ssl=true"
@@ -212,8 +215,13 @@ def run_cli(
         # Inline import to avoid importing pyqt if gui is disabled
         from .gui import run_gui
 
-        run_gui(
-            quart_app_context=quart_app_context,
-            resana_website_url=namespace.resana_website_url,
-            config=config,
-        )
+        with parsec_quick_access_context(
+            config.core_config,
+            appguid="{918CE5EB-F66D-45EB-9A0A-F013B480A5BC}",
+            appname="Resana Secure",
+        ):
+            run_gui(
+                quart_app_context=quart_app_context,
+                resana_website_url=namespace.resana_website_url,
+                config=config,
+            )
