@@ -63,7 +63,9 @@ The available routes can be found in the [api.md](https://github.com/Scille/resa
 ```shell
 curl -X POST http://127.0.0.1:5775/auth -H 'Content-Type: application/json' -d '{"email":"alice@example.com","key":"test"}'
 ```
+
 or
+
 ```shell
 curl -X GET http://127.0.0.1:5775/workspaces -H "Authorization: Bearer <AUTH_ID>"
 ```

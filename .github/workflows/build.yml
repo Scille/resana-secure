@@ -20,6 +20,10 @@ env:
     --numprocesses=auto
     --verbose
 
+concurrency:
+  group: ci-build-${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
 
   # Github PR merging is configured to only require this job to pass
@@ -108,8 +112,8 @@ jobs:
       - name: Generate cache key
         id: cache-key
         run: |
-          echo "key=linux-client-${{ hashFiles('client/poetry.lock') }}" >> $GITHUB_OUTPUT
-          echo "restore-keys=linux-client-" >> $GITHUB_OUTPUT
+          echo "key=linux-client-2-${{ hashFiles('client/poetry.lock') }}" >> $GITHUB_OUTPUT
+          echo "restore-keys=linux-client-2-" >> $GITHUB_OUTPUT
 
       # Using this workaround to cache `poetry` dependencies until
       # https://github.com/actions/setup-python/issues/476 is resolved
@@ -119,7 +123,14 @@ jobs:
         with:
           key: ${{ steps.cache-key.outputs.key }}
           restore-keys: ${{ steps.cache-key.outputs.restore-keys }}
-          path: /home/runner/.cache/pypoetry/virtualenvs/resana-secure-*
+          path: /home/runner/.cache/pypoetry/virtualenvs/resana-secure-ZeXD18oj-py3.9
+
+      - name: Cache rust artifact
+        uses: Swatinem/rust-cache@988c164c3d0e93c4dbab36aaf5bbeb77425b2894 # pin v2.4.0
+        with:
+          workspaces: client/submodules/parsec-cloud -> target
+          cache-targets: true
+          cache-all-crates: true
 
       - name: Install Project
         run: poetry install -v
@@ -141,7 +152,7 @@ jobs:
         if: steps.restore.outputs.cache-hit != 'true'
         with:
           key: ${{ steps.cache-key.outputs.key }}
-          path: /home/runner/.cache/pypoetry/virtualenvs/resana-secure-*
+          path: /home/runner/.cache/pypoetry/virtualenvs/resana-secure-ZeXD18oj-py3.9
 
       - name: "[Quality] Run pre-commit with mypy-client"
         uses: pre-commit/action@v3.0.0
@@ -192,9 +203,9 @@ jobs:
       - name: Cache python dependencies
         uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8  # pin v3.3.1
         with:
-          key: linux-server-${{ hashFiles('client/poetry.lock') }}
-          restore-keys: linux-server-
-          path: /home/runner/.cache/pypoetry/virtualenvs/resana-server-*
+          key: linux-server-2-${{ hashFiles('server/poetry.lock') }}
+          restore-keys: linux-server-2-
+          path: /home/runner/.cache/pypoetry/virtualenvs/resana-server-OVnVNowq-py3.9
 
       - name: Install Project
         run: poetry install -v
@@ -259,6 +270,13 @@ jobs:
           key: windows-build-${{ hashFiles('client/poetry.lock') }}
           restore-keys: windows-build-
           path: C:\Users\runneradmin\AppData\Local\pypoetry\Cache\virtualenvs\resana-secure-*
+
+      - name: Cache rust artifact
+        uses: Swatinem/rust-cache@988c164c3d0e93c4dbab36aaf5bbeb77425b2894 # pin v2.4.0
+        with:
+          workspaces: client/submodules/parsec-cloud -> target
+          cache-targets: true
+          cache-all-crates: true
 
       - name: Install project
         run: poetry install -v
