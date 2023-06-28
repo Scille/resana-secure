@@ -70,8 +70,9 @@ def _setup_logging(log_level: str, log_file: Path | None) -> None:
         logging.basicConfig(format=format, datefmt=datefmt, stream=sys.stdout, level=level)
 
 
-def get_default_dirs() -> Tuple[Path, Path, Path]:
+def get_default_dirs() -> Tuple[Path, Path, Path, Path]:
     mountpoint_base_dir = Path.home() / "Resana-Secure"
+    personal_mountpoint_base_dir = Path.home()
 
     if os.name == "nt":
         appdata = Path(os.environ["APPDATA"])
@@ -89,7 +90,7 @@ def get_default_dirs() -> Tuple[Path, Path, Path]:
         path = os.environ.get("XDG_CONFIG_HOME") or f"{home}/.config"
         config_dir = Path(path) / "resana_secure"
 
-    return mountpoint_base_dir, data_base_dir, config_dir
+    return mountpoint_base_dir, personal_mountpoint_base_dir, data_base_dir, config_dir
 
 
 def _parse_host(s: str) -> Tuple[str, int | None]:
@@ -154,7 +155,12 @@ def run_cli(
             [_parse_host(h) for h in os.environ.get("RESANA_RIE_SERVER_ADDR", "").split(";")]
         )
 
-    (mountpoint_base_dir, default_data_base_dir, default_config_dir) = get_default_dirs()
+    (
+        mountpoint_base_dir,
+        personal_mountpoint_base_dir,
+        default_data_base_dir,
+        default_config_dir,
+    ) = get_default_dirs()
     config_dir = namespace.config or default_config_dir
     data_base_dir = namespace.data or default_data_base_dir
 
@@ -168,6 +174,8 @@ def run_cli(
             mountpoint_enabled=True,
             # On Windows, mount in directory instead of drive letters
             mountpoint_in_directory=True,
+            personal_workspace_base_dir=personal_mountpoint_base_dir,
+            personal_workspace_name_pattern="Drive",
             ipc_win32_mutex_name="resana-secure",
             preferred_org_creation_backend_addr=BackendAddr.from_url(
                 "parsec://localhost:6777?no_ssl=true"
