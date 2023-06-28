@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Resana Secure - release tests</title>
+    <link rel="icon" href="../../client/resana_secure/icon.png" type="image/png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
+    <link href="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="test_book.css">
+    <script src="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.js"></script>
+  </head>
+  <body>
+    <header class="mdc-top-app-bar mdc-top-app-bar--short">
+      <div class="mdc-top-app-bar__row">
+        <section class="mdc-top-app-bar__section mdc-top-app-bar__section--align-start">
+          <button class="material-icons mdc-top-app-bar__navigation-icon mdc-icon-button" aria-label="Open navigation menu" onclick="openNav()">menu</button>
+          <span class="mdc-top-app-bar__title">Resana Secure - release tests</span>
+        </section>
+        <section class="mdc-top-app-bar__section mdc-top-app-bar__section--align-end" role="toolbar">
+          <span class="mdc-top-app-bar__title" id="auth-info" onclick="openAccount()"></span>
+        </section>
+      </div>
+    </header>
+
+    <nav class="mdc-menu mdc-menu-surface">
+      <ul class="mdc-list" role="menu" aria-hidden="true" aria-orientation="vertical" tabindex="-1">
+        <li class="mdc-list-item" role="menuitem" onclick="navTo('release')">
+          <span class="mdc-list-item__ripple"></span>
+          <span class="mdc-list-item__text">Version de la release</span>
+        </li>
+        <li class="mdc-list-item" role="menuitem" onclick="navTo('installation')">
+          <span class="mdc-list-item__ripple"></span>
+          <span class="mdc-list-item__text">Installation</span>
+        </li>
+        <li class="mdc-list-item" role="menuitem" onclick="navTo('bootstrap')">
+          <span class="mdc-list-item__ripple"></span>
+          <span class="mdc-list-item__text">Bootstrap</span>
+        </li>
+        <li class="mdc-list-item" role="menuitem" onclick="navTo('auth')">
+          <span class="mdc-list-item__ripple"></span>
+          <span class="mdc-list-item__text">Auth</span>
+        </li>
+        <li class="mdc-list-item" role="menuitem" onclick="navTo('workspace')">
+          <span class="mdc-list-item__ripple"></span>
+          <span class="mdc-list-item__text">Workspaces</span>
+        </li>
+        <li class="mdc-list-item" role="menuitem" onclick="navTo('offline')">
+          <span class="mdc-list-item__ripple"></span>
+          <span class="mdc-list-item__text">Offline availability</span>
+        </li>
+        <li class="mdc-list-item" role="menuitem" onclick="navTo('mount')">
+          <span class="mdc-list-item__ripple"></span>
+          <span class="mdc-list-item__text">Mount/Unmount</span>
+        </li>
+        <li class="mdc-list-item" role="menuitem" onclick="navTo('folder')">
+          <span class="mdc-list-item__ripple"></span>
+          <span class="mdc-list-item__text">Folders</span>
+        </li>
+        <li class="mdc-list-item" role="menuitem" onclick="navTo('file')">
+          <span class="mdc-list-item__ripple"></span>
+          <span class="mdc-list-item__text">Files</span>
+        </li>
+        <li class="mdc-list-item" role="menuitem" onclick="navTo('invitation')">
+          <span class="mdc-list-item__ripple"></span>
+          <span class="mdc-list-item__text">Invitations</span>
+        </li>
+        <li class="mdc-list-item" role="menuitem" onclick="navTo('invitation-greeter')">
+          <span class="mdc-list-item__ripple"></span>
+          <span class="mdc-list-item__text">&nbsp;&nbsp;Greeter</span>
+        </li>
+        <li class="mdc-list-item" role="menuitem" onclick="navTo('invitation-claimer')">
+          <span class="mdc-list-item__ripple"></span>
+          <span class="mdc-list-item__text">&nbsp;&nbsp;Claimer</span>
+        </li>
+        <li class="mdc-list-item" role="menuitem" onclick="navTo('human')">
+          <span class="mdc-list-item__ripple"></span>
+          <span class="mdc-list-item__text">Humans</span>
+        </li>
+        <li class="mdc-list-item" role="menuitem" onclick="navTo('share')">
+          <span class="mdc-list-item__ripple"></span>
+          <span class="mdc-list-item__text">Share</span>
+        </li>
+        <li class="mdc-list-item" role="menuitem" onclick="navTo('recovery')">
+          <span class="mdc-list-item__ripple"></span>
+          <span class="mdc-list-item__text">Recovery</span>
+        </li>
+        <li class="mdc-list-item" role="menuitem" onclick="navTo('sequester')">
+          <span class="mdc-list-item__ripple"></span>
+          <span class="mdc-list-item__text">Sequester</span>
+        </li>
+        <li class="mdc-list-item" role="menuitem" onclick="navTo('logout')">
+          <span class="mdc-list-item__ripple"></span>
+          <span class="mdc-list-item__text">Déconnexion</span>
+        </li>
+        <li class="mdc-list-item" role="menuitem" onclick="navTo('result')">
+          <span class="mdc-list-item__ripple"></span>
+          <span class="mdc-list-item__text">Résultats</span>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="mdc-menu mdc-menu-surface" id="account-menu">
+      <ul class="mdc-list" role="menu" aria-hidden="true" aria-orientation="vertical" tabindex="-1">
+        <li class="mdc-list-item" role="menuitem" onclick="deconnect()">
+          <span class="mdc-list-item__ripple"></span>
+          <span class="mdc-list-item__text">Se déconnecter</span>
+        </li>
+        <li class="mdc-list-item" role="menuitem" onclick="deconnectAll()">
+          <span class="mdc-list-item__ripple"></span>
+          <span class="mdc-list-item__text">Déconnecter tous les comptes</span>
+        </li>
+      </ul>
+    </div>
+
+    <main class="mdc-top-app-bar--short-fixed-adjust">
+      <section id="release">
+        <h2>Version de la release</h2>
+        <label for="release-version">Numéro de version</label><input id="release-version" value="vX.Y.Z" onchange="releaseVersionChange()">
+
+        <h2>Création de l'organisation de test</h2>
+        <p>L'organisation de test doit être créée sur le serveur Resana Secure de test avec séquestre et anti-virus.</p>
+        <p>ID organisation : <b>test_release_<span class="release-version">vX.Y.Z</span></b></p>
+        <code class="lang-bash">parsec core create_organization test_release_&lt;numéro de version&gt; --addr parsec://&lt;server url&gt; --administration-token &lt;administration token&gt;</code>
+
+        <h3>Génération des clés de séquestre et anti-virus</h3>
+        <p>
+          Les clés doivent être générées sur Linux (Ubuntu 22.04).
+          <pre><code class="lang-bash"># clé de signature
+openssl genrsa -out ./authority_key.private 4096
+openssl rsa -in ./authority_key.private -out ./authority_key_<span class="release-version"></span>.pub -pubout -outform PEM
+# clé de séquestre
+openssl genrsa -out ./sequestre_key.private 4096
+openssl rsa -in ./sequestre_key.private -out ./sequestre_key.pub -pubout -outform PEM
+parsec backend sequester generate_service_certificate --service-label="Service sequestre" --service-public-key=./sequestre_key.pub --authority-private-key=./authority_key.private -o ./sequestre_service_certificate.pem
+# clé d'anti-virus
+openssl genrsa -out ./antivirus_key.private 4096
+openssl rsa -in ./antivirus_key.private -out ./antivirus_key.pub -pubout -outform PEM
+parsec backend sequester generate_service_certificate --service-label="Service antivirus" --service-public-key=./antivirus_key.pub --authority-private-key=./authority_key.private -o ./antivirus_service_certificate.pem</code></pre>
+        </p>
+
+        <p>Vérifier que le filtrage d'IP fonctionne.</p>
+      </section>
+
+      <section id="installation">
+        <h2>Installation</h2>
+        <h2>Réinstallation</h2>
+        <h2>Désinstallation</h2>
+      </section>
+
+      <section id="bootstrap">
+        <h2>Bootstrap</h2>
+        <label for="bootstrap-url">URL de boostrap</label>
+        <input id="bootstrap-url" value="">
+        <br>
+        <label for="sequester-verify-key">Clé de séquestre</label>
+        <textarea id="sequester-verify-key"></textarea>
+        <br>
+        <button onclick="boostrap()">Bootstrap</button>
+        <pre id="bootstrap-result"></pre>
+        <p>Si OK, lancer le séquestre et l'anti-virus sur l'organisation.</p>
+        <pre><code class="lang-bash">parsec backend sequester import_service_certificate --service-certificate ./sequestre_service_certificate.pem --organization test_release_&lt;numéro de version&gt; --service-type storage
+  parsec backend sequester import_service_certificate --service-certificate ./antivirus_service_certificate.pem --organization test_release_&lt;numéro de version&gt; --service-type webhook --webhook-url http://127.0.0.1:5775/submit</code></pre>
+      </section>
+
+      <section id="auth">
+        <h2>Auth</h2>
+        <p><b>Tests à réaliser</b></p>
+        <ul>
+          <li>Connexion KO avec key (mauvaise key) => statut 400</li>
+          <li>Connexion KO avec key (device not found) => statut 404</li>
+          <li>Connexion OK avec key => statut 200</li>
+          <li>Connexion KO avec user_password/encrypted_key (mauvais mot de passe)</li>
+          <li>Connexion KO avec user_password/encrypted_key (device not found)</li>
+          <li>Connexion OK avec user_password/encrypted_key => statut 200</li>
+          <li>Spammer le bouton "Se connecter" (avec mauvaise key) pour vérifier la protection anti-bruteforce</li>
+        </ul>
+
+        <div>
+          Key
+          <label class="switch">
+            <input id="switch-auth" type="checkbox" onchange="switchAuth()">
+            <span class="slider round"></span>
+          </label>
+          User password
+        </div>
+
+        <div id="key-auth">
+          <label for="key-email">Email</label>
+          <input id="key-email" value="gordon.freeman@blackmesa.nm">
+          <br>
+          <label for="key">Key</label>
+          <input id="key" value="P@ssw0rd">
+          <br>
+          <label for="key-organization-id">ID organisation</label>
+          <input id="key-organization-id" value="test_release_">
+        </div>
+        <div id="password-auth">
+          <label for="password-email">Email</label>
+          <input id="password-email" value="gordon.freeman@blackmesa.nm">
+          <br>
+          <label for="password">Mot de passe</label>
+          <input id="password" value="P@ssw0rd">
+          <br>
+          <label for="encrypted-key">Encrypted key</label>
+          <input id="encrypted-key" value="">
+          <br>
+          <label for="password-organization-id">ID organisation</label>
+          <input id="password-organization-id" value="test_release_">
+        </div>
+        <button onclick="login()">Se connecter</button>
+        <button onclick="saveAuth()">Sauvegarder</button>
+        <button onclick="listAuth()">Charger</button>
+        <br>
+        <pre id="auth-result"></pre>
+
+        <label for="generate-password">Mot de passe</label>
+        <input id="generate-password" value="P@ssw0rd">
+        <br>
+        <button onclick="generateKey()">Générer une clé</button>
+        <pre id="generate-key-result"></pre>
+      </section>
+
+      <div class="modal" id="save-modal">
+        <div class="modal-back"></div>
+        <div class="modal-container">
+          <ul id="saves-list"></ul>
+          <button id="modal-close" onclick="closeAuthModal()">Fermer</button>
+        </div>
+      </div>
+
+      <section id="workspace">
+        <h2>Workspaces</h2>
+        <p><b>Tests à réaliser</b></p>
+        <ul>
+          <li>Création d'un workspace avec un nom valide => statut 201</li>
+          <li>Création d'un workspace avec un nom invalide (contient entre autre un des caractères suivants \ / : * ? " &gt; &lt; |) => statut 400</li>
+          <li>Vérifier la création en chargeant la liste</li>
+          <li>Vérifier la création en regardant le point de montage (si actif)</li>
+          <li>Renommer un point de montage avec un nouveau nom valide => 200</li>
+          <li>Renommer un point de montage avec l'ancien nom incorrect => 409</li>
+          <li>Renommer un point de montage avec un nouveau nom invalide => 400</li>
+          <li>Renommer un point de montage avec un faux ID organisation => 404</li>
+          <li>Vérifier le renommage en rechargeant la liste</li>
+          <li>Vérifier le renommage en regardant le point de montage (si actif)</li>
+        </ul>
+
+        <div>
+          <h3>Liste</h3>
+          <button onclick="listWorkspaces()">List workspaces</button>
+          <pre id="workspaces-result"></pre>
+        </div>
+
+        <div>
+          <h3>Création</h3>
+          <label for="workspace-name">Nom</label>
+          <input id="workspace-name" value="">
+          <button onclick="createWorkspace()">Créer</button>
+          <pre id="workspace-create-result"></pre>
+        </div>
+
+        <div>
+          <h3>Renommage</h3>
+          <label for="workspaces-rename-id">Workspace ID</label>
+          <select id="workspace-rename-id" class="workspaces-select" value=""></select>
+          <br>
+          <label for="workspace-rename-old-name">Ancien nom</label>
+          <input id="workspace-rename-old-name" value="">
+          <br>
+          <label for="workspace-rename-new-name">Nouveau nom</label>
+          <input id="workspace-rename-new-name" value="">
+          <br>
+          <button onclick="renameWorkspace()">Renommer</button>
+          <pre id="workspace-rename-result"></pre>
+        </div>
+      </section>
+
+      <section id="offline">
+        TODO
+        <h2>Offline availability</h2>
+        <label for="offine-workspace-input">ID workspace</label><input id="offine-workspace-input" value="">
+        <button onclick="checkOffline()">Vérifier</button>
+        <pre id="offine-get-result"></pre>
+      </section>
+
+      <section id="mount">
+        <h2>Mount/Unmount</h2>
+        TODO
+      </section>
+
+      <section id="folder">
+        <h2>Folders</h2>
+        <p><b>Tests à réaliser</b></p>
+        <ul>
+          <li>TODO</li>
+          <li>(contient entre autre un des caractères suivants \ / : * ? " &gt; &lt; |)</li>
+        </ul>
+
+        <label for="workspace-folders-list-id">Sélectionner un workspace</label>
+        <select id="workspace-folders-list-id" class="workspaces-select" value=""></select>
+
+        <div>
+          <h3>Liste</h3>
+          <button onclick="listFolders()">Lister</button>
+          <pre id="folders-result"></pre>
+        </div>
+
+        <div>
+          <h3>Création</h3>
+          <label for="folder-parent">Parent</label>
+          <select id="folder-parent" class="folders-select" value=""></select>
+          <br>
+          <label for="folder-name">Nom</label>
+          <input id="folder-name" value="">
+          <br>
+          <button onclick="createFolder()">Créer</button>
+          <pre id="folder-create-result"></pre>
+        </div>
+
+        <div>
+          <h3>Renommer/Déplacer</h3>
+          <label for="rename-folder-id">Dossier</label>
+          <select id="rename-folder-id" class="folders-select" value=""></select>
+          <br>
+          <label for="rename-folder-parent">Nouveau parent</label>
+          <select id="rename-folder-parent" class="folders-select" value=""></select>
+          <br>
+          <label for="rename-folder-name">Nouveau nom</label>
+          <input id="rename-folder-name" value="">
+          <br>
+          <button onclick="renameFolder()">Renommer</button>
+          <pre id="rename-folder-result"></pre>
+        </div>
+
+        <div>
+          <h3>Suppression</h3>
+          <label for="delete-folder-input">Dossier</label>
+          <select id="delete-folder-input" class="folders-select" value=""></select>
+          <br>
+          <button onclick="deleteFolder()">Supprimer</button>
+          <pre id="delete-folder-result"></pre>
+        </div>
+      </section>
+
+      <section id="file">
+        <h2>Files</h2>
+        <p><b>Tests à réaliser</b></p>
+        <ul>
+          <li>TODO</li>
+          <li>(contient entre autre un des caractères suivants \ / : * ? " &gt; &lt; |)</li>
+        </ul>
+
+        <label for="workspace-files-list-id">Sélectionner un workspace</label>
+        <select id="workspace-files-list-id" class="workspaces-select" value="" onchange="listFolders(true)"></select>
+        <br>
+        <label for="folder-file-list-id">Sélectionner un dossier</label>
+        <select id="folder-file-list-id" class="folders-select" value=""></select>
+
+        <div>
+          <h3>Liste</h3>
+          <button onclick="listFiles()">List files</button>
+          <pre id="files-result"></pre>
+        </div>
+
+        <div>
+          <h3>Création</h3>
+          <label for="small-filename">Nom</label>
+          <input id="small-filename">
+          <br>
+          <label for="small-file">Fichier</label>
+          <input type="file" id="small-file">
+          <br>
+          <button onclick="createSmallFile()">Créer</button>
+          <pre id="create-small-file-result"></pre>
+        </div>
+
+        <div>
+          <h3>Création multipart</h3>
+          <label for="large-filename">Nom</label>
+          <input id="large-filename">
+          <br>
+          <label for="large-file">Fichier</label>
+          <input type="file" id="large-file">
+          <br>
+          <button onclick="createLargeFile()">Créer</button>
+          <pre id="create-large-file-result"></pre>
+        </div>
+
+        <div>
+          <h3>Ouvrir</h3>
+          <label for="open-file-id">Fichier</label>
+          <select id="open-file-id" class="files-select" value=""></select>
+          <br>
+          <button onclick="openFile()">Ouvrir</button>
+        </div>
+
+        <div>
+          <h3>Renommer/Déplacer</h3>
+          TODO
+        </div>
+
+        <div>
+          <h3>Suppression</h3>
+          TODO
+        </div>
+      </section>
+
+      <section id="invitation">
+        <h2>Invitation</h2>
+        <p><b>Tests à réaliser</b></p>
+        <ul>
+          <li>Création OK => statut 200</li>
+          <li>Suppression OK => statut 204</li>
+        </ul>
+
+        <div>
+          <h3>Liste</h3>
+          <button onclick="listInvitations()">List</button>
+          <pre id="invitations-result"></pre>
+        </div>
+
+        <div>
+          <h3>Création User</h3>
+          <label for="claimer-email">Email</label>
+          <input id="claimer-email">
+          <br>
+          <button onclick="createInvitation()">Créer</button>
+          <pre id="create-invitation-result"></pre>
+        </div>
+
+        <div>
+          <h3>Création Device</h3>
+          <button onclick="createInvitationDevice()">Créer</button>
+          <pre id="create-invitation-device-result"></pre>
+        </div>
+
+        <div>
+          <h3>Suppression</h3>
+          <label for="delete-invitation-token">Dossier</label>
+          <select id="delete-invitation-token" class="invitations-select" value=""></select>
+          <br>
+          <button onclick="deleteInvitation()">Supprimer</button>
+          <pre id="delete-invitation-result"></pre>
+        </div>
+      </section>
+
+      <section id="invitation-greeter">
+        <h2>Greeter</h2>
+        <label for="greeter-invitation-token">Invitation</label>
+        <select id="greeter-invitation-token" class="invitations-select" value=""></select>
+
+        <h4>1-wait-peer-ready</h4>
+        <button onclick="greeterWaitPeerReady()">wait-peer-ready</button>
+        <pre id="greeter-wait-peer-ready-result"></pre>
+
+        <h4>2-check-trust</h4>
+        <button onclick="greeterCheckTrust()">check-trust</button>
+        <pre id="greeter-check-trust-result"></pre>
+
+        <h4>3-wait-peer-trust</h4>
+        <label for="claimer-sas">SAS</label>
+        <input id="claimer-sas" value="">
+        <br>
+        <button onclick="greeterWaitPeerTrust()">wait-peer-trust</button>
+        <pre id="greeter-wait-peer-trust-result"></pre>
+
+        <h4>4-finalize</h4>
+        <label for="greeter-claimer-email">Claimer email</label>
+        <input id="greeter-claimer-email">
+        <br>
+        <label for="granted-profile">Profil</label>
+        <select id="granted-profile" value="">
+          <option value="">Aucun</option>
+          <option value="BADVALUE">BADVALUE</option>
+          <option value="ADMIN">ADMIN</option>
+          <option value="STANDARD">STANDARD</option>
+        </select>
+        <br>
+        <button onclick="greeterFinalize()">finalize</button>
+        <pre id="greeter-finalize-result"></pre>
+      </section>
+
+      <section id="invitation-claimer">
+        <h2>Claimer</h2>
+        <label for="claimer-invitation-token">Token</label>
+        <input id="claimer-invitation-token" value="">
+
+        <h4>0-retreive-info</h4>
+        <button onclick="claimerRetreiveInfo()">retreive-info</button>
+        <pre id="claimer-retreive-info-result"></pre>
+
+        <h4>1-wait-peer-ready</h4>
+        <button onclick="claimerWaitPeerReady()">wait-peer-ready</button>
+        <pre id="claimer-wait-peer-ready-result"></pre>
+
+        <h4>2-check-trust</h4>
+        <label for="greeter-sas">SAS</label>
+        <input id="greeter-sas" value="">
+        <br>
+        <button onclick="claimerCheckTrust()">check-trust</button>
+        <pre id="claimer-check-trust-result"></pre>
+
+        <h4>3-wait-peer-trust</h4>
+        <button onclick="claimerWaitPeerTrust()">wait-peer-trust</button>
+        <pre id="claimer-wait-peer-trust-result"></pre>
+
+        <h4>4-finalize</h4>
+        <label for="claimer-key">Key (mot de passe)</label>
+        <input id="claimer-key" value="">
+        <br>
+        <button onclick="claimerFinalize()">finalize</button>
+        <pre id="claimer-finalize-result"></pre>
+      </section>
+
+      <section id="human">
+        <h2>Humans</h2>
+        <div>
+          <h3>Liste</h3>
+          <button onclick="getHumans()">Lister</button>
+          <pre id="humans-result"></pre>
+        </div>
+        <div>
+          <h3>Révocation</h3>
+          <label for="revoke-email">Email</label>
+          <select id="revoke-email" class="humans-select" value=""></select>
+          <br>
+          <button onclick="revoke()">Revoke</button>
+          <pre id="revoke-result"></pre>
+        </div>
+      </section>
+
+      <section id="share">
+        <h2>Share</h2>
+
+        <label for="share-workspace">Workspace</label>
+        <select id="share-workspace" class="workspaces-select" value=""></select>
+
+        <div>
+          <h3>Liste</h3>
+          <button onclick="listShares()">Lister</button>
+          <pre id="shares-result"></pre>
+        </div>
+
+        <div>
+          <h3>Edit</h3>
+          <label for="share-email">Email</label>
+          <input id="share-email">
+          <br>
+          <label for="share-role">Rôle</label>
+          <select id="share-role">
+            <option value="">Aucun</option>
+            <option value="BADVALUE">BADVALUE</option>
+            <option value="OWNER">OWNER</option>
+            <option value="MANAGER">MANAGER</option>
+            <option value="CONTRIBUTOR">CONTRIBUTOR</option>
+            <option value="READER">READER</option>
+          </select>
+          <br>
+          <button onclick="share()">Partager</button>
+          <pre id="share-result"></pre>
+        </div>
+      </section>
+
+      <section id="recovery">
+        <h2>Recovery</h2>
+
+        <h3>Export</h3>
+        <p>
+          <button onclick="exportRecovery()">Export</button>
+          <pre id="export-result"></pre>
+        </p>
+
+        <h3>Import</h3>
+        <p>
+          <label for="recovery-file">Fichier</label>
+          <input type="file" id="recovery-file">
+          <br>
+          <label for="passphrase">Passphrase</label>
+          <input id="passphrase">
+          <br>
+          <label for="new-key">Nouvelle key</label>
+          <input id="new-key">
+          <br>
+          <button onclick="importRecovery()">Import</button>
+          <pre id="import-result"></pre>
+        </p>
+      </section>
+
+      <section id="sequester">
+        <h2>Sequester</h2>
+        <p>
+          Création du dump du séquestre
+          <pre><code class="lang-bash">parsec backend sequester list_services --organization test_20230419
+parsec backend human_accesses --organization test_20230419
+parsec backend sequester export_realm --organization test_20230419 --service 99ec544e445344a8a985f30a24c2c1bf --realm 6005613898fb45e0ab8b563ceeaa49f5 --output realm-6005613898fb45e0ab8b563ceeaa49f5.sequester-export</code></pre>
+        </p>
+      </section>
+
+      <section id="logout">
+        <h2>Déconnexion</h2>
+        <button class="logout-button" onclick="deconnect(true)">Se déconnecter</button>
+        <button onclick="deconnectAll(true)">Déconnecter tous les comptes</button>
+        <pre id="logout-result"></pre>
+      </section>
+
+      <section id="result">
+        <label for="dev-name">Ton nom</label>
+        <input id="dev-name">
+        <table>
+          <thead>
+            <tr class="result-section">
+              <th>Fonctionnalités</th>
+              <th>Client X avec Backend Y</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="result-section">
+              <th>Installation</th>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Installer Resana Secure</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Désinstaller Resana Secure</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Désinstaller Resana Secure (client ouvert)</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Réinstaller Resana Secure</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Réinstaller Resana Secure (client ouvert)</td>
+              <td></td>
+            </tr>
+            <tr class="result-section">
+              <th>Login</th>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Liste des devices</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Connexion à un device</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Se délogger</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Changer de mot de passe</td>
+              <td></td>
+            </tr>
+            <tr class="result-section">
+              <th>Workspaces</th>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Liste des workspaces</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Créer des workspaces</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Partager un workspace</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Retirer une personne d'un workspace</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Rechiffrer un workspace</td>
+              <td class="not-implemented">Not implemented</td>
+            </tr>
+            <tr>
+              <td>Afficher l'historique d'un fichier</td>
+              <td class="not-implemented">Not implemented</td>
+            </tr>
+            <tr>
+              <td>Monter un workspace à un moment donnée</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Vérifier la synchronisation d'un workspace</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Rendre un workspace disponible hors-ligne</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Filtrer les workspaces</td>
+              <td class="not-implemented">Not implemented</td>
+            </tr>
+            <tr class="result-section">
+              <th>Fichiers</th>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Créer un dossier avec l'API</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Naviguer dans l'arborescence</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Importer un fichier depuis l'API</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Importer un dossier depuis l'API</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Supprimer un fichier</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Renommer un fichier</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Copier/coller un fichier dans l'explorer</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Copier/coller un dossier dans l'explorer</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Supprimer un dossier dans l'explorer</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Supprimer un fichier dans l'explorer</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Renommer un fichier dans l'explorer</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Renommer un dossier dans l'explorer</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Vérifier la synchronisation d'un fichier</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Récupérer un lien vers un fichier</td>
+              <td class="not-implemented">Not implemented</td>
+            </tr>
+            <tr>
+              <td>Utiliser un lien vers un fichier</td>
+              <td class="not-implemented">Not implemented</td>
+            </tr>
+            <tr>
+              <td>Récupérer un lien timestamped vers un fichier</td>
+              <td class="not-implemented">Not implemented</td>
+            </tr>
+            <tr>
+              <td>Utiliser un lien timestamped vers un fichier</td>
+              <td class="not-implemented">Not implemented</td>
+            </tr>
+            <tr class="result-section">
+              <th>Users</th>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Lister les users</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Masquer les utilisateurs révoqués</td>
+              <td class="not-implemented">Not implemented</td>
+            </tr>
+            <tr>
+              <td>Inviter un utilisateur</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Masquer les invitations</td>
+              <td class="not-implemented">Not implemented</td>
+            </tr>
+            <tr>
+              <td>Filter les utilisateurs</td>
+              <td class="not-implemented">Not implemented</td>
+            </tr>
+            <tr>
+              <td>Accueillir un utilisateur</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Révoquer un utilisateur</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Se faire accueillir</td>
+              <td></td>
+            </tr>
+            <tr class="result-section">
+              <th>Devices</th>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Lister les devices</td>
+              <td class="not-implemented">Not implemented</td>
+            </tr>
+            <tr>
+              <td>Accueillir un nouveau device</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Claim un nouveau device</td>
+              <td></td>
+            </tr>
+            <tr class="result-section">
+              <th>Organisation</th>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Créer une nouvelle organisation</td>
+              <td></td>
+            </tr>
+            <tr class="result-section">
+              <th>Recovery</th>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Créer un recovery device</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Utiliser un recovery device</td>
+              <td></td>
+            </tr>
+            <tr class="result-section">
+              <th>Liens</th>
+              <td class="not-implemented">Not implemented</td>
+            </tr>
+            <tr class="result-section">
+              <th>Divers</th>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Ouvrir Resana</td>
+              <td></td>
+            </tr>
+            <tr class="result-section">
+              <th>Sequester client</th>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Bootstrap avec une clé de séquestre</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Ajouter un fichier avec un service de séquestre actif</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>GUI: affichage séquestre présent</td>
+              <td class="not-implemented">Not implemented</td>
+            </tr>
+            <tr class="result-section">
+              <th>Webhook client</th>
+              <td></td>
+            </tr>
+            <tr>
+              <th>Ajouter un fichier avec un service webhook actif</th>
+              <td></td>
+            </tr>
+            <tr class="result-section">
+              <th>Webhook backend</th>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Ajouter un service webhook</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Lister les services webhook</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Désactiver un service webhook</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Activer un service webhook</td>
+              <td></td>
+            </tr>
+            <tr class="result-section">
+              <th>Sequester backend</th>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Ajouter un service de séquestre avec clé générée sur Windows</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Ajouter un service un séquestre avec clé générée sur Linux</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Lister les services de séquestre</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Désactiver un service de séquestre</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Activer un service de séquestre</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Lister les accès utilisateur</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Exporter et valider les données de séquestre</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Exporter et valider les données de séquestre avec des données créées avec le service désactivé</td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script type="text/javascript" src="test_book.js"></script>
+  </body>
+</html>
+
+
+        <!--
+    # Post a small file with JSON
+    with run_test("Post small file with JSON") as context:
+        file_content = random.randbytes(SMALL_FILE_SIZE)
+        r = make_request(
+            "POST",
+            f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/files",
+            auth_token=auth_token,
+            json={
+                "name": "test.txt",
+                "parent": VARIABLES["sub_folder_id"],
+                "content": base64.b64encode(file_content).decode(),
+            },
+        )
+        context.request = r
+        assert r.status_code == 201
+        assert r.json() == {"id": ANY}
+        VARIABLES["file1_id"] = r.json()["id"]
+        assert (MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test.txt").is_file()
+        assert (MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test.txt").stat().st_size == len(
+            file_content
+        )
+        assert (
+            MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test.txt"
+        ).read_bytes() == file_content
+ -->
+        <!--
+    # Post a small file with multipart
+    with run_test("Post small file with multipart") as context:
+        file_content = random.randbytes(SMALL_FILE_SIZE)
+        r = make_request(
+            "POST",
+            f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/files",
+            auth_token=auth_token,
+            data={"parent": VARIABLES["sub_folder_id"]},
+            files={"file": ("test2.txt", file_content)},
+        )
+        context.request = r
+        assert r.status_code == 201
+        assert r.json() == {"id": ANY}
+        VARIABLES["file2_id"] = r.json()["id"]
+        assert (MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test2.txt").is_file()
+        assert (MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test2.txt").stat().st_size == len(
+            file_content
+        )
+        assert (
+            MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test2.txt"
+        ).read_bytes() == file_content
+
+    time.sleep(
+        2.0
+    )  # Wait for file sync to get timestamp, 2 seconds is long enough to be consistent
+    timestamp = DateTime.now().to_rfc3339()
+ -->
+        <!--
+    # Post a large file with multipart
+    with run_test("Post large file with multipart") as context:
+        file_content = random.randbytes(LARGE_FILE_SIZE)
+        r = make_request(
+            "POST",
+            f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/files",
+            auth_token=auth_token,
+            data={"parent": VARIABLES["sub_folder_id"]},
+            files={"file": ("test4.txt", file_content)},
+        )
+        context.request = r
+        assert r.status_code == 201
+        assert r.json() == {"id": ANY}
+        VARIABLES["file4_id"] = r.json()["id"]
+        assert (MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test4.txt").is_file()
+        assert (MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test4.txt").stat().st_size == len(
+            file_content
+        )
+ -->
+        <!--
+    # Wait for all files to be synced
+    count = 0
+    while count < 10:
+        try:
+            r = make_request(
+                "GET",
+                f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/get_offline_availability_status",
+                auth_token=auth_token,
+            )
+            assert r.status_code == 200
+            body = r.json()
+            assert body["local_and_remote_size"] == (SMALL_FILE_SIZE + LARGE_FILE_SIZE) * 2
+            count = 10
+        except AssertionError:
+            pass
+        finally:
+            # At most, even if it all fails, we're only waiting for 10s
+            count += 1
+            time.sleep(1)
+ -->
+            <!--
+    # Rename the file
+    with run_test("Rename a file") as context:
+        r = make_request(
+            "POST",
+            f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/files/rename",
+            auth_token=auth_token,
+            json={"id": VARIABLES["file1_id"], "new_name": "test_renamed.txt"},
+        )
+        context.request = r
+        assert r.status_code == 200
+        assert not (MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test.txt").exists()
+        assert (MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test_renamed.txt").exists()
+ -->
+        <!--
+    # Delete the file
+    with run_test("Delete a file") as context:
+        r = make_request(
+            "DELETE",
+            f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/files/{VARIABLES['file1_id']}",
+            auth_token=auth_token,
+        )
+        context.request = r
+        assert r.status_code == 204
+ -->
+        <!--
+    # Enable offline availability
+    with run_test("Enable offline availability") as context:
+        r = make_request(
+            "POST",
+            f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/toggle_offline_availability",
+            auth_token=auth_token,
+            json={"enable": True},
+        )
+        context.request = r
+        assert r.status_code == 200
+        assert r.json() == {}
+ -->
+        <!--
+    # Check offline availability
+    with run_test("Check that offline availability has been enabled") as context:
+        r = make_request(
+            "GET",
+            f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/get_offline_availability_status",
+            auth_token=auth_token,
+        )
+        context.request = r
+        assert r.status_code == 200
+        assert r.json() == {
+            "is_running": True,
+            "is_prepared": True,
+            "is_available_offline": True,
+            "total_size": (SMALL_FILE_SIZE + LARGE_FILE_SIZE) * 2,
+            "remote_only_size": 0,
+            "local_and_remote_size": (SMALL_FILE_SIZE + LARGE_FILE_SIZE) * 2,
+        }
+ -->
+        <!--
+    # Disable offline availability
+    with run_test("Disable offline availability") as context:
+        r = make_request(
+            "POST",
+            f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/toggle_offline_availability",
+            auth_token=auth_token,
+            json={"enable": False},
+        )
+        context.request = r
+        assert r.status_code == 200
+        assert r.json() == {}
+ -->
+        <!--
+    # Check offline availability
+    with run_test("Check that offline availability has been disabled") as context:
+        r = make_request(
+            "GET",
+            f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/get_offline_availability_status",
+            auth_token=auth_token,
+        )
+        context.request = r
+        assert r.status_code == 200
+        assert r.json() == {
+            "is_running": True,
+            "is_prepared": True,
+            "is_available_offline": False,
+            "total_size": (SMALL_FILE_SIZE + LARGE_FILE_SIZE) * 2,
+            "remote_only_size": 0,
+            "local_and_remote_size": (SMALL_FILE_SIZE + LARGE_FILE_SIZE) * 2,
+        }
+ -->
+        <!--
+    # Check the timestamped content
+    with run_test("Check timestamped content") as context:
+        r = make_request(
+            "GET",
+            f"{resana_addr}/workspaces/{VARIABLES['workspace_id']}/files/{VARIABLES['sub_folder_id']}",
+            json={"timestamp": timestamp},
+            auth_token=auth_token,
+        )
+        context.request = r
+
+        assert r.status_code == 200
+        assert r.json() == {
+            "files": [
+                {
+                    "created": ANY,
+                    "extension": "txt",
+                    "id": VARIABLES["file1_id"],
+                    "name": "test.txt",
+                    "size": SMALL_FILE_SIZE,
+                    "updated": ANY,
+                },
+                {
+                    "created": ANY,
+                    "extension": "txt",
+                    "id": VARIABLES["file2_id"],
+                    "name": "test2.txt",
+                    "size": SMALL_FILE_SIZE,
+                    "updated": ANY,
+                },
+            ]
+        }
+ -->
+<!--
+def test_recovery(auth_token, resana_addr, org_id):
+    VARIABLES = {}
+
+    # Create a recovery device
+    with run_test("Create recovery device") as context:
+        r = make_request("POST", f"{resana_addr}/recovery/export", auth_token=auth_token, json={})
+        context.request = r
+        assert r.status_code == 200
+        assert r.json() == {"file_content": ANY, "file_name": ANY, "passphrase": ANY}
+        VARIABLES["recovery_device"] = base64.b64decode(r.json()["file_content"].encode())
+        VARIABLES["passphrase"] = r.json()["passphrase"]
+ -->
+        <!--
+    # Import the recovery device
+    with run_test("Import recovery device") as r:
+        r = make_request(
+            "POST",
+            f"{resana_addr}/recovery/import",
+            json={
+                "recovery_device_file_content": base64.b64encode(
+                    VARIABLES["recovery_device"]
+                ).decode(),
+                "recovery_device_passphrase": VARIABLES["passphrase"],
+                "new_device_key": "RecoveryNewP@ssw0rd",
+            },
+        )
+        context.request = r
+        assert r.status_code == 200
+ -->
