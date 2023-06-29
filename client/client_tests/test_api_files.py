@@ -521,11 +521,7 @@ async def test_big_file(
             mock.assert_called_once()
             file_path = trio.Path(mock.call_args.args[0])
             assert await file_path.exists()
-            assert (
-                await file_path.read_bytes() == b"\r\n" + file_content
-                if mode == "multipart"
-                else file_content
-            )
+            assert await file_path.read_bytes() == file_content
 
         nursery.cancel_scope.cancel()
 
