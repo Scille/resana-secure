@@ -113,13 +113,8 @@ def main(program_source: Path, conformity: bool = False):
     # Copy windows icon overlays dll needed by `explorer.exe` to display overlays
     # These dll are supposed to be built before running this script
     for dll_file in [
-        program_source.joinpath(
-            "submodules\\parsec-cloud", "windows-icon-handler\\x64\\Release\\check-icon-handler.dll"
-        ),
-        program_source.joinpath(
-            "submodules\\parsec-cloud",
-            "windows-icon-handler\\x64\\Release\\refresh-icon-handler.dll",
-        ),
+        program_source.joinpath("windows-icon-handler\\x64\\Release\\check-icon-handler.dll"),
+        program_source.joinpath("windows-icon-handler\\x64\\Release\\refresh-icon-handler.dll"),
     ]:
         assert os.path.isfile(
             dll_file

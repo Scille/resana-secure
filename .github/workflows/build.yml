@@ -77,7 +77,7 @@ jobs:
       - name: Build Icon overlays COM objects
         run: msbuild -maxCpuCount -property:Configuration=Release .\windows-icon-handler\windows-icon-handler.sln
         shell: cmd
-        working-directory: client/submodules/parsec-cloud
+        working-directory: client
 
       # Using this workaround to cache `poetry` dependencies until
       # https://github.com/actions/setup-python/issues/476 is resolved

@@ -14,8 +14,11 @@
 !define APPGUID "918CE5EB-F66D-45EB-9A0A-F013B480A5BC"
 
 # Icon overlays GUIDS
-!define CHECK_ICON_GUID "{5449BC90-310B-40A8-9ABF-C5CFCEC7F430}"
-!define REFRESH_ICON_GUID "{41e71dd9-368d-46b2-bb9d-4359599bbbc3}"
+!define CHECK_ICON_GUID "{5449BC90-310B-40A8-9ABF-C5CFCEC7F431}"
+!define REFRESH_ICON_GUID "{41e71dd9-368d-46b2-bb9d-4359599bbbc4}"
+# Icon overlays register entry
+!define SHELL_ICON_OVERLAY_CHECK_ICON "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\ResanaCheckIconHandler"
+!define SHELL_ICON_OVERLAY_REFRESH_ICON "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\ResanaRefreshIconHandler"
 
 # Detect version from file
 !define BUILD_DIR "build"
@@ -312,8 +315,8 @@ Section "Resana Secure Cloud Sharing" Section1
     ExecWait '$SYSDIR\regsvr32.exe /s /n /i:user "$INSTDIR\refresh-icon-handler.dll"'
 
     # Write Icons overlays to register
-    WriteRegStr HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\CheckIconHandler" "" "${CHECK_ICON_GUID}"
-    WriteRegStr HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\RefreshIconHandler" "" "${REFRESH_ICON_GUID}"
+    WriteRegStr HKLM "${SHELL_ICON_OVERLAY_CHECK_ICON}" "" "${CHECK_ICON_GUID}"
+    WriteRegStr HKLM "${SHELL_ICON_OVERLAY_REFRESH_ICON}" "" "${REFRESH_ICON_GUID}"
 SectionEnd
 
 !macro InstallWinFSP
@@ -404,8 +407,8 @@ Section Uninstall
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\Desktop\NameSpace\{${APPGUID}"
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel\{${APPGUID}"
 
-  DeleteRegKey HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\ICheckIconHandler"
-  DeleteRegKey HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\IRefreshIconHandler"
+  DeleteRegKey HKLM "${SHELL_ICON_OVERLAY_CHECK_ICON}"
+  DeleteRegKey HKLM "${SHELL_ICON_OVERLAY_REFRESH_ICON}"
 
   ExecWait '$SYSDIR\regsvr32.exe /s /u /i:user "$INSTDIR\check-icon-handler.dll"'
   ExecWait '$SYSDIR\regsvr32.exe /s /u /i:user "$INSTDIR\refresh-icon-handler.dll"'

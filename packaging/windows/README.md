@@ -18,7 +18,7 @@ On `Visual Studio Installer`, select `MSVC v143 - VS 2022 C++ x64/x86 Build Tool
 `C++ ATL for last version of Build Tools v143 (x86 and x64)` componants.
 
 ```shell
-cd client/submodules/parsec-cloud
+cd client
 msbuild -maxCpuCount -property:Configuration=Release .\windows-icon-handler\windows-icon-handler.sln
 ```
 
