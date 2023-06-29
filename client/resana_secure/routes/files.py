@@ -13,6 +13,7 @@ from typing import Sequence, cast, TypedDict, Any, List, Tuple
 
 from parsec._parsec import DateTime
 from parsec.core.logged_core import LoggedCore
+from parsec.core.backend_connection import BackendConnectionError
 from parsec.api.data import EntryID, EntryName
 from parsec.core.mountpoint import MountpointNotMounted
 from parsec.core.fs import FsPath, WorkspaceFS, WorkspaceFSTimestamped
@@ -311,7 +312,7 @@ async def _get_file_creator_and_updater(
     workspace: WorkspaceFS | WorkspaceFSTimestamped,
     entry_id: EntryID,
 ) -> Tuple[str, str]:
-    creator = last_updater = "N/A"
+    creator = last_updater = ""
 
     try:
         creator_id = (
@@ -323,10 +324,13 @@ async def _get_file_creator_and_updater(
     except (FSBackendOfflineError, FSRemoteManifestNotFound):
         pass
 
-    last_updater_id = (await workspace.local_storage.get_manifest(entry_id)).base.author.user_id
-    last_updater_info = await core.get_user_info(last_updater_id)
-    if last_updater_info.human_handle:
-        last_updater = last_updater_info.human_handle.email
+    try:
+        last_updater_id = (await workspace.local_storage.get_manifest(entry_id)).base.author.user_id
+        last_updater_info = await core.get_user_info(last_updater_id)
+        if last_updater_info.human_handle:
+            last_updater = last_updater_info.human_handle.email
+    except BackendConnectionError:
+        pass
 
     return (creator, last_updater)
 
