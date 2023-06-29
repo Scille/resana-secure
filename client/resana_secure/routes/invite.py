@@ -27,6 +27,7 @@ from parsec.core.invite import (
     UserGreetInProgress4Ctx,
     DeviceGreetInProgress4Ctx,
 )
+from parsec.core.fs.storage.user_storage import user_storage_non_speculative_init
 
 from ..utils import (
     authenticated,
@@ -319,6 +320,14 @@ async def claimer_4_finalize(apitoken: str) -> tuple[dict[str, Any], int]:
 
             else:
                 raise APIException(409, {"error": "invalid_state"})
+
+            # Claiming a user means we are it first device, hence we know there
+            # is no existing user manifest (hence our placeholder is non-speculative)
+            if addr.invitation_type == InvitationType.USER:
+                await user_storage_non_speculative_init(
+                    data_base_dir=current_app.resana_config.core_config.data_base_dir,
+                    device=new_device,
+                )
 
             save_device_with_password_in_config(
                 config_dir=current_app.resana_config.core_config.config_dir,
