@@ -9,18 +9,20 @@ from quart import Blueprint, request
 from base64 import b64decode
 
 from PyQt5.QtWidgets import QApplication
-from typing import Sequence, cast, TypedDict, Any, List
+from typing import Sequence, cast, TypedDict, Any, List, Tuple
 
 from parsec._parsec import DateTime
 from parsec.core.logged_core import LoggedCore
 from parsec.api.data import EntryID, EntryName
 from parsec.core.mountpoint import MountpointNotMounted
-from parsec.core.fs import FsPath, WorkspaceFS
+from parsec.core.fs import FsPath, WorkspaceFS, WorkspaceFSTimestamped
 from parsec.core.fs.exceptions import (
     FSNotADirectoryError,
     FSFileNotFoundError,
     FSPermissionError,
     FSIsADirectoryError,
+    FSBackendOfflineError,
+    FSRemoteManifestNotFound,
 )
 
 from ..utils import (
@@ -279,12 +281,19 @@ async def get_workspace_folder_content(
                 )
                 if child_stat["type"] == "folder":
                     continue
+
+                creator, last_updater = await _get_file_creator_and_updater(
+                    core, workspace, child_stat["id"]
+                )
+
                 cooked_files.append(
                     {
                         "id": child_stat["id"].hex,
                         "name": child_name.str,
                         "created": child_stat["created"].to_rfc3339(),
+                        "created_by": creator,
                         "updated": child_stat["updated"].to_rfc3339(),
+                        "updated_by": last_updater,
                         "size": child_stat["size"],
                         "extension": get_file_extension(child_name),
                     }
@@ -295,6 +304,31 @@ async def get_workspace_folder_content(
         cooked_files = await _build_cooked_files()
 
     return {"files": cooked_files}, 200
+
+
+async def _get_file_creator_and_updater(
+    core: LoggedCore,
+    workspace: WorkspaceFS | WorkspaceFSTimestamped,
+    entry_id: EntryID,
+) -> Tuple[str, str]:
+    creator = last_updater = "N/A"
+
+    try:
+        creator_id = (
+            await workspace.remote_loader.load_manifest(entry_id, version=1)
+        ).author.user_id
+        creator_info = await core.get_user_info(creator_id)
+        if creator_info.human_handle:
+            creator = creator_info.human_handle.email
+    except (FSBackendOfflineError, FSRemoteManifestNotFound):
+        pass
+
+    last_updater_id = (await workspace.local_storage.get_manifest(entry_id)).base.author.user_id
+    last_updater_info = await core.get_user_info(last_updater_id)
+    if last_updater_info.human_handle:
+        last_updater = last_updater_info.human_handle.email
+
+    return (creator, last_updater)
 
 
 @files_bp.route("/workspaces/<WorkspaceID:workspace_id>/files", methods=["POST"])

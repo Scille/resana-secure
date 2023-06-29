@@ -1271,7 +1271,9 @@ HTTP 200
             "extension": <string>,
             "size": <int>,
             "created": <datetime>,
+            "created_by": <str>,
             "updated": <datetime>,
+            "updated_by": <str>,
         },
         ...
     ]
