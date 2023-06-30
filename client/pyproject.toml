@@ -11,6 +11,10 @@ quart-trio = "^0.10.0"
 quart-cors = "^0.5"
 hypercorn = "^0.13.2"
 
+# Forcing 2.2.3 because there seems to be an issue in 2.3.6
+# See https://github.com/Scille/resana-secure/issues/200#issuecomment-1614692826
+werkzeug = "2.2.3"
+
 # Install parsec from the submodule
 parsec-cloud = { path = "./submodules/parsec-cloud", extras = ["backend", "core"], develop = false }
 cryptography = "^41.0.0"
