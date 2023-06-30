@@ -107,18 +107,20 @@ class ManagedComponent:
 
             managed_component = None
 
-            async with component_factory() as component:
-                try:
-                    managed_component = cls(component=component, stop_component=_stop_component)
-                    task_status.started(managed_component)
-                    await trio.sleep_forever()
+            try:
+                async with component_factory() as component:
+                    try:
+                        managed_component = cls(component=component, stop_component=_stop_component)
+                        task_status.started(managed_component)
+                        await trio.sleep_forever()
 
-                finally:
-                    # Do this before entering the component's __aexit__ to ensure
-                    # the component cannot be acquired while it is tearing down
-                    if managed_component is not None:
-                        managed_component._component = None
-                    component_stopped.set()
+                    finally:
+                        # Do this before entering the component's __aexit__ to ensure
+                        # the component cannot be acquired while it is tearing down
+                        if managed_component is not None:
+                            managed_component._component = None
+            finally:
+                component_stopped.set()
 
     async def stop(self) -> None:
         """
