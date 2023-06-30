@@ -136,6 +136,34 @@ jobs:
         run: poetry install -v
         working-directory: client
 
+      - name: Verify poetry lock is up to date with submodule dependency parsec-cloud
+        run: |
+          set -o pipefail -e
+          POETRY_PARSEC_VERSION=$(poetry show parsec-cloud | sed -n 's/^\s\+version\s\+: \(v\S\+\)\s\+$/\1/p')
+          SUBMOD_PARSEC_VERSION=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' submodules/parsec-cloud/parsec/_version.py)
+
+          if [ -z "$POETRY_PARSEC_VERSION" ]; then
+            echo "Empty poetry version" >&2
+            exit 1
+          fi
+
+          if [ -z "$SUBMOD_PARSEC_VERSION" ]; then
+            echo "Empty submodule version" >&2
+            exit 1
+          fi
+
+          if [ "$POETRY_PARSEC_VERSION" != "$SUBMOD_PARSEC_VERSION" ]; then
+            (
+              echo "The versions between poetry and submodule don't match (\`$POETRY_PARSEC_VERSION\` != \`$SUBMOD_PARSEC_VERSION\`)"
+              echo "This is likely because someone forgot to update \`poetry.lock\` file"
+              echo "To update \`poetry.lock\` use:"
+              echo
+              echo "\`poetry lock --no-update\`"
+            ) >&2
+            exit 1
+          fi
+        working-directory: client
+
       - name: Check fuse
         run: poetry run python -c "import fuse"
         working-directory: client
