@@ -15,6 +15,7 @@ from parsec.core.invite import (
 )
 from parsec._parsec import SequesterVerifyKeyDer, save_device_with_password_in_config
 from parsec.core.types import BackendOrganizationBootstrapAddr
+from parsec.core.fs.storage.user_storage import user_storage_non_speculative_init
 from parsec.api.protocol import HumanHandle, DeviceLabel
 from ..utils import APIException, backend_errors_to_api_exceptions, get_data, Parser
 from ..app import current_app
@@ -62,6 +63,12 @@ async def organization_bootstrap() -> tuple[dict[str, Any], int]:
                 human_handle=human_handle,
                 device_label=device_label,
                 sequester_authority_verify_key=sequester_key,
+            )
+            # The organization is brand new, of course there is no existing
+            # remote user manifest, hence our placeholder is non-speculative.
+            await user_storage_non_speculative_init(
+                data_base_dir=current_app.resana_config.core_config.data_base_dir,
+                device=new_device,
             )
             save_device_with_password_in_config(
                 config_dir=current_app.resana_config.core_config.config_dir,
