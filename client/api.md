@@ -682,6 +682,7 @@ HTTP 200
 ### `POST /workspaces`
 
 Créé un nouveau workspace.
+name : les caractères `\ / : * ? " > < |` sont interdits sur Windows https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file ainsi que certains mots https://github.com/Scille/parsec-cloud/blob/77cc7ba287d442cc5b98366bf52cd1b51690db87/parsec/core/mountpoint/winify.py#L22-L43.
 
 Request:
 
@@ -1056,6 +1057,7 @@ ou
 ### `POST /workspaces/<id>/folders`
 
 Créé un nouveau répertoire.
+name : les caractères `\ / : * ? " > < |` sont interdits sur Windows https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file ainsi que certains mots https://github.com/Scille/parsec-cloud/blob/77cc7ba287d442cc5b98366bf52cd1b51690db87/parsec/core/mountpoint/winify.py#L22-L43.
 
 Request:
 
@@ -1305,6 +1307,7 @@ ou
 ### `POST /workspaces/<id>/files`
 
 Créé un nouveau fichier.
+name/filename : les caractères `\ / : * ? " > < |` sont interdits sur Windows https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file ainsi que certains mots https://github.com/Scille/parsec-cloud/blob/77cc7ba287d442cc5b98366bf52cd1b51690db87/parsec/core/mountpoint/winify.py#L22-L43.
 
 Request:
 
