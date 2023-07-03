@@ -26,9 +26,10 @@ async def do_head(subpath: str) -> tuple[dict[str, Any], int]:
 
 
 @auth_bp.route("/auth", methods=["POST"])
-# Limited to 1 request per second, 10 per minute
-@rate_limit(1, timedelta(seconds=1))
-@rate_limit(10, timedelta(minutes=1))
+# Limited to 2 request per second, 20 per minute
+# 1 for OPTION + 1 for POST request from browser
+@rate_limit(2, timedelta(seconds=1))
+@rate_limit(20, timedelta(minutes=1))
 async def do_auth() -> tuple[dict[str, Any], int]:
     # Either send a non-encrypted Parsec Key using the field `key`
     # or send the encrypted Parsec Key with the field `encrypted_key` and

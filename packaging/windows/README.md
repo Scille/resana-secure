@@ -12,7 +12,7 @@ Build steps
 
 Run the `freeze_program.py` Python script with the path to the Resana Secure sources to use:
 ```shell
-$ python freeze_program.py ../..
+python freeze_program.py ../../client
 ```
 
 Note the Python version embedded inside the build will be taken from the interpreter
