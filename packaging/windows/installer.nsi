@@ -154,7 +154,7 @@ FunctionEnd
 
 Function checkProgramAlreadyRunning
     check:
-        System::Call 'kernel32::OpenMutex(i 0x100000, b 0, t "resana-secure") i .R0'
+        System::Call 'kernel32::OpenMutexW(i 0x100000, b 0, t "resana-secure") i .R0'
         IntCmp $R0 0 notRunning
             System::Call 'kernel32::CloseHandle(i $R0)'
             MessageBox MB_OKCANCEL|MB_ICONEXCLAMATION \
@@ -190,7 +190,7 @@ Function .onInit
       Push "$R0"
       Call GetParent
       Pop $R1
-      ClearErrors
+      ; ClearErrors
       ; If run without `_?=R1`, the uninstaller executable (i.e. `$R0`) will
       ; copy itself in a temporary directory, run this copy and exit right away.
       ; This is needed otherwise the installer won't be able to remove itself,
@@ -287,6 +287,7 @@ ShowUnInstDetails hide
     CreateDirectory "$TEMP\resana_secure_tmp"
     Rename "$INSTDIR\check-icon-handler.dll" "$TEMP\resana_secure_tmp\check-icon-handler.dll.old"
     Rename "$INSTDIR\refresh-icon-handler.dll" "$TEMP\resana_secure_tmp\refresh-icon-handler.dll.old"
+    # Rename "$INSTDIR\msvcp140.dll" "$TEMP\resana_secure_tmp\msvcp140.dll.old"
     Rename "$INSTDIR\vcruntime140.dll" "$TEMP\resana_secure_tmp\vcruntime140.dll.old"
     Rename "$INSTDIR\vcruntime140_1.dll" "$TEMP\resana_secure_tmp\vcruntime140_1.dll.old"
 !macroend
@@ -378,6 +379,22 @@ SectionEnd
 
 # --- Uninstallation section ---
 Section Uninstall
+    DeleteRegKey HKLM "${SHELL_ICON_OVERLAY_CHECK_ICON}"
+    DeleteRegKey HKLM "${SHELL_ICON_OVERLAY_REFRESH_ICON}"
+
+    ExecWait '$SYSDIR\regsvr32.exe /s /u /i:user "$INSTDIR\check-icon-handler.dll"'
+    ExecWait '$SYSDIR\regsvr32.exe /s /u /i:user "$INSTDIR\refresh-icon-handler.dll"'
+
+    # stop explorer
+    ; FindWindow $R0 "Shell_TrayWnd"
+    ; SendMessage $R0 0x5B4 0 0
+    ; Sleep 5000
+    ; loop:
+    ;     Sleep 100
+    ;     FindWindow $R0 "Shell_TrayWnd"
+    ;     IntCmp $R0 0 done loop
+    ; done:
+
     !insertmacro MoveParsecShellExtension
     # Delete program files.
     Delete "$INSTDIR\homepage.url"
@@ -407,11 +424,8 @@ Section Uninstall
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\Desktop\NameSpace\{${APPGUID}"
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel\{${APPGUID}"
 
-  DeleteRegKey HKLM "${SHELL_ICON_OVERLAY_CHECK_ICON}"
-  DeleteRegKey HKLM "${SHELL_ICON_OVERLAY_REFRESH_ICON}"
-
-  ExecWait '$SYSDIR\regsvr32.exe /s /u /i:user "$INSTDIR\check-icon-handler.dll"'
-  ExecWait '$SYSDIR\regsvr32.exe /s /u /i:user "$INSTDIR\refresh-icon-handler.dll"'
+  # Restart explorer
+  # Exec "explorer"
 SectionEnd
 
 # Add version info to installer properties.
