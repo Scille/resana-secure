@@ -15,6 +15,7 @@ from parsec._parsec import (
     save_device_with_password_in_config,
     LocalDeviceError,
 )
+from parsec.core.recovery import generate_recovery_device, generate_new_device_from_recovery
 from parsec.core.local_device import (
     get_recovery_device_file_name,
 )
@@ -37,7 +38,8 @@ async def export_device(core: LoggedCore) -> tuple[dict[str, Any], int]:
     os.close(fp)
     path = Path(raw_path)
     try:
-        passphrase = await save_recovery_device(path, core.device, True)
+        recovery_device = await generate_recovery_device(core.device)
+        passphrase = await save_recovery_device(path, recovery_device, True)
         raw = path.read_bytes()
     finally:
         path.unlink()
@@ -79,7 +81,10 @@ async def import_device() -> tuple[dict[str, Any], int]:
     try:
         path.write_bytes(args["file_content"])
         try:
-            new_device = await load_recovery_device(path, args["passphrase"])
+            recovery_device = await load_recovery_device(path, args["passphrase"])
+            new_device = await generate_new_device_from_recovery(
+                recovery_device, recovery_device.device_label
+            )
         # TODO: change it for LocalDeviceCryptoError once https://github.com/Scille/parsec-cloud/issues/4048 is done
         except LocalDeviceError:
             raise APIException(400, {"error": "invalid_passphrase"})
