@@ -4,7 +4,6 @@ from quart import Blueprint
 
 from typing import Any
 
-import platform
 import binascii
 import base64
 
@@ -16,8 +15,14 @@ from parsec.core.invite import (
 from parsec._parsec import SequesterVerifyKeyDer, save_device_with_password_in_config
 from parsec.core.types import BackendOrganizationBootstrapAddr
 from parsec.core.fs.storage.user_storage import user_storage_non_speculative_init
-from parsec.api.protocol import HumanHandle, DeviceLabel
-from ..utils import APIException, backend_errors_to_api_exceptions, get_data, Parser
+from parsec.api.protocol import HumanHandle
+from ..utils import (
+    APIException,
+    backend_errors_to_api_exceptions,
+    get_data,
+    Parser,
+    get_default_device_label,
+)
 from ..app import current_app
 
 organization_bp = Blueprint("organization_api", __name__)
@@ -51,10 +56,7 @@ async def organization_bootstrap() -> tuple[dict[str, Any], int]:
     else:
         sequester_key = None
 
-    try:
-        device_label = DeviceLabel(platform.node() or "-unknown-")
-    except ValueError:
-        device_label = DeviceLabel("-unknown-")
+    device_label = get_default_device_label()
 
     with backend_errors_to_api_exceptions():
         try:

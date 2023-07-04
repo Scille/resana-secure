@@ -20,7 +20,7 @@ from parsec.core.local_device import (
     get_recovery_device_file_name,
 )
 
-from ..utils import APIException, authenticated, get_data, Parser
+from ..utils import APIException, authenticated, get_data, Parser, get_default_device_label
 from ..app import current_app
 
 recovery_bp = Blueprint("recovery_api", __name__)
@@ -83,7 +83,7 @@ async def import_device() -> tuple[dict[str, Any], int]:
         try:
             recovery_device = await load_recovery_device(path, args["passphrase"])
             new_device = await generate_new_device_from_recovery(
-                recovery_device, recovery_device.device_label
+                recovery_device, get_default_device_label()
             )
         # TODO: change it for LocalDeviceCryptoError once https://github.com/Scille/parsec-cloud/issues/4048 is done
         except LocalDeviceError:

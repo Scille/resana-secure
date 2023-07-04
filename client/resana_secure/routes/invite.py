@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-import platform
 from quart import Blueprint
 
 from parsec.core.logged_core import LoggedCore
-from parsec.api.protocol import InvitationType, HumanHandle, DeviceLabel, UserProfile
+from parsec.api.protocol import InvitationType, HumanHandle, UserProfile
 from parsec.api.data import SASCode
 from parsec._parsec import save_device_with_password_in_config
 from parsec.core.invite import (
@@ -36,6 +35,7 @@ from ..utils import (
     APIException,
     apitoken_to_addr,
     backend_errors_to_api_exceptions,
+    get_default_device_label,
 )
 from ..app import current_app
 
@@ -304,10 +304,7 @@ async def claimer_4_finalize(apitoken: str) -> tuple[dict[str, Any], int]:
         async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
 
-            try:
-                requested_device_label = DeviceLabel(platform.node() or "-unknown-")
-            except ValueError:
-                requested_device_label = DeviceLabel("-unknown-")
+            requested_device_label = get_default_device_label()
             if isinstance(in_progress_ctx, UserClaimInProgress3Ctx):
                 new_device = await in_progress_ctx.do_claim_user(
                     requested_device_label=requested_device_label, requested_human_handle=None
