@@ -1,4 +1,5 @@
 from __future__ import annotations
+import platform
 
 from typing import Callable, Iterator, Any, TypeVar, Awaitable
 from typing_extensions import ParamSpec, Concatenate
@@ -12,7 +13,7 @@ from werkzeug.exceptions import HTTPException
 from parsec._parsec import DateTime
 from parsec.core.logged_core import LoggedCore
 from parsec.api.data import EntryID
-from parsec.api.protocol import OrganizationID, InvitationType, InvitationToken
+from parsec.api.protocol import OrganizationID, InvitationType, InvitationToken, DeviceLabel
 from parsec.core.types import BackendInvitationAddr, BackendOrganizationAddr
 from parsec.core.backend_connection import (
     BackendConnectionError,
@@ -288,3 +289,10 @@ def backend_errors_to_api_exceptions() -> Iterator[None]:
         raise APIException(400, {"error": "mountpoint_already_mounted"})
     except MountpointNotMounted:
         raise APIException(404, {"error": "mountpoint_not_mounted"})
+
+
+def get_default_device_label() -> DeviceLabel:
+    try:
+        return DeviceLabel(platform.node() or "-unknown-")
+    except ValueError:
+        return DeviceLabel("-unknown-")

@@ -3,6 +3,7 @@ from base64 import b64encode
 from tempfile import mkstemp
 import pathlib
 from quart.typing import TestAppProtocol, TestClientProtocol
+from parsec._parsec import save_recovery_device
 
 from .conftest import LocalDeviceTestbed
 
@@ -118,3 +119,37 @@ async def test_recovery_delete_temp_file(
     assert body == {}
 
     assert not pathlib.Path(temp_path).exists()
+
+
+@pytest.mark.trio
+async def test_can_import_old_recovery_devices(
+    test_app: TestAppProtocol, local_device: LocalDeviceTestbed, tmp_path: pathlib.Path
+):
+    # Create a recovery device the old way
+    file_key = tmp_path / "recovery.psrk"
+    passphrase = await save_recovery_device(file_key, local_device.device, True)
+    raw = file_key.read_bytes()
+
+    anonymous_client = test_app.test_client()
+    response = await anonymous_client.post(
+        "/recovery/import",
+        json={
+            "recovery_device_file_content": b64encode(raw).decode(),
+            "recovery_device_passphrase": passphrase,
+            "new_device_key": "new_key",
+        },
+    )
+    assert response.status_code == 200
+    body = await response.get_json()
+    assert body == {}
+
+    # Auth with new device
+    response = await anonymous_client.post(
+        "/auth",
+        json={
+            "email": local_device.device.human_handle.email,
+            "key": "new_key",
+            "organization": local_device.organization.str,
+        },
+    )
+    assert response.status_code == 200
