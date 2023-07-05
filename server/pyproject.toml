@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "resana_server"
-version = "0.13.0"
+version = "0.13.1"
 description = ""
 authors = ["Scille SAS"]
 packages = [
@@ -28,8 +28,8 @@ werkzeug = "2.2.3"
 
 # install parsec from pypi for linux, or from git for windows & macos
 parsec-cloud = [
-    { markers = "sys_platform == 'linux'", version = "^2.16.0-rc.0", extras = ["backend"] },
-    { markers = "sys_platform != 'linux'", git = "https://github.com/Scille/parsec-cloud", tag = "v2.16.0-rc.0" }
+    { markers = "sys_platform == 'linux'", version = "^2.16.0-rc.2", extras = ["backend"] },
+    { markers = "sys_platform != 'linux'", git = "https://github.com/Scille/parsec-cloud", tag = "v2.16.0-rc.2" }
 ]
 
 [tool.poetry.dev-dependencies]
