@@ -82,6 +82,7 @@ async def create_invitation(core: LoggedCore) -> tuple[dict[str, Any], int]:
         else:
             addr, _ = await core.new_device_invitation(send_email=False)
 
+    #print(addr.organization_id)
     apitoken = build_apitoken(
         backend_addr=addr,
         organization_id=addr.organization_id,
@@ -89,7 +90,7 @@ async def create_invitation(core: LoggedCore) -> tuple[dict[str, Any], int]:
         token=addr.token,
     )
     return {"token": apitoken}, 200
-
+    
 
 @invitations_bp.route("/invitations/<string:apitoken>", methods=["DELETE"])
 @authenticated
@@ -103,3 +104,4 @@ async def delete_invitation(core: LoggedCore, apitoken: str) -> tuple[dict[str, 
         await core.delete_invitation(token=addr.token)
 
     return {}, 204
+    
