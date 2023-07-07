@@ -1,1 +1,1 @@
-parsec-cloud[backend]==2.11.1
+git+ssh://git@github.com/Scille/resana-secure.git@v0.13.1#subdirectory=server
