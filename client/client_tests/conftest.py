@@ -26,10 +26,10 @@ from parsec.backend.config import BackendConfig, MockedBlockStoreConfig
 
 from resana_secure.app import app_factory
 from resana_secure.config import ResanaConfig, _CoreConfig
-
+from random import randint
 
 LocalDeviceTestbed = namedtuple("LocalDeviceTestbed", "device,email,key,organization")
-
+LocalDeviceTestbed2 = namedtuple("LocalDeviceTestbed2", "device,email,key,organization,config_dir")
 
 @pytest.fixture(scope="session")
 def client_origin():
@@ -48,7 +48,6 @@ class BackendAddrRegisterer:
     async def get(self) -> BackendAddr:
         await self.backend_addr_defined.wait()
         return self.backend_addr
-
 
 @pytest.fixture
 def _backend_addr_register(request):
@@ -100,7 +99,7 @@ async def test_app(core_config: ResanaConfig, client_origin: str):
 
 
 @pytest.fixture
-async def authenticated_client(test_app: TestAppProtocol, local_device: LocalDeviceTestbed):
+async def authenticated_client(test_app: TestAppProtocol, local_device: LocalDeviceTestbed2):
     test_client = test_app.test_client()
 
     response = await test_client.post(
@@ -153,10 +152,10 @@ async def running_backend(_backend_addr_register):
 async def local_device(
     running_backend: BackendApp, backend_addr: BackendAddr, core_config_dir: Path
 ):
-    organization_id = OrganizationID("CoolOrg")
-    device_label = DeviceLabel("alice's desktop")
+    organization_id = OrganizationID("KoolOrg")
+    device_label = DeviceLabel("Marie's desktop")
     password = "P@ssw0rd."
-    human_handle = HumanHandle(email="alice@example.com", label="Alice")
+    human_handle = HumanHandle(email="marie@example.com", label="Marie")
     bootstrap_addr = BackendOrganizationBootstrapAddr.build(
         backend_addr=backend_addr,
         organization_id=organization_id,
@@ -169,19 +168,18 @@ async def local_device(
     save_device_with_password_in_config(
         config_dir=core_config_dir, device=new_device, password=password
     )
-    return LocalDeviceTestbed(
-        device=new_device, email=human_handle.email, key=password, organization=organization_id
+    return LocalDeviceTestbed2(
+        device=new_device, email=human_handle.email, key=password, organization=organization_id , config_dir=core_config_dir
     )
-
 
 @pytest.fixture
 async def other_local_device(
     running_backend: BackendApp, backend_addr: BackendAddr, core_config_dir: Path
 ):
     organization_id = OrganizationID("AwesomeOrg")
-    device_label = DeviceLabel("bob's desktop")
+    device_label = DeviceLabel("tom's desktop")
     password = "P@ssw0rd."
-    human_handle = HumanHandle(email="bob@example.com", label="Bob")
+    human_handle = HumanHandle(email="tom@example.com", label="Tom")
     bootstrap_addr = BackendOrganizationBootstrapAddr.build(
         backend_addr=backend_addr,
         organization_id=organization_id,
@@ -194,8 +192,8 @@ async def other_local_device(
     save_device_with_password_in_config(
         config_dir=core_config_dir, device=new_device, password=password
     )
-    return LocalDeviceTestbed(
-        device=new_device, email=human_handle.email, key=password, organization=organization_id
+    return LocalDeviceTestbed2(
+        device=new_device, email=human_handle.email, key=password, organization=organization_id , config_dir=core_config_dir
     )
 
 
