@@ -27,8 +27,11 @@ from parsec.backend.config import BackendConfig, MockedBlockStoreConfig
 from resana_secure.app import app_factory
 from resana_secure.config import ResanaConfig, _CoreConfig
 
+import shutil
+import os
 
 LocalDeviceTestbed = namedtuple("LocalDeviceTestbed", "device,email,key,organization")
+LocalDeviceTestbed2 = namedtuple("LocalDeviceTestbed2", "device,email,key,organization,config_dir")
 
 
 @pytest.fixture(scope="session")
@@ -49,6 +52,10 @@ class BackendAddrRegisterer:
         await self.backend_addr_defined.wait()
         return self.backend_addr
 
+def copy_and_rename_file(original_file_path, new_file_name):
+    directory, file_name = os.path.split(original_file_path)
+    new_file_path = os.path.join(directory, new_file_name)
+    shutil.copyfile(original_file_path, new_file_path)
 
 @pytest.fixture
 def _backend_addr_register(request):
@@ -169,8 +176,8 @@ async def local_device(
     save_device_with_password_in_config(
         config_dir=core_config_dir, device=new_device, password=password
     )
-    return LocalDeviceTestbed(
-        device=new_device, email=human_handle.email, key=password, organization=organization_id
+    return LocalDeviceTestbed2(
+        device=new_device, email=human_handle.email, key=password, organization=organization_id,config_dir=core_config_dir
     )
 
 
@@ -194,8 +201,8 @@ async def other_local_device(
     save_device_with_password_in_config(
         config_dir=core_config_dir, device=new_device, password=password
     )
-    return LocalDeviceTestbed(
-        device=new_device, email=human_handle.email, key=password, organization=organization_id
+    return LocalDeviceTestbed2(
+        device=new_device, email=human_handle.email, key=password, organization=organization_id,config_dir=core_config_dir
     )
 
 
