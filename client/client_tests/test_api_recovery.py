@@ -165,6 +165,7 @@ async def test_recovery_with_big_number_of_device(
 ):
     response = await authenticated_client.post("/recovery/export", json={})
     body = await response.get_json()
+    
     assert response.status_code == 200
     assert (
         body["file_name"]
@@ -204,7 +205,6 @@ async def test_recovery_with_big_number_of_device(
             )
             device_info_list.append(email_device_id)
         elif rename_or_not == True:
-            #print("tototot" * 100)
             response = await anonymous_client.post(
                 "/recovery/import",
                 json={
@@ -218,7 +218,6 @@ async def test_recovery_with_big_number_of_device(
     body = await response.get_json()
     assert body == {}
     folder_path = str(local_device.config_dir) + "/devices"
-    #print(folder_path)
     file_list = [file.name for file in Path(folder_path).iterdir() if file.is_file()]
 
     if rename_or_not == True:

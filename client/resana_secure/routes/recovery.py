@@ -90,11 +90,62 @@ async def import_device() -> tuple[dict[str, Any], int]:
             raise APIException(400, {"error": "invalid_passphrase"})
     finally:
         path.unlink()
-
     save_device_with_password_in_config(
         config_dir=current_app.resana_config.core_config.config_dir,
         device=new_device,
         password=args["password"],
     )
 
+    return {}, 200
+
+
+@recovery_bp.route("/recovery/rename", methods=["POST"])
+async def rename_device() -> tuple[dict[str, Any], int]:
+    data = await get_data()
+    parser = Parser()
+    parser.add_argument(
+        "recovery_device_file_content",
+        converter=b64decode,
+        new_name="file_content",
+        required=True,
+    )
+    parser.add_argument(
+        "recovery_device_passphrase", type=str, new_name="passphrase", required=True
+    )
+    parser.add_argument("new_device_key", type=str, new_name="password", required=True)
+    args, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
+
+    fp, raw_path = tempfile.mkstemp(suffix=".psrk")
+    # Closing the open file returned by mkstemp
+    os.close(fp)
+    path = Path(raw_path)
+    try:
+        path.write_bytes(args["file_content"])
+        try:
+            recovery_device = await load_recovery_device(path, args["passphrase"])
+            new_device = await generate_new_device_from_recovery(
+                recovery_device, get_default_device_label()
+            )
+        # TODO: change it for LocalDeviceCryptoError once https://github.com/Scille/parsec-cloud/issues/4048 is done
+        except LocalDeviceError:
+            raise APIException(400, {"error": "invalid_passphrase"})
+    finally:
+        path.unlink()
+    
+    # This will rename the create device from device.keys to device_backup.txt
+
+    folder_path = str(current_app.resana_config.core_config.config_dir) + "/devices"
+    file_list = [file.name for file in Path(folder_path).iterdir() if file.is_file()]
+    old_name = folder_path + "/" + file_list[0]
+    new_name = folder_path + "/" + file_list[0].replace(".keys","_backup.txt")
+    os.rename(old_name,new_name)
+    
+    save_device_with_password_in_config(
+        config_dir=current_app.resana_config.core_config.config_dir,
+        device=new_device,
+        password=args["password"],
+    )
+    
     return {}, 200
