@@ -14,6 +14,7 @@ Add the following lines to a file `sitecustomize.py` accessible through the pyth
 
 import os
 from functools import wraps
+from typing import Union, Optional, cast
 from ipaddress import ip_address, ip_network
 from typing import Optional, Union, cast
 
@@ -32,6 +33,7 @@ from hypercorn.typing import (
 )
 from structlog import get_logger
 
+
 logger = get_logger()
 
 
@@ -39,6 +41,7 @@ class AsgiIpFilteringMiddleware:
 
     ENV_VAR_NAME_NETWORK = "ASGI_AUTHORIZED_NETWORKS"
     ENV_VAR_NAME_PROXY = "ASGI_AUTHORIZED_PROXIES"
+    ENV_VAR_NAME_ORGANIZATION = "ASGI_AUTHORIZED_ORGANIZATION"
     MESSAGE_REJECTED = (
         "The IP address {} is not part of the subnetworks authorized by "
         "the ASGI IP filtering middleware configuration."
@@ -49,6 +52,7 @@ class AsgiIpFilteringMiddleware:
         asgi_app: ASGI3Framework,
         authorized_networks: Optional[str] = None,
         authorized_proxies: Optional[str] = None,
+        authorized_ips_per_orgs: Optional[str] = None,
     ):
         """
         Authorized networks are provided as a string of IPv4 or IPv6 networks
@@ -59,6 +63,8 @@ class AsgiIpFilteringMiddleware:
         variable `ASGI_AUTHORIZED_NETWORKS` is used.
         """
         self.asgi_app = asgi_app
+        self.org_id = ""
+
         if authorized_networks is None:
             authorized_networks = os.environ.get(self.ENV_VAR_NAME_NETWORK)
         if authorized_networks is None:
@@ -73,15 +79,28 @@ class AsgiIpFilteringMiddleware:
                 "No authorized proxy configuration provided"
                 f" (use `{self.ENV_VAR_NAME_PROXY}` environment variable)"
             )
+        if authorized_ips_per_orgs is None:
+            authorized_ips_per_orgs = os.environ.get(self.ENV_VAR_NAME_ORGANIZATION)
+        if authorized_ips_per_orgs is None:
+            raise ValueError(
+                "No authorized ips per organization provided"
+                f" (use `{self.ENV_VAR_NAME_ORG_IDS}` environment variable)"
+            )
+
         self.authorized_networks = [ip_network(word) for word in authorized_networks.split()]
         self.authorized_proxies = [ip_network(word) for word in authorized_proxies.split()]
+        self.authorized_ips_per_org = {}
+        for org in authorized_ips_per_orgs.split(';'):
+            tmp_list = org.split(',')
+            self.authorized_ips_per_org[tmp_list[0]] = tmp_list[1:]
+
         logger.info(
             "IP filtering is enabled",
             authorized_networks=self.authorized_networks,
             authorized_proxies=self.authorized_proxies,
         )
 
-    def is_network_authorized(self, host: str) -> bool:
+    def is_network_authorized(self, host: str, organization_id: Optional[str] = None) -> bool:
         """
         Return `True` if the provided host is authorized, `False` otherwise.
         """
@@ -89,6 +108,11 @@ class AsgiIpFilteringMiddleware:
             host_ip = ip_address(host)
         except ValueError:
             return False
+        if organization_id:
+            try:
+                return any(host_ip in network for network in self.authorized_ips_per_org[organization_id])
+            except KeyError:
+                return False  # Which value to return if the org is not given ?
         return any(host_ip in network for network in self.authorized_networks)
 
     def is_proxy_authorized(self, proxy: str) -> bool:
@@ -107,6 +131,13 @@ class AsgiIpFilteringMiddleware:
         """
         ASGI entry point for new connections.
         """
+        async def wrapped_receive():
+            result = await receive()
+            if "bytes" in result.keys() and b"organization_id" in result["bytes"]:
+                import msgpack
+                self.org_id = msgpack.unpackb(result["bytes"])["organization_id"]
+            return result
+
         if scope["type"] in ("http", "websocket"):
             scope = cast(Union[HTTPScope, WebsocketScope], scope)
             client = scope.get("client")
@@ -133,7 +164,11 @@ class AsgiIpFilteringMiddleware:
             if not self.is_network_authorized(ip_host.decode()):
                 logger.info("A connection has been rejected", **scope)
                 return await self.http_reject(scope, send, ip_host.decode())
+            if self.org_id and not self.is_network_authorized(ip_host.decode(), self.org_id):
+                return await self.http_reject(scope, send, ip_host.decode())
 
+        if not self.org_id:
+            return await self.asgi_app(scope, wrapped_receive, send)
         return await self.asgi_app(scope, receive, send)
 
     async def http_reject(
@@ -209,7 +244,7 @@ else:
             await websocket.accept()
             await websocket.send("WS event")
 
-        app.asgi_app = AsgiIpFilteringMiddleware(app.asgi_app, "130.0.0.0/24 131.0.0.0/24", "127.0.0.0/24 128.0.0.0/24")  # type: ignore[assignment]
+        app.asgi_app = AsgiIpFilteringMiddleware(app.asgi_app, "130.0.0.0/24 131.0.0.0/24", "127.0.0.0/24 128.0.0.0/24", "Org, 130.0.0.0/24")  # type: ignore[assignment]
 
         client = app.test_client()
 
