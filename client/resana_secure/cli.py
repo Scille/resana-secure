@@ -175,7 +175,7 @@ def run_cli(
             # On Windows, mount in directory instead of drive letters
             mountpoint_in_directory=True,
             personal_workspace_base_dir=personal_mountpoint_base_dir,
-            personal_workspace_name_pattern="Drive",
+            personal_workspace_name_pattern="Mon_Drive_Sec",
             ipc_win32_mutex_name="resana-secure",
             preferred_org_creation_backend_addr=BackendAddr.from_url(
                 "parsec://localhost:6777?no_ssl=true"
