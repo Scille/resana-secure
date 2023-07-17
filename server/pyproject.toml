@@ -29,7 +29,7 @@ werkzeug = "2.2.3"
 # install parsec from pypi for linux, or from git for windows & macos
 parsec-cloud = [
     { markers = "sys_platform == 'linux'", version = "^2.16.0-rc.2", extras = ["backend"] },
-    { markers = "sys_platform != 'linux'", git = "https://github.com/Scille/parsec-cloud", tag = "v2.16.0-rc.2" }
+    { markers = "sys_platform != 'linux'", git = "https://github.com/Scille/parsec-cloud", tag = "v2.16.0-rc.2", extras = ["backend"] }
 ]
 
 [tool.poetry.dev-dependencies]

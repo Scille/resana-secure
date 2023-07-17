@@ -37,13 +37,19 @@ logger = get_logger()
 
 class AsgiIpFilteringMiddleware:
 
-    ENV_VAR_NAME = "ASGI_AUTHORIZED_NETWORKS"
+    ENV_VAR_NAME_NETWORK = "ASGI_AUTHORIZED_NETWORKS"
+    ENV_VAR_NAME_PROXY = "ASGI_AUTHORIZED_PROXIES"
     MESSAGE_REJECTED = (
         "The IP address {} is not part of the subnetworks authorized by "
         "the ASGI IP filtering middleware configuration."
     )
 
-    def __init__(self, asgi_app: ASGI3Framework, authorized_networks: Optional[str] = None):
+    def __init__(
+        self,
+        asgi_app: ASGI3Framework,
+        authorized_networks: Optional[str] = None,
+        authorized_proxies: Optional[str] = None,
+    ):
         """
         Authorized networks are provided as a string of IPv4 or IPv6 networks
         (e.g `192.168.0.0/16` or `2001:db00::0/24`) separated with whitespace
@@ -54,16 +60,28 @@ class AsgiIpFilteringMiddleware:
         """
         self.asgi_app = asgi_app
         if authorized_networks is None:
-            authorized_networks = os.environ.get(self.ENV_VAR_NAME)
+            authorized_networks = os.environ.get(self.ENV_VAR_NAME_NETWORK)
         if authorized_networks is None:
             raise ValueError(
-                "No authrorized network configuration provided"
-                f" (use `{self.ENV_VAR_NAME}` environment variable)"
+                "No authorized network configuration provided"
+                f" (use `{self.ENV_VAR_NAME_NETWORK}` environment variable)"
+            )
+        if authorized_proxies is None:
+            authorized_proxies = os.environ.get(self.ENV_VAR_NAME_PROXY)
+        if authorized_proxies is None:
+            raise ValueError(
+                "No authorized proxy configuration provided"
+                f" (use `{self.ENV_VAR_NAME_PROXY}` environment variable)"
             )
         self.authorized_networks = [ip_network(word) for word in authorized_networks.split()]
-        logger.info("IP filtering is enabled", authorized_networks=self.authorized_networks)
+        self.authorized_proxies = [ip_network(word) for word in authorized_proxies.split()]
+        logger.info(
+            "IP filtering is enabled",
+            authorized_networks=self.authorized_networks,
+            authorized_proxies=self.authorized_proxies,
+        )
 
-    def is_authorized(self, host: str) -> bool:
+    def is_network_authorized(self, host: str) -> bool:
         """
         Return `True` if the provided host is authorized, `False` otherwise.
         """
@@ -72,6 +90,16 @@ class AsgiIpFilteringMiddleware:
         except ValueError:
             return False
         return any(host_ip in network for network in self.authorized_networks)
+
+    def is_proxy_authorized(self, proxy: str) -> bool:
+        """
+        Return `True` if the provided proxy is authorized, `False` otherwise.
+        """
+        try:
+            proxy_ip = ip_address(proxy)
+        except ValueError:
+            return False
+        return any(proxy_ip in proxy for proxy in self.authorized_proxies)
 
     async def __call__(
         self, scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable
@@ -85,10 +113,27 @@ class AsgiIpFilteringMiddleware:
             if client is None:
                 logger.info("No client information is provided", **scope)
                 return await self.http_reject(scope, send)
-            host, _ = client
-            if not self.is_authorized(host):
+            ip_proxy, _ = client
+            if not self.is_proxy_authorized(ip_proxy):
                 logger.info("A connection has been rejected", **scope)
-                return await self.http_reject(scope, send, host)
+                return await self.http_reject(scope, send, ip_proxy)
+            headers = scope.get("headers")
+            if headers is None:
+                logger.info("No header information is provided", **scope)
+                return await self.http_reject(scope, send)
+            # headers type is Iterable[Tuple[bytes, bytes]]
+            x_real_ip = [(field, value) for (field, value) in headers if field == b"x-real-ip"]
+            if not len(x_real_ip):
+                logger.info("No x-real-ip information is provided", **scope)
+                return await self.http_reject(scope, send)
+            _, ip_host = x_real_ip[0]
+            if ip_host is None:
+                logger.info("No x-real-ip information is provided", **scope)
+                return await self.http_reject(scope, send)
+            if not self.is_network_authorized(ip_host.decode()):
+                logger.info("A connection has been rejected", **scope)
+                return await self.http_reject(scope, send, ip_host.decode())
+
         return await self.asgi_app(scope, receive, send)
 
     async def http_reject(
@@ -164,33 +209,56 @@ else:
             await websocket.accept()
             await websocket.send("WS event")
 
-        app.asgi_app = AsgiIpFilteringMiddleware(app.asgi_app, "127.0.0.0/24 128.0.0.0/24")  # type: ignore[assignment]
+        app.asgi_app = AsgiIpFilteringMiddleware(app.asgi_app, "130.0.0.0/24 131.0.0.0/24", "127.0.0.0/24 128.0.0.0/24")  # type: ignore[assignment]
 
         client = app.test_client()
 
         # Regular route
-        response = await client.get("/", scope_base={"client": ("127.0.0.1", 1234)})
+        response = await client.get(
+            "/",
+            scope_base={"client": ("127.0.0.1", 1234), "headers": [(b"x-real-ip", b"130.0.0.1")]},
+        )
         assert response.status_code == 200
         assert (await response.data).decode() == "Hello World"
 
-        response = await client.get("/", scope_base={"client": ("128.0.0.1", 1234)})
+        response = await client.get(
+            "/",
+            scope_base={"client": ("128.0.0.1", 1234), "headers": [(b"x-real-ip", b"131.0.0.1")]},
+        )
         assert response.status_code == 200
         assert (await response.data).decode() == "Hello World"
 
-        response = await client.get("/", scope_base={"client": ("129.0.0.1", 1234)})
+        response = await client.get(
+            "/",
+            scope_base={"client": ("129.0.0.1", 1234), "headers": [(b"x-real-ip", b"130.0.0.1")]},
+        )
         assert response.status_code == 403
         assert response.content_type == "text/html; charset=UTF-8"
         expected = AsgiIpFilteringMiddleware.MESSAGE_REJECTED.format("129.0.0.1")
         assert (await response.data).decode() == expected
 
+        response = await client.get(
+            "/",
+            scope_base={"client": ("127.0.0.1", 1234), "headers": [(b"x-real-ip", b"132.0.0.1")]},
+        )
+        assert response.status_code == 403
+        assert response.content_type == "text/html; charset=UTF-8"
+        expected = AsgiIpFilteringMiddleware.MESSAGE_REJECTED.format("132.0.0.1")
+        assert (await response.data).decode() == expected
+
         # Websocket route
-        async with client.websocket("/ws", scope_base={"client": ("127.0.0.1", 1234)}) as ws:  # type: ignore[call-arg]
+        async with client.websocket("/ws", scope_base={"client": ("127.0.0.1", 1234), "headers": [(b"x-real-ip", b"130.0.0.1")]}) as ws:  # type: ignore[call-arg]
             assert await ws.receive() == "WS event"
 
-        async with client.websocket("/ws", scope_base={"client": ("128.0.0.1", 1234)}) as ws:  # type: ignore[call-arg]
+        async with client.websocket("/ws", scope_base={"client": ("128.0.0.1", 1234), "headers": [(b"x-real-ip", b"131.0.0.1")]}) as ws:  # type: ignore[call-arg]
             assert await ws.receive() == "WS event"
 
         with pytest.raises(WebsocketDisconnectError) as ctx:
-            async with client.websocket("/ws", scope_base={"client": ("129.0.0.1", 1234)}) as ws:  # type: ignore[call-arg]
+            async with client.websocket("/ws", scope_base={"client": ("129.0.0.1", 1234), "headers": [(b"x-real-ip", b"130.0.0.1")]}) as ws:  # type: ignore[call-arg]
+                await ws.receive()
+        assert ctx.value.args == (403,)
+
+        with pytest.raises(WebsocketDisconnectError) as ctx:
+            async with client.websocket("/ws", scope_base={"client": ("127.0.0.1", 1234), "headers": [(b"x-real-ip", b"132.0.0.1")]}) as ws:  # type: ignore[call-arg]
                 await ws.receive()
         assert ctx.value.args == (403,)
