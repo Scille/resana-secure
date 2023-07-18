@@ -79,10 +79,12 @@ def core_config(backend_addr: BackendAddr, tmp_path: Path, core_config_dir: Path
             data_base_dir=tmp_path / "data",
             mountpoint_base_dir=tmp_path / "mountpoint",
             mountpoint_enabled=True,
+            mountpoint_in_directory=True,
             ipc_win32_mutex_name="resana-secure",
             preferred_org_creation_backend_addr=BackendAddr.from_url(
                 "parsec://localhost:6777?no_ssl=true"
             ),
+            personal_workspace_name_pattern="Block_Reman",
         ),
         rie_server_addrs=[(backend_addr.hostname, None)],
     )

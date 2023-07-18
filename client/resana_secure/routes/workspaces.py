@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from quart import Blueprint
@@ -56,6 +57,15 @@ async def create_workspaces(core: LoggedCore) -> tuple[dict[str, Any], int]:
 
     with backend_errors_to_api_exceptions():
         workspace_id = await core.user_fs.workspace_create(args["name"])
+
+    personal_workspace_name_pattern = core.config.personal_workspace_name_pattern
+    personal_workspace_name_regex = (
+        re.compile(personal_workspace_name_pattern) if personal_workspace_name_pattern else None
+    )
+
+    if personal_workspace_name_regex and personal_workspace_name_regex.fullmatch(str(args["name"])):
+        workspace_fs = core.user_fs.get_workspace(workspace_id)
+        await workspace_fs.enable_block_remanence()
 
     # TODO: should we do a `user_fs.sync()` ?
 

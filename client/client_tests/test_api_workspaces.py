@@ -58,6 +58,51 @@ async def test_create_and_list_workspaces(authenticated_client: TestClientProtoc
 
 
 @pytest.mark.trio
+async def test_create_with_block_remanence_workspaces(authenticated_client: TestClientProtocol):
+    # No workspaces
+    response = await authenticated_client.get("/workspaces")
+    assert response.status_code == 200
+    assert await response.get_json() == {"workspaces": []}
+
+    # Create workspace
+    response = await authenticated_client.post("/workspaces", json={"name": "Block_Reman"})
+    assert response.status_code == 201
+    body = await response.get_json()
+    assert body == {"id": ANY}
+    foo_id = body["id"]
+
+    # Get block_remanence status
+    response = await authenticated_client.get(
+        f"/workspaces/{foo_id}/get_offline_availability_status"
+    )
+    assert response.status_code == 200
+    body = await response.get_json()
+    assert body == {
+        "is_available_offline": True,
+        "is_prepared": True,
+        "is_running": True,
+        "total_size": 0,
+        "remote_only_size": 0,
+        "local_and_remote_size": 0,
+    }
+
+    # Get the updated workspaces list
+    response = await authenticated_client.get("/workspaces")
+    assert response.status_code == 200
+    assert await response.get_json() == {
+        "workspaces": [
+            {"id": foo_id, "name": "Block_Reman", "role": "OWNER"},
+        ]
+    }
+
+    # Enforce the sync
+    response = await authenticated_client.post("/workspaces/sync", json={})
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {}
+
+
+@pytest.mark.trio
 async def test_rename_workspace(authenticated_client: TestClientProtocol, workspace: WorkspaceInfo):
     for i in range(2):
         response = await authenticated_client.patch(
