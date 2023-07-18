@@ -1,0 +1,13 @@
+[Desktop Entry]
+Name=Resana Secure
+Comment=Secure cloud framework
+Exec=parsec %u
+Icon=${SNAP}/resana.png
+Type=Application
+Terminal=false
+StartupNotify=false
+StartupWMClass=Resana
+Categories=Network
+# In the future, if we have custom link and want them to open the resana app
+# We could have something like
+# MimeType=x-scheme-handler/resana;

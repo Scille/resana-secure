@@ -1,0 +1,18 @@
+#!/bin/sh
+
+# Move to the snap directory as we don't want the current directory to be part of `sys.path`
+# We could use the isolated `-I` python option but this would also disable `PYTHONPATH`
+# Note that this would be an issue if the GUI CLI used file arguments, which is luckily not the case.
+cd ${SNAP}
+
+. ${SNAP}/resana-setup.sh
+
+# SNAP env variable is used by Qt to determine we are within a sandbox
+# and hence should use xdg-desktop-portal. However this is broken
+# (see https://github.com/Scille/parsec-cloud/issues/702) so we bypass this
+# and fallback to xdg-open which is fine given we use snap in classic mode
+# (i.e. without sandbox).
+unset SNAP
+
+# Execute the resana_secure module with arguments forwarding
+exec $PYTHON -m resana_secure $@
