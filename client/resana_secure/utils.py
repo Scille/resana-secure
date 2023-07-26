@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from quart import jsonify, session, request
 from werkzeug.exceptions import HTTPException
 
-from parsec._parsec import DateTime
+from parsec._parsec import DateTime, UserID, HumanHandle
 from parsec.core.logged_core import LoggedCore
 from parsec.api.data import EntryID
 from parsec.api.protocol import OrganizationID, InvitationType, InvitationToken, DeviceLabel
@@ -106,12 +106,34 @@ class BadField(Exception):
     def __init__(self, name: str):
         self.name = name
 
+    def nested(self, name: str) -> BadField:
+        return BadField(f"{name}.{self.name}")
+
+
+class BadFields(Exception):
+    def __init__(self, names: list[str]):
+        self.names = names
+
+    def nested(self, name: str) -> BadFields:
+        return BadFields([f"{name}.{subname}" for subname in self.names])
+
+    @classmethod
+    def from_indexed_bad_fields(cls, indexed_bad_fields: dict[int, list[str]]) -> BadFields:
+        return cls(
+            [
+                f"[{index}].{bad_field}"
+                for index, bad_fields in indexed_bad_fields.items()
+                for bad_field in bad_fields
+            ]
+        )
+
 
 @dataclass
 class Argument:
     name: str
     type: Any | None
     converter: Callable[[Any], T] | None
+    validator: Callable[[Any], None] | None
     new_name: str | None
     default: Any | None
     required: bool
@@ -130,6 +152,7 @@ class Parser:
         name: str,
         type: Any | None = None,
         converter: Callable[[Any], T] | None = None,
+        validator: Callable[[Any], None] | None = None,
         new_name: str | None = None,
         default: T | None = None,
         required: bool = False,
@@ -139,6 +162,7 @@ class Parser:
                 name,
                 type=type,
                 converter=converter,
+                validator=validator,
                 new_name=new_name,
                 default=default,
                 required=required,
@@ -155,6 +179,8 @@ class Parser:
                 args[name] = r
             except BadField as f:
                 bad_fields.append(f.name)
+            except BadFields as f:
+                bad_fields.extend(f.names)
         return args, bad_fields
 
     def _parse_arg(self, data: dict[str, Any], arg: Argument) -> Any:
@@ -163,11 +189,17 @@ class Parser:
             if arg.required:
                 raise BadField(arg.name)
             return arg.default
-        if arg.converter:
-            try:
+
+        try:
+            if arg.validator:
+                arg.validator(val)
+            if arg.converter:
                 return arg.converter(val)
-            except (ValueError, TypeError) as exc:
-                raise BadField(arg.name) from exc
+        except (ValueError, TypeError, AssertionError) as exc:
+            raise BadField(arg.name) from exc
+        except (BadField, BadFields) as exc:
+            raise exc.nested(arg.name)
+
         if arg.type and not isinstance(val, arg.type):
             raise BadField(arg.name)
         return val
@@ -296,3 +328,24 @@ def get_default_device_label() -> DeviceLabel:
         return DeviceLabel(platform.node() or "-unknown-")
     except ValueError:
         return DeviceLabel("-unknown-")
+
+
+def email_validator(email: str) -> None:
+    HumanHandle(email, "email validation")
+
+
+async def get_user_id_from_email(core: LoggedCore, email: str) -> UserID | None:
+    # Note: even with a valid email, we might get more than 1 result here
+    # Example:
+    # - query: billy@example.co
+    # - user1: billy@example.co
+    # - user2: billy@example.co.uk
+    # Still, checking only the first page should be ok
+    user_infos, _ = await core.find_humans(query=email)
+    for user_info in user_infos:
+        if user_info.human_handle is None:
+            continue
+        if user_info.human_handle.email != email:
+            continue
+        return user_info.user_id
+    return None

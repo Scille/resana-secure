@@ -233,26 +233,30 @@ async def other_device(running_backend: BackendApp, local_device: LocalDeviceTes
     return RemoteDeviceTestbed(device.device_id, email=local_device.email)
 
 
-@pytest.fixture
-async def other_user(running_backend: BackendApp, local_device: LocalDeviceTestbed):
+async def _other_user(
+    running_backend: BackendApp,
+    author: LocalDeviceTestbed,
+    email: str,
+    label: str = "-unknown-",
+):
     organization_id = OrganizationID("CoolOrg")
     now = DateTime.now()
-    author = local_device.device.device_id
-    author_key = local_device.device.signing_key
+    author_user_id = author.device.device_id
+    author_key = author.device.signing_key
 
     device_id = DeviceID.new()
     user_certificate = UserCertificate(
-        author=author,
+        author=author_user_id,
         timestamp=now,
         user_id=device_id.user_id,
-        human_handle=HumanHandle(email="bob@example.com", label="-unknown-"),
+        human_handle=HumanHandle(email=email, label=label),
         public_key=PrivateKey.generate().public_key,
         profile=UserProfile.STANDARD,
     )
     redacted_user_certificate = user_certificate.evolve(human_handle=None)
 
     device_certificate = DeviceCertificate(
-        author=author,
+        author=author_user_id,
         timestamp=now,
         device_id=device_id,
         device_label=DeviceLabel("-unknown-"),
@@ -283,6 +287,41 @@ async def other_user(running_backend: BackendApp, local_device: LocalDeviceTestb
     )
     assert user.human_handle is not None
     return RemoteDeviceTestbed(device.device_id, email=user.human_handle.email)
+
+
+@pytest.fixture
+async def other_user(running_backend: BackendApp, local_device: LocalDeviceTestbed):
+    return await _other_user(running_backend, local_device, email="bob@example.com")
+
+
+@pytest.fixture
+async def bob_user(running_backend: BackendApp, local_device: LocalDeviceTestbed):
+    return await _other_user(
+        running_backend,
+        local_device,
+        label="Bob",
+        email="bob@example.com",
+    )
+
+
+@pytest.fixture
+async def carl_user(running_backend: BackendApp, local_device: LocalDeviceTestbed):
+    return await _other_user(
+        running_backend,
+        local_device,
+        label="Carl",
+        email="carl@example.com",
+    )
+
+
+@pytest.fixture
+async def diana_user(running_backend: BackendApp, local_device: LocalDeviceTestbed):
+    return await _other_user(
+        running_backend,
+        local_device,
+        label="Diana",
+        email="diana@example.com",
+    )
 
 
 # Copied from parsec's test/core/conftest.py

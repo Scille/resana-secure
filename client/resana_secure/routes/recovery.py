@@ -1,29 +1,53 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import os
 import tempfile
 from pathlib import Path
 from quart import Blueprint
 from base64 import b64encode, b64decode
+from dataclasses import dataclass
 
 from parsec.core.logged_core import LoggedCore
 from parsec._parsec import (
     save_recovery_device,
     load_recovery_device,
     save_device_with_password_in_config,
-    LocalDeviceError,
+    LocalDeviceCryptoError,
+    UserCertificate,
 )
 from parsec.core.recovery import generate_recovery_device, generate_new_device_from_recovery
 from parsec.core.local_device import (
     get_recovery_device_file_name,
 )
+from parsec.core.shamir import (
+    create_shamir_recovery_device,
+    ShamirRecoveryError,
+    ShamirRecoveryInvalidCertificationError,
+    ShamirRecoveryInvalidDataError,
+    ShamirRecoveryAlreadySetError,
+)
 
-from ..utils import APIException, authenticated, get_data, Parser, get_default_device_label
+from ..utils import (
+    APIException,
+    authenticated,
+    get_data,
+    Parser,
+    get_default_device_label,
+    BadFields,
+    get_user_id_from_email,
+    email_validator,
+)
 from ..app import current_app
 
 recovery_bp = Blueprint("recovery_api", __name__)
+
+
+@dataclass
+class SharedRecoveryRecipient:
+    email: str
+    weight: int
 
 
 @recovery_bp.route("/recovery/export", methods=["POST"])
@@ -85,8 +109,7 @@ async def import_device() -> tuple[dict[str, Any], int]:
             new_device = await generate_new_device_from_recovery(
                 recovery_device, get_default_device_label()
             )
-        # TODO: change it for LocalDeviceCryptoError once https://github.com/Scille/parsec-cloud/issues/4048 is done
-        except LocalDeviceError:
+        except LocalDeviceCryptoError:
             raise APIException(400, {"error": "invalid_passphrase"})
     finally:
         path.unlink()
@@ -96,5 +119,76 @@ async def import_device() -> tuple[dict[str, Any], int]:
         device=new_device,
         password=args["password"],
     )
+
+    return {}, 200
+
+
+@recovery_bp.route("/recovery/shared/setup", methods=["POST"])
+@authenticated
+async def shared_recovery_setup(core: LoggedCore) -> tuple[dict[str, Any], int]:
+    data = await get_data()
+
+    subparser = Parser()
+    subparser.add_argument("email", type=str, required=True, validator=email_validator)
+    subparser.add_argument("weight", type=int, default=1)
+
+    def converter(arg: list[dict[str, str | int]]) -> list[SharedRecoveryRecipient]:
+        result = []
+        indexed_bad_fields = {}
+        for i, item in enumerate(arg):
+            args, bad_fields = subparser.parse_args(item)
+            if bad_fields:
+                indexed_bad_fields[i] = bad_fields
+                continue
+            recipient = SharedRecoveryRecipient(args["email"], args["weight"])
+            result.append(recipient)
+        if indexed_bad_fields:
+            raise BadFields.from_indexed_bad_fields(indexed_bad_fields)
+        return result
+
+    parser = Parser()
+    parser.add_argument(
+        "threshold",
+        type=int,
+        required=True,
+    )
+    parser.add_argument("users", type=list, required=True, converter=converter)
+    args, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
+    threshold = cast(int, args["threshold"])
+    users = cast(list[SharedRecoveryRecipient], args["users"])
+
+    # Extract certificates
+    weights: list[int] = []
+    certificates: list[UserCertificate] = []
+    users_not_found: list[str] = []
+    for user in users:
+        user_id = await get_user_id_from_email(core, user.email)
+        if user_id is None:
+            users_not_found.append(user.email)
+            continue
+        certificate, _ = await core._remote_devices_manager.get_user(user_id)
+        certificates.append(certificate)
+        weights.append(user.weight)
+    if users_not_found:
+        return {"error": "users_not_found", "emails": users_not_found}, 400
+
+    # Create shared recovery device
+    try:
+        await create_shamir_recovery_device(
+            core,
+            certificates,
+            threshold,
+            weights,
+        )
+    except ShamirRecoveryAlreadySetError:
+        return {"error": "already_set"}, 400
+    except ShamirRecoveryInvalidCertificationError:
+        return {"error": "invalid_configuration"}, 400
+    except ShamirRecoveryInvalidDataError:
+        return {"error": "invalid_configuration"}, 400
+    except ShamirRecoveryError:
+        return {"error": "invalid_configuration"}, 400
 
     return {}, 200

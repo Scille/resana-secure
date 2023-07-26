@@ -20,6 +20,8 @@ from ..utils import (
     Parser,
     backend_errors_to_api_exceptions,
     get_workspace_type,
+    get_user_id_from_email,
+    email_validator,
 )
 
 workspaces_bp = Blueprint("workspaces_api", __name__)
@@ -140,26 +142,19 @@ async def get_workspace_share_info(
 async def share_workspace(core: LoggedCore, workspace_id: EntryID) -> tuple[dict[str, Any], int]:
     data = await get_data()
     parser = Parser()
-    parser.add_argument("email", type=str, required=True)
+    parser.add_argument("email", type=str, required=True, validator=email_validator)
     parser.add_argument("role", converter=RealmRole.from_str)
     args, bad_fields = parser.parse_args(data)
     if bad_fields:
         raise APIException.from_bad_fields(bad_fields)
 
     with backend_errors_to_api_exceptions():
-        results, _ = await core.find_humans(query=args["email"], per_page=1)
-        try:
-            # TODO: find_humans doesn't guarantee exact match on email
-            assert (
-                results[0].human_handle is not None
-                and results[0].human_handle.email == args["email"]
-            )
-            recipient = results[0].user_id
-        except IndexError:
+        user_id = await get_user_id_from_email(core, args["email"])
+        if user_id is None:
             raise APIException(404, {"error": "unknown_email"})
 
         await core.user_fs.workspace_share(
-            workspace_id=workspace_id, recipient=recipient, role=args["role"]
+            workspace_id=workspace_id, recipient=user_id, role=args["role"]
         )
 
     return {}, 200

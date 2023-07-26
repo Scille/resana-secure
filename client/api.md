@@ -1678,3 +1678,49 @@ HTTP 400
     "error": "invalid_passphrase"
 }
 ```
+
+### `POST /recovery/shared/setup`
+
+Configure un nouvel appareil de récupération partagé.
+
+Request:
+
+```python
+{
+    "threshold": <int>
+    "users": [
+        {
+            "email": <str>,
+            "weight": <int>
+        },
+        ...
+    ]
+}
+```
+
+Response:
+
+```python
+HTTP 200
+{
+}
+```
+
+ou
+
+```python
+HTTP 400
+{
+    "error": "users_not_found",
+    "emails": [<string>, ...]
+}
+```
+
+ou
+
+```python
+HTTP 400
+{
+    "error": "invalid_configuration"
+}
+```
