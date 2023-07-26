@@ -60,6 +60,7 @@ async def test_claim_ok(
         assert response.status_code == 200
         invitation = InvitationInfo("device", None, body["token"])
 
+    assert local_device.device.human_handle is not None
     new_device_email = (
         invitation.claimer_email if type == "user" else local_device.device.human_handle.email
     )

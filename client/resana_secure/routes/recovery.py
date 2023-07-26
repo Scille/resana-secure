@@ -16,6 +16,7 @@ from parsec._parsec import (
     save_device_with_password_in_config,
     LocalDeviceCryptoError,
     UserCertificate,
+    ShamirRecoveryBriefCertificate,
 )
 from parsec.core.recovery import generate_recovery_device, generate_new_device_from_recovery
 from parsec.core.local_device import (
@@ -25,6 +26,7 @@ from parsec.core.shamir import (
     create_shamir_recovery_device,
     remove_shamir_recovery_device,
     get_shamir_recovery_self_info,
+    get_shamir_recovery_others_list,
     ShamirRecoveryError,
     ShamirRecoveryInvalidDataError,
     ShamirRecoveryAlreadySetError,
@@ -50,6 +52,19 @@ recovery_bp = Blueprint("recovery_api", __name__)
 class SharedRecoveryRecipient:
     email: str
     weight: int
+
+
+async def brief_certificate_to_recipients(
+    core: LoggedCore, brief_certificate: ShamirRecoveryBriefCertificate
+) -> list[SharedRecoveryRecipient]:
+    recipients: list[SharedRecoveryRecipient] = []
+    for user_id, weight in brief_certificate.per_recipient_shares.items():
+        user_certificate, _ = await core._remote_devices_manager.get_user(user_id)
+        assert user_certificate.human_handle is not None  # All recipients are humans
+        recipients.append(SharedRecoveryRecipient(user_certificate.human_handle.email, weight))
+
+    recipients.sort(key=lambda x: x.email)
+    return recipients
 
 
 @recovery_bp.route("/recovery/export", methods=["POST"])
@@ -157,12 +172,12 @@ async def shared_recovery_setup(core: LoggedCore) -> tuple[dict[str, Any], int]:
         type=int,
         required=True,
     )
-    parser.add_argument("users", type=list, required=True, converter=converter)
+    parser.add_argument("recipients", type=list, required=True, converter=converter)
     args, bad_fields = parser.parse_args(data)
     if bad_fields:
         raise APIException.from_bad_fields(bad_fields)
     threshold = cast(int, args["threshold"])
-    users = cast(list[SharedRecoveryRecipient], args["users"])
+    users = cast(list[SharedRecoveryRecipient], args["recipients"])
 
     # Extract certificates
     weights: list[int] = []
@@ -222,7 +237,7 @@ async def get_shared_recovery_setup(core: LoggedCore) -> tuple[dict[str, Any], i
     _, bad_fields = parser.parse_args(data)
     if bad_fields:
         raise APIException.from_bad_fields(bad_fields)
-    # Remove shared recovery device
+
     try:
         device_certificate, brief_certificate = await get_shamir_recovery_self_info(core)
     except ShamirRecoveryNotSetError:
@@ -233,17 +248,54 @@ async def get_shared_recovery_setup(core: LoggedCore) -> tuple[dict[str, Any], i
     device_label = (
         device_certificate.device_label.str if device_certificate.device_label is not None else None
     )
-    recipients: list[SharedRecoveryRecipient] = []
-    for user_id, weight in brief_certificate.per_recipient_shares.items():
-        user_certificate, _ = await core._remote_devices_manager.get_user(user_id)
-        assert user_certificate.human_handle is not None  # All recipients are humans
-        recipients.append(SharedRecoveryRecipient(user_certificate.human_handle.email, weight))
-
-    recipients.sort(key=lambda x: x.email)
+    recipients = await brief_certificate_to_recipients(core, brief_certificate)
     response = {
         "device_label": device_label,
         "threshold": brief_certificate.threshold,
-        "users": [asdict(recipient) for recipient in recipients],
+        "recipients": [asdict(recipient) for recipient in recipients],
     }
 
+    return response, 200
+
+
+@recovery_bp.route("/recovery/shared/setup/others", methods=["GET"])
+@authenticated
+async def get_shared_recovery_others_list(core: LoggedCore) -> tuple[dict[str, Any], int]:
+    data = await get_data(allow_empty=True)
+    parser = Parser()
+    _, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
+
+    try:
+        result = await get_shamir_recovery_others_list(core)
+    except ShamirRecoveryError as exc:
+        return {"error": "unexpected_error", "detail": str(exc)}, 400
+
+    items = []
+    for (
+        author_certificate,
+        user_certificate,
+        brief_certificate,
+        maybe_share_data,
+    ) in result:
+        weight = 0 if maybe_share_data is None else len(maybe_share_data.weighted_share)
+        device_label = (
+            author_certificate.device_label.str
+            if author_certificate.device_label is not None
+            else None
+        )
+        assert user_certificate.human_handle is not None  # All recipients are humans
+        recipients = await brief_certificate_to_recipients(core, brief_certificate)
+        item = {
+            "email": user_certificate.human_handle.email,
+            "label": user_certificate.human_handle.label,
+            "device_label": device_label,
+            "threshold": brief_certificate.threshold,
+            "recipients": [asdict(recipient) for recipient in recipients],
+            "my_weight": weight,
+        }
+        items.append(item)
+
+    response = {"setups": items}
     return response, 200

@@ -41,6 +41,7 @@ async def test_recovery_ok(
     assert body == {}
 
     # New user should be able to connect
+    assert local_device.device.human_handle is not None
     response = await anonymous_client.post(
         "/auth",
         json={
@@ -147,6 +148,7 @@ async def test_can_import_old_recovery_devices(
     assert body == {}
 
     # Auth with new device
+    assert local_device.device.human_handle is not None
     response = await anonymous_client.post(
         "/auth",
         json={

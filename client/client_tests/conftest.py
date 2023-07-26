@@ -1,13 +1,21 @@
+from __future__ import annotations
+
 import pytest
 import trio
 from functools import partial
-from collections import namedtuple
-from quart.typing import TestAppProtocol
+from quart.typing import TestAppProtocol, TestClientProtocol
 from hypercorn.config import Config as HyperConfig
 from hypercorn.trio.run import worker_serve
 from pathlib import Path
+from dataclasses import dataclass
 
-from parsec._parsec import DateTime, save_device_with_password_in_config, PrivateKey, SigningKey
+from parsec._parsec import (
+    DateTime,
+    save_device_with_password_in_config,
+    PrivateKey,
+    SigningKey,
+    LocalDevice,
+)
 from parsec.api.data import UserCertificate, DeviceCertificate
 from parsec.api.protocol import (
     OrganizationID,
@@ -23,12 +31,31 @@ from parsec.backend import backend_app_factory, BackendApp
 from parsec.backend.asgi import app_factory as backend_asgi_app_factory
 from parsec.backend.user import User as BackendUser, Device as BackendDevice
 from parsec.backend.config import BackendConfig, MockedBlockStoreConfig
-
 from resana_secure.app import app_factory
 from resana_secure.config import ResanaConfig, _CoreConfig
 
 
-LocalDeviceTestbed = namedtuple("LocalDeviceTestbed", "device,email,key,organization")
+@dataclass
+class LocalDeviceTestbed:
+    device: LocalDevice
+    email: str
+    key: str
+    organization: OrganizationID
+
+    async def authenticated_client(self, test_app: TestAppProtocol) -> TestClientProtocol:
+        test_client = test_app.test_client()
+
+        response = await test_client.post(
+            "/auth",
+            json={
+                "email": self.email,
+                "key": self.key,
+                "organization": self.organization.str,
+            },
+        )
+        assert response.status_code == 200
+        # Note cookie is automatically added to test_client's cookie jar
+        return test_client
 
 
 @pytest.fixture(scope="session")
@@ -103,19 +130,7 @@ async def test_app(core_config: ResanaConfig, client_origin: str):
 
 @pytest.fixture
 async def authenticated_client(test_app: TestAppProtocol, local_device: LocalDeviceTestbed):
-    test_client = test_app.test_client()
-
-    response = await test_client.post(
-        "/auth",
-        json={
-            "email": local_device.email,
-            "key": local_device.key,
-            "organization": local_device.organization.str,
-        },
-    )
-    assert response.status_code == 200
-    # Note cookie is automatically added to test_client's cookie jar
-    return test_client
+    return await local_device.authenticated_client(test_app)
 
 
 @pytest.fixture
@@ -201,7 +216,10 @@ async def other_local_device(
     )
 
 
-RemoteDeviceTestbed = namedtuple("RemoteDeviceTestbed", "device_id,email")
+@dataclass
+class RemoteDeviceTestbed:
+    device_id: DeviceID
+    email: str
 
 
 @pytest.fixture
@@ -236,6 +254,7 @@ async def other_device(running_backend: BackendApp, local_device: LocalDeviceTes
 async def _other_user(
     running_backend: BackendApp,
     author: LocalDeviceTestbed,
+    core_config_dir: Path,
     email: str,
     label: str = "-unknown-",
 ):
@@ -244,23 +263,25 @@ async def _other_user(
     author_user_id = author.device.device_id
     author_key = author.device.signing_key
 
+    private_key = PrivateKey.generate()
     device_id = DeviceID.new()
     user_certificate = UserCertificate(
         author=author_user_id,
         timestamp=now,
         user_id=device_id.user_id,
         human_handle=HumanHandle(email=email, label=label),
-        public_key=PrivateKey.generate().public_key,
+        public_key=private_key.public_key,
         profile=UserProfile.STANDARD,
     )
     redacted_user_certificate = user_certificate.evolve(human_handle=None)
 
+    signing_key = SigningKey.generate()
     device_certificate = DeviceCertificate(
         author=author_user_id,
         timestamp=now,
         device_id=device_id,
         device_label=DeviceLabel("-unknown-"),
-        verify_key=SigningKey.generate().verify_key,
+        verify_key=signing_key.verify_key,
     )
     redacted_device_certificate = device_certificate.evolve(device_label=None)
 
@@ -286,39 +307,68 @@ async def _other_user(
         organization_id=organization_id, user=user, first_device=device
     )
     assert user.human_handle is not None
-    return RemoteDeviceTestbed(device.device_id, email=user.human_handle.email)
+    new_local_device = LocalDevice.generate_new_device(
+        organization_addr=author.device.organization_addr,
+        profile=UserProfile.STANDARD,
+        device_id=device_certificate.device_id,
+        human_handle=user_certificate.human_handle,
+        device_label=device_certificate.device_label,
+        signing_key=signing_key,
+        private_key=private_key,
+    )
+    password = "P@ssw0rd."
+    save_device_with_password_in_config(core_config_dir, new_local_device, password)
+    return LocalDeviceTestbed(
+        device=new_local_device,
+        email=user.human_handle.email,
+        key=password,
+        organization=organization_id,
+    )
 
 
 @pytest.fixture
-async def other_user(running_backend: BackendApp, local_device: LocalDeviceTestbed):
-    return await _other_user(running_backend, local_device, email="bob@example.com")
+async def other_user(
+    running_backend: BackendApp, local_device: LocalDeviceTestbed, core_config_dir: Path
+):
+    return await _other_user(
+        running_backend, local_device, core_config_dir, email="bob@example.com"
+    )
 
 
 @pytest.fixture
-async def bob_user(running_backend: BackendApp, local_device: LocalDeviceTestbed):
+async def bob_user(
+    running_backend: BackendApp, local_device: LocalDeviceTestbed, core_config_dir: Path
+):
     return await _other_user(
         running_backend,
         local_device,
+        core_config_dir,
         label="Bob",
         email="bob@example.com",
     )
 
 
 @pytest.fixture
-async def carl_user(running_backend: BackendApp, local_device: LocalDeviceTestbed):
+async def carl_user(
+    running_backend: BackendApp, local_device: LocalDeviceTestbed, core_config_dir: Path
+):
     return await _other_user(
         running_backend,
         local_device,
+        core_config_dir,
         label="Carl",
         email="carl@example.com",
     )
 
 
 @pytest.fixture
-async def diana_user(running_backend: BackendApp, local_device: LocalDeviceTestbed):
+async def diana_user(
+    running_backend: BackendApp, local_device: LocalDeviceTestbed, core_config_dir: Path
+):
     return await _other_user(
         running_backend,
         local_device,
+        core_config_dir,
         label="Diana",
         email="diana@example.com",
     )

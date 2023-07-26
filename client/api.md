@@ -1688,7 +1688,7 @@ Request:
 ```python
 {
     "threshold": <int>
-    "users": [
+    "recipients": [
         {
             "email": <str>,
             "weight": <int>
@@ -1761,7 +1761,7 @@ HTTP 200
 {
     "device_label": str,
     "threshold": int,
-    "users": [
+    "recipients": [
         {
             "email": <str>,
             "weight": <int>
@@ -1775,5 +1775,38 @@ or
 HTTP 404
 {
     "error": "not_setup"
+}
+```
+
+
+### `GET /recovery/shared/setup/others`
+
+Retourne l'appareil de récupération partagé courant
+
+```python
+{
+}
+```
+
+Response:
+
+```python
+HTTP 200
+{
+    "setups": [
+        {
+            "email": <str>,
+            "label": <str>,
+            "device_label": <str>,
+            "threshold": <int>,
+            "recipients": [
+                {
+                    "email": <str>,
+                    "weight": <int>
+                },
+            "my_weight": <int>,
+        },
+        ...
+    ]
 }
 ```
