@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 from base64 import b64encode
 from tempfile import mkstemp
@@ -92,7 +94,7 @@ async def test_recovery_delete_temp_file(
     body = await response.get_json()
     assert response.status_code == 200
 
-    temp_path: str
+    temp_path: str | None = None
 
     new_device_key = b"P@ssw0rd."
     anonymous_client = test_app.test_client()
@@ -118,6 +120,7 @@ async def test_recovery_delete_temp_file(
     body = await response.get_json()
     assert body == {}
 
+    assert temp_path is not None
     assert not pathlib.Path(temp_path).exists()
 
 
