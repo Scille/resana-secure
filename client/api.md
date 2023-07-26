@@ -1724,3 +1724,56 @@ HTTP 400
     "error": "invalid_configuration"
 }
 ```
+
+
+### `DELETE /recovery/shared/setup`
+
+Supprime l'appareil de récupération partagé courant.
+
+Request:
+
+```python
+{
+}
+```
+
+Response:
+
+```python
+HTTP 200
+{
+}
+```
+
+### `GET /recovery/shared/setup`
+
+Retourne l'appareil de récupération partagé courant
+
+```python
+{
+}
+```
+
+Response:
+
+```python
+HTTP 200
+{
+    "device_label": str,
+    "threshold": int,
+    "users": [
+        {
+            "email": <str>,
+            "weight": <int>
+        },
+        ...
+    ]
+}
+```
+or
+```python
+HTTP 404
+{
+    "error": "not_setup"
+}
+```

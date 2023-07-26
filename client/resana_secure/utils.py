@@ -334,14 +334,18 @@ def email_validator(email: str) -> None:
     HumanHandle(email, "email validation")
 
 
-async def get_user_id_from_email(core: LoggedCore, email: str) -> UserID | None:
+async def get_user_id_from_email(
+    core: LoggedCore, email: str, *, omit_revoked: bool
+) -> UserID | None:
     # Note: even with a valid email, we might get more than 1 result here
     # Example:
     # - query: billy@example.co
     # - user1: billy@example.co
     # - user2: billy@example.co.uk
     # Still, checking only the first page should be ok
-    user_infos, _ = await core.find_humans(query=email)
+    user_infos, _ = await core.find_humans(
+        query=email, omit_revoked=omit_revoked, omit_non_human=True
+    )
     for user_info in user_infos:
         if user_info.human_handle is None:
             continue

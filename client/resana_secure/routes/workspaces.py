@@ -149,7 +149,7 @@ async def share_workspace(core: LoggedCore, workspace_id: EntryID) -> tuple[dict
         raise APIException.from_bad_fields(bad_fields)
 
     with backend_errors_to_api_exceptions():
-        user_id = await get_user_id_from_email(core, args["email"])
+        user_id = await get_user_id_from_email(core, args["email"], omit_revoked=True)
         if user_id is None:
             raise APIException(404, {"error": "unknown_email"})
 

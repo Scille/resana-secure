@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from quart import Blueprint
 from base64 import b64encode, b64decode
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 from parsec.core.logged_core import LoggedCore
 from parsec._parsec import (
@@ -23,10 +23,12 @@ from parsec.core.local_device import (
 )
 from parsec.core.shamir import (
     create_shamir_recovery_device,
+    remove_shamir_recovery_device,
+    get_shamir_recovery_self_info,
     ShamirRecoveryError,
-    ShamirRecoveryInvalidCertificationError,
     ShamirRecoveryInvalidDataError,
     ShamirRecoveryAlreadySetError,
+    ShamirRecoveryNotSetError,
 )
 
 from ..utils import (
@@ -123,6 +125,9 @@ async def import_device() -> tuple[dict[str, Any], int]:
     return {}, 200
 
 
+# Shared recovery
+
+
 @recovery_bp.route("/recovery/shared/setup", methods=["POST"])
 @authenticated
 async def shared_recovery_setup(core: LoggedCore) -> tuple[dict[str, Any], int]:
@@ -164,7 +169,7 @@ async def shared_recovery_setup(core: LoggedCore) -> tuple[dict[str, Any], int]:
     certificates: list[UserCertificate] = []
     users_not_found: list[str] = []
     for user in users:
-        user_id = await get_user_id_from_email(core, user.email)
+        user_id = await get_user_id_from_email(core, user.email, omit_revoked=True)
         if user_id is None:
             users_not_found.append(user.email)
             continue
@@ -184,11 +189,61 @@ async def shared_recovery_setup(core: LoggedCore) -> tuple[dict[str, Any], int]:
         )
     except ShamirRecoveryAlreadySetError:
         return {"error": "already_set"}, 400
-    except ShamirRecoveryInvalidCertificationError:
-        return {"error": "invalid_configuration"}, 400
     except ShamirRecoveryInvalidDataError:
         return {"error": "invalid_configuration"}, 400
-    except ShamirRecoveryError:
-        return {"error": "invalid_configuration"}, 400
+    except ShamirRecoveryError as exc:
+        return {"error": "unexpected_error", "detail": str(exc)}, 400
 
     return {}, 200
+
+
+@recovery_bp.route("/recovery/shared/setup", methods=["DELETE"])
+@authenticated
+async def remove_shared_recovery_setup(core: LoggedCore) -> tuple[dict[str, Any], int]:
+    data = await get_data(allow_empty=True)
+    parser = Parser()
+    _, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
+    # Remove shared recovery device
+    try:
+        await remove_shamir_recovery_device(core)
+    except ShamirRecoveryError as exc:
+        return {"error": "unexpected_error", "detail": str(exc)}, 400
+
+    return {}, 200
+
+
+@recovery_bp.route("/recovery/shared/setup", methods=["GET"])
+@authenticated
+async def get_shared_recovery_setup(core: LoggedCore) -> tuple[dict[str, Any], int]:
+    data = await get_data(allow_empty=True)
+    parser = Parser()
+    _, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
+    # Remove shared recovery device
+    try:
+        device_certificate, brief_certificate = await get_shamir_recovery_self_info(core)
+    except ShamirRecoveryNotSetError:
+        return {"error": "not_setup"}, 404
+    except ShamirRecoveryError as exc:
+        return {"error": "unexpected_error", "detail": str(exc)}, 400
+
+    device_label = (
+        device_certificate.device_label.str if device_certificate.device_label is not None else None
+    )
+    recipients: list[SharedRecoveryRecipient] = []
+    for user_id, weight in brief_certificate.per_recipient_shares.items():
+        user_certificate, _ = await core._remote_devices_manager.get_user(user_id)
+        assert user_certificate.human_handle is not None  # All recipients are humans
+        recipients.append(SharedRecoveryRecipient(user_certificate.human_handle.email, weight))
+
+    recipients.sort(key=lambda x: x.email)
+    response = {
+        "device_label": device_label,
+        "threshold": brief_certificate.threshold,
+        "users": [asdict(recipient) for recipient in recipients],
+    }
+
+    return response, 200
