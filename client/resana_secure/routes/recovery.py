@@ -143,9 +143,9 @@ async def import_device() -> tuple[dict[str, Any], int]:
 # Shared recovery
 
 
-@recovery_bp.route("/recovery/shared/setup", methods=["POST"])
+@recovery_bp.route("/recovery/shamir/setup", methods=["POST"])
 @authenticated
-async def shared_recovery_setup(core: LoggedCore) -> tuple[dict[str, Any], int]:
+async def shamir_recovery_setup(core: LoggedCore) -> tuple[dict[str, Any], int]:
     data = await get_data()
 
     subparser = Parser()
@@ -212,9 +212,9 @@ async def shared_recovery_setup(core: LoggedCore) -> tuple[dict[str, Any], int]:
     return {}, 200
 
 
-@recovery_bp.route("/recovery/shared/setup", methods=["DELETE"])
+@recovery_bp.route("/recovery/shamir/setup", methods=["DELETE"])
 @authenticated
-async def remove_shared_recovery_setup(core: LoggedCore) -> tuple[dict[str, Any], int]:
+async def remove_shamir_recovery_setup(core: LoggedCore) -> tuple[dict[str, Any], int]:
     data = await get_data(allow_empty=True)
     parser = Parser()
     _, bad_fields = parser.parse_args(data)
@@ -229,9 +229,9 @@ async def remove_shared_recovery_setup(core: LoggedCore) -> tuple[dict[str, Any]
     return {}, 200
 
 
-@recovery_bp.route("/recovery/shared/setup", methods=["GET"])
+@recovery_bp.route("/recovery/shamir/setup", methods=["GET"])
 @authenticated
-async def get_shared_recovery_setup(core: LoggedCore) -> tuple[dict[str, Any], int]:
+async def get_shamir_recovery_setup(core: LoggedCore) -> tuple[dict[str, Any], int]:
     data = await get_data(allow_empty=True)
     parser = Parser()
     _, bad_fields = parser.parse_args(data)
@@ -258,9 +258,9 @@ async def get_shared_recovery_setup(core: LoggedCore) -> tuple[dict[str, Any], i
     return response, 200
 
 
-@recovery_bp.route("/recovery/shared/setup/others", methods=["GET"])
+@recovery_bp.route("/recovery/shamir/setup/others", methods=["GET"])
 @authenticated
-async def get_shared_recovery_others_list(core: LoggedCore) -> tuple[dict[str, Any], int]:
+async def list_shamir_recovery_for_other_users(core: LoggedCore) -> tuple[dict[str, Any], int]:
     data = await get_data(allow_empty=True)
     parser = Parser()
     _, bad_fields = parser.parse_args(data)

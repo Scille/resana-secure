@@ -14,7 +14,7 @@ async def test_create_list_delete_users_invitations(authenticated_client: TestCl
         response = await authenticated_client.get("/invitations")
         body = await response.get_json()
         assert response.status_code == 200
-        assert body == {"users": expected_users, "device": None, "shared_recoveries": []}
+        assert body == {"users": expected_users, "device": None, "shamir_recoveries": []}
         return body
 
     # No invitations for a starter
@@ -100,7 +100,7 @@ async def test_create_list_delete_device_invitation(authenticated_client: TestCl
         response = await authenticated_client.get("/invitations")
         body = await response.get_json()
         assert response.status_code == 200, body
-        assert body == {"users": [], "device": expected_device, "shared_recoveries": []}
+        assert body == {"users": [], "device": expected_device, "shamir_recoveries": []}
         return body
 
     # No invitations for a starter
@@ -141,7 +141,7 @@ async def test_create_list_delete_device_invitation(authenticated_client: TestCl
 
 
 @pytest.mark.trio
-async def test_create_list_delete_shared_recovery_invitations(
+async def test_create_list_delete_shamir_recovery_invitations(
     test_app: TestAppProtocol,
     bob_user: LocalDeviceTestbed,
     carl_user: LocalDeviceTestbed,
@@ -153,14 +153,14 @@ async def test_create_list_delete_shared_recovery_invitations(
     carl_client = await carl_user.authenticated_client(test_app)
     diana_client = await diana_user.authenticated_client(test_app)
 
-    async def _check_invitations(client, expected_shared_recoveries):
+    async def _check_invitations(client, expected_shamir_recoveries):
         response = await client.get("/invitations")
         body = await response.get_json()
         assert response.status_code == 200
         assert body == {
             "users": [],
             "device": None,
-            "shared_recoveries": expected_shared_recoveries,
+            "shamir_recoveries": expected_shamir_recoveries,
         }
         return body
 
@@ -177,7 +177,7 @@ async def test_create_list_delete_shared_recovery_invitations(
             {"email": "diana@example.com", "weight": 1},
         ],
     }
-    response = await alice_client.post("/recovery/shared/setup", json=json)
+    response = await alice_client.post("/recovery/shamir/setup", json=json)
     body = await response.get_json()
     assert response.status_code == 200
     assert body == {}
@@ -186,7 +186,7 @@ async def test_create_list_delete_shared_recovery_invitations(
     alice_invitation_created_on: DateTime | None = None
     for i in range(2):
         response = await bob_client.post(
-            "/invitations", json={"type": "shared_recovery", "claimer_email": "alice@example.com"}
+            "/invitations", json={"type": "shamir_recovery", "claimer_email": "alice@example.com"}
         )
         body = await response.get_json()
         assert response.status_code == 200, body
@@ -209,7 +209,7 @@ async def test_create_list_delete_shared_recovery_invitations(
                     }
                 ],
             )
-            alice_invitation_created_on = body["shared_recoveries"][0]["created_on"]
+            alice_invitation_created_on = body["shamir_recoveries"][0]["created_on"]
 
         # Alice does not see the invitation though
         await _check_invitations(alice_client, [])
@@ -223,14 +223,14 @@ async def test_create_list_delete_shared_recovery_invitations(
             {"email": "diana@example.com", "weight": 1},
         ],
     }
-    response = await bob_client.post("/recovery/shared/setup", json=json)
+    response = await bob_client.post("/recovery/shamir/setup", json=json)
     body = await response.get_json()
     assert response.status_code == 200
     assert body == {}
 
     # And another invitation
     response = await alice_client.post(
-        "/invitations", json={"type": "shared_recovery", "claimer_email": "bob@example.com"}
+        "/invitations", json={"type": "shamir_recovery", "claimer_email": "bob@example.com"}
     )
     body = await response.get_json()
     assert response.status_code == 200
@@ -344,11 +344,11 @@ async def test_delete_invalid_invitation_token(authenticated_client: TestClientP
 
 
 @pytest.mark.trio
-async def test_shared_recovery_invitations_claimer_not_a_member(
+async def test_shamir_recovery_invitations_claimer_not_a_member(
     authenticated_client: TestClientProtocol,
 ):
     response = await authenticated_client.post(
-        "/invitations", json={"type": "shared_recovery", "claimer_email": "billy@example.com"}
+        "/invitations", json={"type": "shamir_recovery", "claimer_email": "billy@example.com"}
     )
     body = await response.get_json()
     assert response.status_code == 400
@@ -356,12 +356,12 @@ async def test_shared_recovery_invitations_claimer_not_a_member(
 
 
 @pytest.mark.trio
-async def test_shared_recovery_invitations_no_shared_recovery_setup(
+async def test_shamir_recovery_invitations_no_shamir_recovery_setup(
     authenticated_client: TestClientProtocol,
     bob_user,
 ):
     response = await authenticated_client.post(
-        "/invitations", json={"type": "shared_recovery", "claimer_email": "bob@example.com"}
+        "/invitations", json={"type": "shamir_recovery", "claimer_email": "bob@example.com"}
     )
     body = await response.get_json()
     assert response.status_code == 400

@@ -5,7 +5,7 @@ from .conftest import LocalDeviceTestbed, RemoteDeviceTestbed
 
 
 @pytest.mark.trio
-async def test_shared_recovery_setup(
+async def test_shamir_recovery_setup(
     test_app: TestAppProtocol,
     bob_user: LocalDeviceTestbed,
     carl_user: LocalDeviceTestbed,
@@ -19,7 +19,7 @@ async def test_shared_recovery_setup(
 
     # No client sees any setup
     for client in (alice_client, bob_client, carl_client, diana_client):
-        response = await client.get("/recovery/shared/setup/others")
+        response = await client.get("/recovery/shamir/setup/others")
         body = await response.get_json()
         assert response.status_code == 200
         assert body == {"setups": []}
@@ -33,13 +33,13 @@ async def test_shared_recovery_setup(
             {"email": "diana@example.com", "weight": 1},
         ],
     }
-    response = await alice_client.post("/recovery/shared/setup", json=json)
+    response = await alice_client.post("/recovery/shamir/setup", json=json)
     body = await response.get_json()
     assert response.status_code == 200
     assert body == {}
 
     # Check current configuration
-    response = await alice_client.get("/recovery/shared/setup", json=json)
+    response = await alice_client.get("/recovery/shamir/setup", json=json)
     body = await response.get_json()
     assert response.status_code == 200
     assert body == {
@@ -53,14 +53,14 @@ async def test_shared_recovery_setup(
     }
 
     # Alice does not see her own setup
-    response = await alice_client.get("/recovery/shared/setup/others")
+    response = await alice_client.get("/recovery/shamir/setup/others")
     body = await response.get_json()
     assert response.status_code == 200
     assert body == {"setups": []}
 
     # All recipients can see the setup
     for client in (bob_client, carl_client, diana_client):
-        response = await client.get("/recovery/shared/setup/others")
+        response = await client.get("/recovery/shamir/setup/others")
         body = await response.get_json()
         assert response.status_code == 200
         assert body == {
@@ -89,13 +89,13 @@ async def test_shared_recovery_setup(
             {"email": "diana@example.com", "weight": 2},
         ],
     }
-    response = await alice_client.post("/recovery/shared/setup", json=json)
+    response = await alice_client.post("/recovery/shamir/setup", json=json)
     body = await response.get_json()
     assert response.status_code == 200
     assert body == {}
 
     # Check current configuration
-    response = await alice_client.get("/recovery/shared/setup", json=json)
+    response = await alice_client.get("/recovery/shamir/setup", json=json)
     body = await response.get_json()
     assert response.status_code == 200
     assert body == {
@@ -109,14 +109,14 @@ async def test_shared_recovery_setup(
     }
 
     # Alice still does not see her own setup
-    response = await alice_client.get("/recovery/shared/setup/others")
+    response = await alice_client.get("/recovery/shamir/setup/others")
     body = await response.get_json()
     assert response.status_code == 200
     assert body == {"setups": []}
 
     # All recipients can see the new setup
     for client in (bob_client, carl_client, diana_client):
-        response = await client.get("/recovery/shared/setup/others")
+        response = await client.get("/recovery/shamir/setup/others")
         body = await response.get_json()
         assert response.status_code == 200
         assert body == {
@@ -137,39 +137,39 @@ async def test_shared_recovery_setup(
         }
 
     # Remove shared recovery setup
-    response = await alice_client.delete("/recovery/shared/setup")
+    response = await alice_client.delete("/recovery/shamir/setup")
     body = await response.get_json()
     assert response.status_code == 200, body
     assert body == {}
 
     # Check current configuration
-    response = await alice_client.get("/recovery/shared/setup", json=json)
+    response = await alice_client.get("/recovery/shamir/setup", json=json)
     body = await response.get_json()
     assert response.status_code == 404
     assert body == {"error": "not_setup"}
 
     # No client sees any setup
     for client in (alice_client, bob_client, carl_client, diana_client):
-        response = await client.get("/recovery/shared/setup/others")
+        response = await client.get("/recovery/shamir/setup/others")
         body = await response.get_json()
         assert response.status_code == 200
         assert body == {"setups": []}
 
     # Deletion is idempotent
-    response = await alice_client.delete("/recovery/shared/setup")
+    response = await alice_client.delete("/recovery/shamir/setup")
     body = await response.get_json()
     assert response.status_code == 200, body
     assert body == {}
 
     # Check current configuration
-    response = await alice_client.get("/recovery/shared/setup", json=json)
+    response = await alice_client.get("/recovery/shamir/setup", json=json)
     body = await response.get_json()
     assert response.status_code == 404
     assert body == {"error": "not_setup"}
 
 
 @pytest.mark.trio
-async def test_shared_recovery_setup_invalid_nested_types(
+async def test_shamir_recovery_setup_invalid_nested_types(
     test_app: TestAppProtocol,
     local_device: LocalDeviceTestbed,
     authenticated_client: TestClientProtocol,
@@ -182,7 +182,7 @@ async def test_shared_recovery_setup_invalid_nested_types(
             {"email": "carl@example.com", "weight": "y"},
         ],
     }
-    response = await authenticated_client.post("/recovery/shared/setup", json=json)
+    response = await authenticated_client.post("/recovery/shamir/setup", json=json)
     body = await response.get_json()
     assert response.status_code == 400
     assert body == {
@@ -192,7 +192,7 @@ async def test_shared_recovery_setup_invalid_nested_types(
 
 
 @pytest.mark.trio
-async def test_shared_recovery_setup_users_not_found(
+async def test_shamir_recovery_setup_users_not_found(
     test_app: TestAppProtocol,
     local_device: LocalDeviceTestbed,
     bob_user: RemoteDeviceTestbed,
@@ -206,14 +206,14 @@ async def test_shared_recovery_setup_users_not_found(
             {"email": "diana@example.com", "weight": 1},
         ],
     }
-    response = await authenticated_client.post("/recovery/shared/setup", json=json)
+    response = await authenticated_client.post("/recovery/shamir/setup", json=json)
     body = await response.get_json()
     assert response.status_code == 400
     assert body == {"emails": ["carl@example.com", "diana@example.com"], "error": "users_not_found"}
 
 
 @pytest.mark.trio
-async def test_shared_recovery_setup_user_in_recipients(
+async def test_shamir_recovery_setup_user_in_recipients(
     test_app: TestAppProtocol,
     local_device: LocalDeviceTestbed,
     carl_user: RemoteDeviceTestbed,
@@ -228,7 +228,7 @@ async def test_shared_recovery_setup_user_in_recipients(
             {"email": "diana@example.com", "weight": 1},
         ],
     }
-    response = await authenticated_client.post("/recovery/shared/setup", json=json)
+    response = await authenticated_client.post("/recovery/shamir/setup", json=json)
     body = await response.get_json()
     assert response.status_code == 400
     assert body == {"error": "invalid_configuration"}

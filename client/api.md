@@ -261,7 +261,7 @@ HTTP 200
             "created_on" <datetime>,
             "status": <string>
         }
-    "shared_recoveries": [
+    "shamir_recoveries": [
         {
             "token": <uuid>,
             "created_on": <datetime>,
@@ -310,7 +310,7 @@ ou pour un device
 ou pour une récupération partagée
 ```python
 {
-    "type": "shared_recovery"
+    "type": "shamir_recovery"
     "claimer_email": <string>
 }
 ```
@@ -347,7 +347,7 @@ ou (seulement pour les récupérations partagées)
 ```python
 HTTP 400
 {
-    "error":  "no_shared_recovery_setup"
+    "error":  "no_shamir_recovery_setup"
 }
 ```
 
@@ -1714,7 +1714,7 @@ HTTP 400
 }
 ```
 
-### `POST /recovery/shared/setup`
+### `POST /recovery/shamir/setup`
 
 Configure un nouvel appareil de récupération partagé.
 
@@ -1761,7 +1761,7 @@ HTTP 400
 ```
 
 
-### `DELETE /recovery/shared/setup`
+### `DELETE /recovery/shamir/setup`
 
 Supprime l'appareil de récupération partagé courant.
 
@@ -1780,7 +1780,7 @@ HTTP 200
 }
 ```
 
-### `GET /recovery/shared/setup`
+### `GET /recovery/shamir/setup`
 
 Retourne l'appareil de récupération partagé courant
 
@@ -1814,7 +1814,7 @@ HTTP 404
 ```
 
 
-### `GET /recovery/shared/setup/others`
+### `GET /recovery/shamir/setup/others`
 
 Retourne l'appareil de récupération partagé courant
 

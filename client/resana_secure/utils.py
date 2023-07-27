@@ -296,7 +296,7 @@ def backend_errors_to_api_exceptions() -> Iterator[None]:
     except BackendInvitationOnExistingMember:
         raise APIException(400, {"error": "claimer_already_member"})
     except BackendInvitationShamirRecoveryNotSetup:
-        raise APIException(400, {"error": "no_shared_recovery_setup"})
+        raise APIException(400, {"error": "no_shamir_recovery_setup"})
     except BackendConnectionError as exc:
         # Should mainly catch `BackendProtocolError`
         raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
