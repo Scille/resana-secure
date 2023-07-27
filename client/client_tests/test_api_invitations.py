@@ -365,6 +365,4 @@ async def test_shamir_recovery_invitations_no_shamir_recovery_setup(
     )
     body = await response.get_json()
     assert response.status_code == 400
-    # TODO: replace once https://github.com/Scille/parsec-cloud/pull/4921 is merged
-    # assert body == {"error": "claimer_not_a_member"}
-    assert body == {"detail": "Backend error: ShamirRecoveryNotSetup", "error": "unexpected_error"}
+    assert body == {"error": "no_shamir_recovery_setup"}

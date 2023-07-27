@@ -23,6 +23,7 @@ from parsec.core.backend_connection import (
     BackendInvitationAlreadyUsed,
     BackendNotFoundError,
     BackendInvitationOnExistingMember,
+    BackendInvitationShamirRecoveryNotSetup,
 )
 from parsec.core.fs.exceptions import (
     FSWorkspaceNotFoundError,
@@ -44,11 +45,6 @@ from parsec.core.fs.workspacefs import WorkspaceFS, WorkspaceFSTimestamped
 from .cores_manager import CoreNotLoggedError
 from .invites_manager import LongTermCtxNotStarted
 from .app import current_app
-
-
-# TODO: replace once https://github.com/Scille/parsec-cloud/pull/4921 is merged
-class BackendInvitationShamirRecoveryNotSetup(Exception):
-    pass
 
 
 class APIException(HTTPException):
