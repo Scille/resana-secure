@@ -173,7 +173,7 @@ async def test_claim_ok(
     response = await authenticated_client.get("/invitations")
     body = await response.get_json()
     assert response.status_code == 200
-    assert body == {"users": [], "device": None}
+    assert body == {"users": [], "device": None, "shared_recoveries": []}
 
     # And the new user should be visible
     if type == "user":

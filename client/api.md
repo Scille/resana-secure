@@ -261,6 +261,15 @@ HTTP 200
             "created_on" <datetime>,
             "status": <string>
         }
+    "shared_recoveries": [
+        {
+            "token": <uuid>,
+            "created_on": <datetime>,
+            "claimer_email": <string>,
+            "status": <string>
+        },
+        …
+    ]
 }
 ```
 
@@ -298,6 +307,14 @@ ou pour un device
 }
 ```
 
+ou pour une récupération partagée
+```python
+{
+    "type": "shared_recovery"
+    "claimer_email": <string>
+}
+```
+
 Response:
 
 ```python
@@ -313,6 +330,24 @@ ou
 HTTP 400
 {
     "error":  "claimer_already_member"
+}
+```
+
+ou (seulement pour les récupérations partagées)
+
+```python
+HTTP 400
+{
+    "error":  "claimer_not_a_member"
+}
+```
+
+ou (seulement pour les récupérations partagées)
+
+```python
+HTTP 400
+{
+    "error":  "no_shared_recovery_setup"
 }
 ```
 

@@ -46,6 +46,11 @@ from .invites_manager import LongTermCtxNotStarted
 from .app import current_app
 
 
+# TODO: replace once https://github.com/Scille/parsec-cloud/pull/4921 is merged
+class BackendInvitationShamirRecoveryNotSetup(Exception):
+    pass
+
+
 class APIException(HTTPException):
     def __init__(self, status_code: int, data: Any) -> None:
         response = jsonify(data)
@@ -290,6 +295,8 @@ def backend_errors_to_api_exceptions() -> Iterator[None]:
         raise APIException(404, {"error": "not_found"})
     except BackendInvitationOnExistingMember:
         raise APIException(400, {"error": "claimer_already_member"})
+    except BackendInvitationShamirRecoveryNotSetup:
+        raise APIException(400, {"error": "no_shared_recovery_setup"})
     except BackendConnectionError as exc:
         # Should mainly catch `BackendProtocolError`
         raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
