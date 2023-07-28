@@ -5,6 +5,7 @@ import secrets
 import logging
 from typing import AsyncIterator, List, cast
 from contextlib import asynccontextmanager
+from collections import defaultdict
 
 from quart_cors import cors
 from quart_trio import QuartTrio
@@ -16,6 +17,8 @@ from hypercorn.trio import serve as hypercorn_trio_serve
 # Expose current_app as a ResanaApp for all modules
 if True:  # Hack to please flake8
     current_app = cast("ResanaApp", quart_current_app)
+
+from parsec._parsec import DeviceID
 
 from .ltcm import LTCM
 from .config import ResanaConfig
@@ -38,7 +41,7 @@ class ResanaApp(QuartTrio):
 
     ltcm: LTCM
     cores_manager: CoresManager
-    greeters_manager: GreetersManager
+    greeters_managers: dict[DeviceID, GreetersManager]
     claimers_manager: ClaimersManager
     resana_config: ResanaConfig
     hyper_config: HyperConfig
@@ -124,7 +127,7 @@ async def app_factory(
             config=config,
             ltcm=ltcm,
         )
-        app.greeters_manager = GreetersManager()
+        app.greeters_managers = defaultdict(GreetersManager)
         app.claimers_manager = ClaimersManager()
         yield app
 

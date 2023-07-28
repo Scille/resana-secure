@@ -68,6 +68,7 @@ async def test_shamir_recovery_claim(
 
         async def carl_greets():
             nonlocal carl_greeter_sas
+
             response = await carl_client.post(f"/invitations/{token}/greeter/1-wait-peer-ready")
             body = await response.get_json()
             assert response.status_code == 200, body
@@ -176,6 +177,12 @@ async def test_shamir_recovery_claim(
         assert body["type"] == "shamir_recovery"
         diana_greeter_sas = body["greeter_sas"]
         diana_greeter_sas_ready.set()
+
+        # Bob is drunk
+        # Make sure he cannot interfere with diana's invite, even on the same app
+        response = await bob_client.post(f"/invitations/{token}/greeter/2-wait-peer-trust")
+        body = await response.get_json()
+        assert response.status_code == 409, body
 
         response = await diana_client.post(f"/invitations/{token}/greeter/2-wait-peer-trust")
         body = await response.get_json()

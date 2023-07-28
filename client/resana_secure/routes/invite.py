@@ -89,7 +89,7 @@ async def greeter_1_wait_peer_ready(core: LoggedCore, apitoken: str) -> tuple[di
         raise APIException(404, {"error": "unknown_token"})
 
     with backend_errors_to_api_exceptions():
-        async with current_app.greeters_manager.start_ctx(
+        async with current_app.greeters_managers[core.device.device_id].start_ctx(
             device=core.device, addr=addr
         ) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
@@ -119,7 +119,9 @@ async def greeter_2_wait_peer_trust(core: LoggedCore, apitoken: str) -> tuple[di
         raise APIException(404, {"error": "unknown_token"})
 
     with backend_errors_to_api_exceptions():
-        async with current_app.greeters_manager.retreive_ctx(addr) as lifetime_ctx:
+        async with current_app.greeters_managers[core.device.device_id].retreive_ctx(
+            addr
+        ) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
             if not isinstance(
                 in_progress_ctx,
@@ -157,7 +159,9 @@ async def greeter_3_check_trust(core: LoggedCore, apitoken: str) -> tuple[dict[s
         raise APIException.from_bad_fields(bad_fields)
 
     with backend_errors_to_api_exceptions():
-        async with current_app.greeters_manager.retreive_ctx(addr) as lifetime_ctx:
+        async with current_app.greeters_managers[core.device.device_id].retreive_ctx(
+            addr
+        ) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
             if not isinstance(
                 in_progress_ctx,
@@ -204,7 +208,9 @@ async def greeter_4_finalize(core: LoggedCore, apitoken: str) -> tuple[dict[str,
         granted_profile = None
 
     with backend_errors_to_api_exceptions():
-        async with current_app.greeters_manager.retreive_ctx(addr) as lifetime_ctx:
+        async with current_app.greeters_managers[core.device.device_id].retreive_ctx(
+            addr
+        ) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
             in_progress_4_ctx: UserGreetInProgress4Ctx | DeviceGreetInProgress4Ctx
 
