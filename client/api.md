@@ -547,27 +547,57 @@ Request:
 
 ```python
 {
-    "token": <uuid>
 }
 ```
 
-Response:
+Les champs de la réponse dépendent de la valeur du champs `type`.
+
+Pour une invitation de type utilisateur:
 
 ```python
 HTTP 200
 {
-    "type": <string>,
-    "greeter_email": <string>,
+    "type": "user",
+    "greeter_email": <string>
 }
 ```
 
-ou
+Pour une invitation de type device:
+
+```python
+HTTP 200
+{
+    "type": "device",
+    "greeter_email": <string>
+}
+```
+
+Pour une invitation de type shamir:
+
+```python
+HTTP 200
+{
+    "type": "shamir_recovery",
+    "threshold": <int>,
+    "enough_shares": <bool>,
+    "recipients": [
+        {
+            "email": <str>,
+            "weight": <int>,
+            "retrieved": <bool>,
+        },
+        ...
+    ]
+}
+```
+
+Si `enough_share` est vrai, le client doit passer directement à l'étape 4.
 
 - HTTP 404 si le token est inconnu
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
 - HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
-`type` est `DEVICE` ou `USER`
+`type` est `device`, `user` or `shamir_recovery`
 `candidate_greeter_sas` est une liste de quatre codes dont un seul correspond
 au code SAS du pair. L'utilisateur est donc obligé de se concerter avec le pair
 pour déterminer lequel est le bon.
@@ -576,11 +606,18 @@ pour déterminer lequel est le bon.
 
 Attend que le pair qui enrôle ait rejoint le serveur Parsec.
 
-Request:
+Request pour une invitation de type user ou device:
 
 ```python
 {
-    "token": <uuid>
+}
+```
+
+Request pour une invitation de type shamir
+
+```python
+{
+    "greeter_email": str
 }
 ```
 
@@ -593,7 +630,23 @@ HTTP 200
 }
 ```
 
-ou
+ou, dans le cas d'une invitation shamir quand l'email fournit ne correspond à aucun des destinataires:
+
+```python
+HTTP 400
+{
+    "error": "email_not_in_recipients"
+}
+```
+
+ou, dans le cas d'une invitation shamir quand l'email fournit correspond à un destinataire déjà contacté:
+
+```python
+HTTP 400
+{
+    "error": "recipient_already_recovered"
+}
+```
 
 - HTTP 404 si le token est inconnu
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
@@ -653,6 +706,19 @@ HTTP 200
 {
 }
 ```
+
+ou, dans le cadre d'une invitation de type shamir:
+
+```python
+HTTP 200
+{
+    "enough_shares": bool
+}
+```
+
+Si `enough_shares` est faux, le client doit recommencer à l'étape 0 (ou directement l'étape 1) pour récupérer une nouvelle part du secret.
+
+Si `enough_shares` est vrai, le client peut continuer à l'étape 4 pour finalizer la création de l'appareil.
 
 ou
 

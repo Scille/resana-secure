@@ -14,7 +14,12 @@ from parsec.core.backend_connection import (
 )
 from parsec.core.types import LocalDevice, BackendInvitationAddr
 from parsec.core.config import CoreConfig
-from parsec.core.invite import claimer_retrieve_info, UserGreetInitialCtx, DeviceGreetInitialCtx
+from parsec.core.invite import (
+    claimer_retrieve_info,
+    UserGreetInitialCtx,
+    DeviceGreetInitialCtx,
+    ShamirRecoveryGreetInitialCtx,
+)
 
 from .app import current_app
 
@@ -146,7 +151,10 @@ class GreetLongTermCtx(BaseLongTermCtx):
     @classmethod
     @asynccontextmanager
     async def start(  # type: ignore[override]
-        cls, config: CoreConfig, device: LocalDevice, addr: BackendInvitationAddr
+        cls,
+        config: CoreConfig,
+        device: LocalDevice,
+        addr: BackendInvitationAddr,
     ) -> AsyncIterator[GreetLongTermCtx]:
         async with backend_authenticated_cmds_factory(
             addr=device.organization_addr,
@@ -159,10 +167,16 @@ class GreetLongTermCtx(BaseLongTermCtx):
                 user_initial_ctx = UserGreetInitialCtx(cmds=cmds, token=addr.token)
                 user_in_progress_ctx = await user_initial_ctx.do_wait_peer()
                 instance = cls(user_in_progress_ctx)
-            else:
+            elif addr.invitation_type == InvitationType.DEVICE:
                 device_initial_ctx = DeviceGreetInitialCtx(cmds=cmds, token=addr.token)
                 device_in_progress_ctx = await device_initial_ctx.do_wait_peer()
                 instance = cls(device_in_progress_ctx)
+            elif addr.invitation_type == InvitationType.SHAMIR_RECOVERY:
+                shamir_recovery_initial_ctx = ShamirRecoveryGreetInitialCtx(
+                    cmds=cmds, token=addr.token
+                )
+                shamir_recovery_in_progress_ctx = await shamir_recovery_initial_ctx.do_wait_peer()
+                instance = cls(shamir_recovery_in_progress_ctx)
             yield instance
 
 
