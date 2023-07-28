@@ -250,8 +250,9 @@ def _prelude_to_response(prelude: ShamirRecoveryClaimPreludeCtx) -> dict[str, An
         weight = recipient.shares
         retrieved = recipient.user_id in prelude.recovered
         recipients.append({"email": email, "weight": weight, "retrieved": retrieved})
+    recipients.sort(key=lambda x: cast(str, x["email"]))
     return {
-        "type": type,
+        "type": "shamir_recovery",
         "threshold": threshold,
         "enough_shares": enough_shares,
         "recipients": recipients,
@@ -496,7 +497,7 @@ async def claimer_4_finalize(apitoken: str) -> tuple[dict[str, Any], int]:
             )
 
             # In the case of a shamir recovery, it is the claimer that deletes the invitation
-            if isinstance(in_progress_ctx, ShamirRecoveryClaimInProgress3Ctx):
+            if isinstance(in_progress_ctx, ShamirRecoveryClaimPreludeCtx):
                 await _delete_shamir_invitation(new_device, addr.token)
 
             lifetime_ctx.mark_as_terminated()
