@@ -49,19 +49,19 @@ recovery_bp = Blueprint("recovery_api", __name__)
 
 
 @dataclass
-class SharedRecoveryRecipient:
+class ShamirRecoveryRecipient:
     email: str
     weight: int
 
 
 async def brief_certificate_to_recipients(
     core: LoggedCore, brief_certificate: ShamirRecoveryBriefCertificate
-) -> list[SharedRecoveryRecipient]:
-    recipients: list[SharedRecoveryRecipient] = []
+) -> list[ShamirRecoveryRecipient]:
+    recipients: list[ShamirRecoveryRecipient] = []
     for user_id, weight in brief_certificate.per_recipient_shares.items():
         user_certificate, _ = await core._remote_devices_manager.get_user(user_id)
         assert user_certificate.human_handle is not None  # All recipients are humans
-        recipients.append(SharedRecoveryRecipient(user_certificate.human_handle.email, weight))
+        recipients.append(ShamirRecoveryRecipient(user_certificate.human_handle.email, weight))
 
     recipients.sort(key=lambda x: x.email)
     return recipients
@@ -152,7 +152,7 @@ async def shamir_recovery_setup(core: LoggedCore) -> tuple[dict[str, Any], int]:
     subparser.add_argument("email", type=str, required=True, validator=email_validator)
     subparser.add_argument("weight", type=int, default=1)
 
-    def converter(arg: list[dict[str, str | int]]) -> list[SharedRecoveryRecipient]:
+    def converter(arg: list[dict[str, str | int]]) -> list[ShamirRecoveryRecipient]:
         result = []
         indexed_bad_fields = {}
         for i, item in enumerate(arg):
@@ -160,7 +160,7 @@ async def shamir_recovery_setup(core: LoggedCore) -> tuple[dict[str, Any], int]:
             if bad_fields:
                 indexed_bad_fields[i] = bad_fields
                 continue
-            recipient = SharedRecoveryRecipient(args["email"], args["weight"])
+            recipient = ShamirRecoveryRecipient(args["email"], args["weight"])
             result.append(recipient)
         if indexed_bad_fields:
             raise BadFields.from_indexed_bad_fields(indexed_bad_fields)
@@ -177,7 +177,7 @@ async def shamir_recovery_setup(core: LoggedCore) -> tuple[dict[str, Any], int]:
     if bad_fields:
         raise APIException.from_bad_fields(bad_fields)
     threshold = cast(int, args["threshold"])
-    users = cast(list[SharedRecoveryRecipient], args["recipients"])
+    users = cast(list[ShamirRecoveryRecipient], args["recipients"])
 
     # Extract certificates
     weights: list[int] = []
