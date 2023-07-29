@@ -461,6 +461,8 @@ async def claimer_4_finalize(apitoken: str) -> tuple[dict[str, Any], int]:
                 )
 
             elif isinstance(in_progress_ctx, ShamirRecoveryClaimPreludeCtx):
+                if not len(in_progress_ctx.shares) >= in_progress_ctx.threshold:
+                    return {"error": "not-enough-shares"}, 400
                 recovery_device = await in_progress_ctx.retrieve_recovery_device()
                 new_device = await generate_new_device_from_recovery(
                     recovery_device, requested_device_label

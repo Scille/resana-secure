@@ -749,6 +749,15 @@ HTTP 200
 }
 ```
 
+ou dans le cas d'une invitation shamir avec un nombre de parts insuffisant:
+
+```python
+HTTP 400
+{
+    "error": "not-enough-shares"
+}
+```
+
 ou
 
 - HTTP 404 si le token est inconnu

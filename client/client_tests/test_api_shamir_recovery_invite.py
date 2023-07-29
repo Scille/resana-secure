@@ -213,6 +213,17 @@ async def test_shamir_recovery_claim(
 
         await first_alice_claim_done.wait()
 
+        # Alice might be too eager to go to step 4
+        new_password = "garbage"
+        new_password_b64 = b64encode(new_password.encode()).decode("ascii")
+        response = await claimer_client.post(
+            f"/invitations/{token}/claimer/4-finalize",
+            json={"key": new_password_b64},
+        )
+        body = await response.get_json()
+        assert response.status_code == 400, body
+        assert body == {"error": "not-enough-shares"}
+
         # Diana is done, Alice might or might not get back to step 0
         if alice_retrieves_before_next_recipient:
             response = await claimer_client.post(
