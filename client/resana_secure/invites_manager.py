@@ -218,6 +218,8 @@ class GreetLongTermCtx(BaseLongTermCtx):
                 )
                 shamir_recovery_in_progress_ctx = await shamir_recovery_initial_ctx.do_wait_peer()
                 instance = cls(shamir_recovery_in_progress_ctx)
+            else:
+                assert False
             yield instance
 
 

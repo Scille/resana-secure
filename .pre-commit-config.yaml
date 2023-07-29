@@ -37,6 +37,7 @@ repos:
           # W503 line break before binary operator
           # Misc:
           # E266 too many leading '#' for block comment
+          # E402 Module level import not at top of file (useful for `packaging/windows/launch_script.py`)
           - --ignore=E501,E127,E128,E203,W503,E266,E402
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
