@@ -74,7 +74,7 @@ def make_request(method, url, auth_token=None, headers=None, data=None, files=No
 def test_workspaces(auth_token, resana_addr):
     VARIABLES = {}
 
-    MOUNTPOINT_DIR, _, _ = get_default_dirs()
+    MOUNTPOINT_DIR, _, _, _ = get_default_dirs()
 
     # List workspaces
     with run_test("List workspaces") as context:
@@ -260,7 +260,7 @@ def test_files(auth_token, resana_addr):
     SMALL_FILE_SIZE = 1024
     LARGE_FILE_SIZE = 2**20 * 20  # 20mB
 
-    MOUNTPOINT_DIR, _, _ = get_default_dirs()
+    MOUNTPOINT_DIR, _, _, _ = get_default_dirs()
 
     # Get a workspace id
     with run_test("Get workspace id") as context:
@@ -456,38 +456,46 @@ def test_files(auth_token, resana_addr):
             "files": [
                 {
                     "created": ANY,
+                    "created_by": "gordon.freeman@blackmesa.nm",
                     "extension": "txt",
                     "id": VARIABLES["file1_id"],
                     "name": "test.txt",
                     "size": SMALL_FILE_SIZE,
                     "updated": ANY,
+                    "updated_by": "gordon.freeman@blackmesa.nm",
                 },
                 {
                     "created": ANY,
+                    "created_by": "gordon.freeman@blackmesa.nm",
                     "extension": "txt",
                     "id": VARIABLES["file2_id"],
                     "name": "test2.txt",
                     "size": SMALL_FILE_SIZE,
                     "updated": ANY,
+                    "updated_by": "gordon.freeman@blackmesa.nm",
                 },
                 {
                     "created": ANY,
+                    "created_by": "",
                     "extension": "txt",
                     "id": VARIABLES["file3_id"],
                     "name": "test3.txt",
                     "size": LARGE_FILE_SIZE,
                     "updated": ANY,
+                    "updated_by": "gordon.freeman@blackmesa.nm",
                 },
                 {
                     "created": ANY,
+                    "created_by": "",
                     "extension": "txt",
                     "id": VARIABLES["file4_id"],
                     "name": "test4.txt",
                     "size": LARGE_FILE_SIZE,
                     "updated": ANY,
+                    "updated_by": "gordon.freeman@blackmesa.nm",
                 },
             ]
-        }
+        }, r.json()
         assert [p.name for p in (MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder").iterdir()] == [
             "test.txt",
             "test2.txt",
@@ -541,35 +549,43 @@ def test_files(auth_token, resana_addr):
             "files": [
                 {
                     "created": ANY,
+                    "created_by": "gordon.freeman@blackmesa.nm",
                     "extension": "txt",
                     "id": VARIABLES["file2_id"],
                     "name": "test2.txt",
                     "size": SMALL_FILE_SIZE,
                     "updated": ANY,
+                    "updated_by": "gordon.freeman@blackmesa.nm",
                 },
                 {
                     "created": ANY,
+                    "created_by": "gordon.freeman@blackmesa.nm",
                     "extension": "txt",
                     "id": VARIABLES["file3_id"],
                     "name": "test3.txt",
                     "size": LARGE_FILE_SIZE,
                     "updated": ANY,
+                    "updated_by": "gordon.freeman@blackmesa.nm",
                 },
                 {
                     "created": ANY,
+                    "created_by": "gordon.freeman@blackmesa.nm",
                     "extension": "txt",
                     "id": VARIABLES["file4_id"],
                     "name": "test4.txt",
                     "size": LARGE_FILE_SIZE,
                     "updated": ANY,
+                    "updated_by": "gordon.freeman@blackmesa.nm",
                 },
                 {
                     "created": ANY,
+                    "created_by": "gordon.freeman@blackmesa.nm",
                     "extension": "txt",
                     "id": VARIABLES["file1_id"],
                     "name": "test_renamed.txt",
                     "size": SMALL_FILE_SIZE,
                     "updated": ANY,
+                    "updated_by": "gordon.freeman@blackmesa.nm",
                 },
             ]
         }
@@ -603,27 +619,33 @@ def test_files(auth_token, resana_addr):
             "files": [
                 {
                     "created": ANY,
+                    "created_by": "gordon.freeman@blackmesa.nm",
                     "extension": "txt",
                     "id": VARIABLES["file2_id"],
                     "name": "test2.txt",
                     "size": SMALL_FILE_SIZE,
                     "updated": ANY,
+                    "updated_by": "gordon.freeman@blackmesa.nm",
                 },
                 {
                     "created": ANY,
+                    "created_by": "gordon.freeman@blackmesa.nm",
                     "extension": "txt",
                     "id": VARIABLES["file3_id"],
                     "name": "test3.txt",
                     "size": LARGE_FILE_SIZE,
                     "updated": ANY,
+                    "updated_by": "gordon.freeman@blackmesa.nm",
                 },
                 {
                     "created": ANY,
+                    "created_by": "gordon.freeman@blackmesa.nm",
                     "extension": "txt",
                     "id": VARIABLES["file4_id"],
                     "name": "test4.txt",
                     "size": LARGE_FILE_SIZE,
                     "updated": ANY,
+                    "updated_by": "gordon.freeman@blackmesa.nm",
                 },
             ]
         }
@@ -743,19 +765,23 @@ def test_files(auth_token, resana_addr):
             "files": [
                 {
                     "created": ANY,
+                    "created_by": "gordon.freeman@blackmesa.nm",
                     "extension": "txt",
                     "id": VARIABLES["file1_id"],
                     "name": "test.txt",
                     "size": SMALL_FILE_SIZE,
                     "updated": ANY,
+                    "updated_by": "gordon.freeman@blackmesa.nm",
                 },
                 {
                     "created": ANY,
+                    "created_by": "gordon.freeman@blackmesa.nm",
                     "extension": "txt",
                     "id": VARIABLES["file2_id"],
                     "name": "test2.txt",
                     "size": SMALL_FILE_SIZE,
                     "updated": ANY,
+                    "updated_by": "gordon.freeman@blackmesa.nm",
                 },
             ]
         }
@@ -871,6 +897,7 @@ def test_user_invitations(auth_token, resana_addr, org_id):
                         "token": token,
                     }
                 ],
+                "shamir_recoveries": [],
             }
         return token
 
@@ -879,7 +906,7 @@ def test_user_invitations(auth_token, resana_addr, org_id):
         r = make_request("GET", f"{resana_addr}/invitations", auth_token=auth_token)
         context.request = r
         assert r.status_code == 200
-        assert r.json() == {"device": None, "users": []}
+        assert r.json() == {"device": None, "users": [], "shamir_recoveries": []}
 
     token = _invite_user()
 
@@ -1085,6 +1112,7 @@ def test_device_invitations(auth_token, resana_addr, org_id):
                     "status": "IDLE",
                 },
                 "users": [],
+                "shamir_recoveries": [],
             }
         return token
 
@@ -1093,7 +1121,7 @@ def test_device_invitations(auth_token, resana_addr, org_id):
         r = make_request("GET", f"{resana_addr}/invitations", auth_token=auth_token)
         context.request = r
         assert r.status_code == 200
-        assert r.json() == {"device": None, "users": []}
+        assert r.json() == {"device": None, "users": [], "shamir_recoveries": []}
 
     token = _invite_device()
 
