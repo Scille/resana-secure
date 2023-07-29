@@ -106,7 +106,7 @@ class BaseInviteManager:
             self._addr_to_claim_ctx[addr] = removed_component_handle
 
     @asynccontextmanager
-    async def retreive_ctx(self, addr: BackendInvitationAddr) -> AsyncIterator[BaseLongTermCtx]:
+    async def retrieve_ctx(self, addr: BackendInvitationAddr) -> AsyncIterator[BaseLongTermCtx]:
         try:
             component_handle = self._addr_to_claim_ctx[addr]
         except KeyError:

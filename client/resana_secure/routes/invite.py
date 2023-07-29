@@ -119,7 +119,7 @@ async def greeter_2_wait_peer_trust(core: LoggedCore, apitoken: str) -> tuple[di
         raise APIException(404, {"error": "unknown_token"})
 
     with backend_errors_to_api_exceptions():
-        async with current_app.greeters_managers[core.device.device_id].retreive_ctx(
+        async with current_app.greeters_managers[core.device.device_id].retrieve_ctx(
             addr
         ) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
@@ -159,7 +159,7 @@ async def greeter_3_check_trust(core: LoggedCore, apitoken: str) -> tuple[dict[s
         raise APIException.from_bad_fields(bad_fields)
 
     with backend_errors_to_api_exceptions():
-        async with current_app.greeters_managers[core.device.device_id].retreive_ctx(
+        async with current_app.greeters_managers[core.device.device_id].retrieve_ctx(
             addr
         ) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
@@ -208,7 +208,7 @@ async def greeter_4_finalize(core: LoggedCore, apitoken: str) -> tuple[dict[str,
         granted_profile = None
 
     with backend_errors_to_api_exceptions():
-        async with current_app.greeters_managers[core.device.device_id].retreive_ctx(
+        async with current_app.greeters_managers[core.device.device_id].retrieve_ctx(
             addr
         ) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
@@ -279,7 +279,7 @@ async def claimer_0_retreive_info(apitoken: str) -> tuple[dict[str, Any], int]:
 
         # First check for old prelude
         try:
-            async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
+            async with current_app.claimers_manager.retrieve_ctx(addr) as lifetime_ctx:
                 in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
                 if isinstance(in_progress_ctx, ShamirRecoveryClaimPreludeCtx):
                     response = _prelude_to_response(in_progress_ctx)
@@ -340,7 +340,7 @@ async def claimer_1_wait_peer_ready(apitoken: str) -> tuple[dict[str, Any], int]
         raise APIException.from_bad_fields(bad_fields)
 
     with backend_errors_to_api_exceptions():
-        async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
+        async with current_app.claimers_manager.retrieve_ctx(addr) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
             if not isinstance(
                 in_progress_ctx,
@@ -386,7 +386,7 @@ async def claimer_2_check_trust(apitoken: str) -> tuple[dict[str, Any], int]:
         raise APIException.from_bad_fields(bad_fields)
 
     with backend_errors_to_api_exceptions():
-        async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
+        async with current_app.claimers_manager.retrieve_ctx(addr) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
             if not isinstance(
                 in_progress_ctx,
@@ -416,7 +416,7 @@ async def claimer_3_wait_peer_trust(apitoken: str) -> tuple[dict[str, Any], int]
         raise APIException(404, {"error": "unknown_token"})
 
     with backend_errors_to_api_exceptions():
-        async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
+        async with current_app.claimers_manager.retrieve_ctx(addr) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
             if not isinstance(
                 in_progress_ctx,
@@ -465,7 +465,7 @@ async def claimer_4_finalize(apitoken: str) -> tuple[dict[str, Any], int]:
         raise APIException.from_bad_fields(bad_fields)
 
     with backend_errors_to_api_exceptions():
-        async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
+        async with current_app.claimers_manager.retrieve_ctx(addr) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
 
             requested_device_label = get_default_device_label()
