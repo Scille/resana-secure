@@ -11,6 +11,11 @@ from .conftest import TestAppProtocol, TestClientProtocol, LocalDeviceTestbed
     (False, True),
     ids=("alice_does_not_retrieve_before_finalize", "alice_retrieves_before_finalize"),
 )
+@pytest.mark.parametrize(
+    "alice_retrieves_before_next_recipient",
+    (False, True),
+    ids=("alice_does_not_retrieve_before_next_recipient", "alice_retrieves_before_next_recipient"),
+)
 async def test_shamir_recovery_claim(
     test_app: TestAppProtocol,
     authenticated_client: TestClientProtocol,
@@ -18,6 +23,7 @@ async def test_shamir_recovery_claim(
     carl_user: LocalDeviceTestbed,
     diana_user: LocalDeviceTestbed,
     alice_retrieves_before_finalize: str,
+    alice_retrieves_before_next_recipient: str,
 ):
     claimer_client = test_app.test_client()
     alice_client = authenticated_client
@@ -207,34 +213,37 @@ async def test_shamir_recovery_claim(
 
         await first_alice_claim_done.wait()
 
-        # Diana is done, Alice continues with Carl who is still waiting
-        response = await claimer_client.post(
-            f"/invitations/{token}/claimer/0-retreive-info", json={}
-        )
-        body = await response.get_json()
-        assert response.status_code == 200
-        assert body == {
-            "type": "shamir_recovery",
-            "threshold": 5,
-            "enough_shares": False,
-            "recipients": [
-                {
-                    "email": "bob@example.com",
-                    "weight": 2,
-                    "retrieved": False,
-                },
-                {
-                    "email": "carl@example.com",
-                    "weight": 3,
-                    "retrieved": False,
-                },
-                {
-                    "email": "diana@example.com",
-                    "weight": 2,
-                    "retrieved": True,
-                },
-            ],
-        }
+        # Diana is done, Alice might or might not get back to step 0
+        if alice_retrieves_before_next_recipient:
+            response = await claimer_client.post(
+                f"/invitations/{token}/claimer/0-retreive-info", json={}
+            )
+            body = await response.get_json()
+            assert response.status_code == 200
+            assert body == {
+                "type": "shamir_recovery",
+                "threshold": 5,
+                "enough_shares": False,
+                "recipients": [
+                    {
+                        "email": "bob@example.com",
+                        "weight": 2,
+                        "retrieved": False,
+                    },
+                    {
+                        "email": "carl@example.com",
+                        "weight": 3,
+                        "retrieved": False,
+                    },
+                    {
+                        "email": "diana@example.com",
+                        "weight": 2,
+                        "retrieved": True,
+                    },
+                ],
+            }
+
+        # Alice continues with Carl who is still waiting
         response = await claimer_client.post(
             f"/invitations/{token}/claimer/1-wait-peer-ready",
             json={"greeter_email": "carl@example.com"},
