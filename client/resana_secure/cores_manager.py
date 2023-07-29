@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import trio
 from uuid import uuid4
 from typing import TYPE_CHECKING, AsyncIterator, Callable, Dict, Optional, Tuple, List, cast
@@ -104,7 +106,10 @@ def is_org_hosted_on_rie(
 
 @asynccontextmanager
 async def start_core(
-    config: ResanaConfig, device: LocalDevice, on_stopped: Callable[[], None]
+    config: ResanaConfig,
+    device: LocalDevice,
+    on_stopped: Callable[[], None],
+    previous_component: object | None = None,
 ) -> AsyncIterator[LoggedCore]:
 
     core_config = config.core_config.evolve(

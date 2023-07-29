@@ -32,7 +32,6 @@ from parsec.core.invite import (
     ShamirRecoveryClaimInProgress2Ctx,
     ShamirRecoveryClaimInProgress3Ctx,
     ShamirRecoveryClaimPreludeCtx,
-    ShamirRecoveryClaimInitialCtx,
     InviteNotFoundError,
 )
 from parsec.core.fs.storage.user_storage import user_storage_non_speculative_init
@@ -50,7 +49,6 @@ from ..utils import (
     email_validator,
 )
 from ..app import current_app
-from ..invites_manager import LongTermCtxNotStarted
 
 invite_bp = Blueprint("invite_api", __name__)
 
@@ -281,28 +279,6 @@ async def claimer_0_retrieve_info(apitoken: str) -> tuple[dict[str, Any], int]:
         raise APIException(404, {"error": "unknown_token"})
 
     with backend_errors_to_api_exceptions():
-
-        # First check for old prelude
-        try:
-            async with current_app.claimers_manager.retrieve_ctx(addr) as lifetime_ctx:
-                in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
-                if isinstance(in_progress_ctx, ShamirRecoveryClaimPreludeCtx):
-                    response = _prelude_to_response(in_progress_ctx)
-                    return response, 200
-                if isinstance(
-                    in_progress_ctx,
-                    (
-                        ShamirRecoveryClaimInitialCtx,
-                        ShamirRecoveryClaimInProgress1Ctx,
-                        ShamirRecoveryClaimInProgress2Ctx,
-                        ShamirRecoveryClaimInProgress3Ctx,
-                    ),
-                ):
-                    lifetime_ctx.update_in_progress_ctx(in_progress_ctx.prelude)
-                    response = _prelude_to_response(in_progress_ctx.prelude)
-                    return response, 200
-        except LongTermCtxNotStarted:
-            pass
 
         async with current_app.claimers_manager.start_ctx(addr) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
