@@ -135,6 +135,24 @@ async def test_shamir_recovery_claim(
             ],
         }
 
+        # Ooops, Alice picked a user that doesn't exist
+        response = await claimer_client.post(
+            f"/invitations/{token}/claimer/1-wait-peer-ready",
+            json={"greeter_email": "billy@example.com"},
+        )
+        body = await response.get_json()
+        assert response.status_code == 400, body
+        assert body == {"error": "email_not_in_recipients"}
+
+        # Ooops, Alice picked a user that is not in the recipients
+        response = await claimer_client.post(
+            f"/invitations/{token}/claimer/1-wait-peer-ready",
+            json={"greeter_email": "alice@example.com"},
+        )
+        body = await response.get_json()
+        assert response.status_code == 400, body
+        assert body == {"error": "email_not_in_recipients"}
+
         # Alice decides to start with Diana
 
         async def alice_claims():
@@ -253,6 +271,15 @@ async def test_shamir_recovery_claim(
                     },
                 ],
             }
+
+        # Ooops, Alice picked Diana again by mistake
+        response = await claimer_client.post(
+            f"/invitations/{token}/claimer/1-wait-peer-ready",
+            json={"greeter_email": "diana@example.com"},
+        )
+        body = await response.get_json()
+        assert response.status_code == 400, body
+        assert body == {"error": "recipient_already_recovered"}
 
         # Alice continues with Carl who is still waiting
         response = await claimer_client.post(
