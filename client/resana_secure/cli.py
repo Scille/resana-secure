@@ -1,28 +1,28 @@
 from __future__ import annotations
 
 import argparse
-import trio
-from typing import (
-    Tuple,
-    Any,
-    MutableMapping,
-    Sequence,
-    List,
-)
-from pathlib import Path
-from functools import partial
+import logging
 import os
 import sys
-import logging
+from functools import partial
+from pathlib import Path
+from typing import (
+    Any,
+    List,
+    MutableMapping,
+    Sequence,
+    Tuple,
+)
+
 import structlog
+import trio
 
 from parsec.core.cli.run import parsec_quick_access_context
 from parsec.core.config import BackendAddr
 
+from ._version import __version__
 from .app import serve_app
 from .config import ResanaConfig, _CoreConfig
-from ._version import __version__
-
 
 logger = structlog.get_logger()
 

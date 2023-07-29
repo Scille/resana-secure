@@ -1,10 +1,10 @@
 from functools import wraps
 
-from parsec.backend import asgi
-from parsec.backend.cli import run_cmd
-from parsec.backend.asgi import app_factory, BackendQuartTrio
-
 from asgi_ip_filtering import AsgiIpFilteringMiddleware
+
+from parsec.backend import asgi
+from parsec.backend.asgi import BackendQuartTrio, app_factory
+from parsec.backend.cli import run_cmd
 
 
 def patch_app_factory() -> None:

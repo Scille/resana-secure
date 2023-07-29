@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-import pytest
+import pathlib
 from base64 import b64encode
 from tempfile import mkstemp
-import pathlib
+
+import pytest
 from quart.typing import TestAppProtocol, TestClientProtocol
+
 from parsec._parsec import save_recovery_device
 
 from .conftest import LocalDeviceTestbed

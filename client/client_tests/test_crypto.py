@@ -1,12 +1,13 @@
-import pytest
 import base64
 
+import pytest
+
 from resana_secure.crypto import (
-    encrypt_parsec_key,
-    decrypt_parsec_key,
     CryptoError,
-    _js_string_to_bytes,
     _bytes_to_js_string,
+    _js_string_to_bytes,
+    decrypt_parsec_key,
+    encrypt_parsec_key,
 )
 
 

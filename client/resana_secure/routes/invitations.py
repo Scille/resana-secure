@@ -1,24 +1,23 @@
 from __future__ import annotations
 
-from typing import TypedDict, Any
+from typing import Any, TypedDict
 
 from quart import Blueprint
 
-from parsec.core.logged_core import LoggedCore
 from parsec.api.protocol import InvitationType
+from parsec.core.logged_core import LoggedCore
 
 from ..utils import (
-    authenticated,
-    get_data,
-    Parser,
     APIException,
-    build_apitoken,
+    Parser,
     apitoken_to_addr,
+    authenticated,
     backend_errors_to_api_exceptions,
-    get_user_id_from_email,
+    build_apitoken,
     email_validator,
+    get_data,
+    get_user_id_from_email,
 )
-
 
 invitations_bp = Blueprint("invitations_api", __name__)
 

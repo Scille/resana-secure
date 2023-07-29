@@ -1,12 +1,13 @@
-import pytest
 import base64
 from pathlib import Path
+
+import pytest
 from quart.typing import TestAppProtocol
 
+from parsec._parsec import SequesterSigningKeyDer, list_available_devices
 from parsec.api.protocol import OrganizationID
 from parsec.backend import BackendApp
 from parsec.backend.organization import generate_bootstrap_token
-from parsec._parsec import list_available_devices, SequesterSigningKeyDer
 from parsec.core.types import BackendAddr, BackendOrganizationBootstrapAddr
 
 

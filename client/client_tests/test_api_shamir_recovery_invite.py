@@ -1,8 +1,9 @@
-import trio
-import pytest
 from base64 import b64encode
 
-from .conftest import TestAppProtocol, TestClientProtocol, LocalDeviceTestbed
+import pytest
+import trio
+
+from .conftest import LocalDeviceTestbed, TestAppProtocol, TestClientProtocol
 
 
 @pytest.mark.trio

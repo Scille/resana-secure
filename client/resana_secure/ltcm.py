@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-import trio
-from functools import partial
-from trio_typing import TaskStatus
-from typing import Callable, Dict, AsyncIterator, AsyncContextManager, Awaitable
 from contextlib import asynccontextmanager
+from functools import partial
+from typing import AsyncContextManager, AsyncIterator, Awaitable, Callable, Dict
+
+import trio
+from trio_typing import TaskStatus
 
 
 class ReadCancelledByWriter(Exception):

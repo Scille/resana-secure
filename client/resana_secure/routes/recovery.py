@@ -1,49 +1,49 @@
 from __future__ import annotations
 
-from typing import Any, cast
-
 import os
 import tempfile
+from base64 import b64decode, b64encode
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from quart import Blueprint
-from base64 import b64encode, b64decode
-from dataclasses import dataclass, asdict
+from typing import Any, cast
 
-from parsec.core.logged_core import LoggedCore
+from quart import Blueprint
+
 from parsec._parsec import (
-    save_recovery_device,
+    LocalDeviceCryptoError,
+    ShamirRecoveryBriefCertificate,
+    UserCertificate,
     load_recovery_device,
     save_device_with_password_in_config,
-    LocalDeviceCryptoError,
-    UserCertificate,
-    ShamirRecoveryBriefCertificate,
+    save_recovery_device,
 )
-from parsec.core.recovery import generate_recovery_device, generate_new_device_from_recovery
 from parsec.core.local_device import (
     get_recovery_device_file_name,
 )
+from parsec.core.logged_core import LoggedCore
+from parsec.core.recovery import generate_new_device_from_recovery, generate_recovery_device
 from parsec.core.shamir import (
-    create_shamir_recovery_device,
-    remove_shamir_recovery_device,
-    get_shamir_recovery_self_info,
-    get_shamir_recovery_others_list,
+    ShamirRecoveryAlreadySetError,
     ShamirRecoveryError,
     ShamirRecoveryInvalidDataError,
-    ShamirRecoveryAlreadySetError,
     ShamirRecoveryNotSetError,
+    create_shamir_recovery_device,
+    get_shamir_recovery_others_list,
+    get_shamir_recovery_self_info,
+    remove_shamir_recovery_device,
 )
 
+from ..app import current_app
 from ..utils import (
     APIException,
-    authenticated,
-    get_data,
-    Parser,
-    get_default_device_label,
     BadFields,
-    get_user_id_from_email,
+    Parser,
+    authenticated,
     email_validator,
+    get_data,
+    get_default_device_label,
+    get_user_id_from_email,
 )
-from ..app import current_app
 
 recovery_bp = Blueprint("recovery_api", __name__)
 

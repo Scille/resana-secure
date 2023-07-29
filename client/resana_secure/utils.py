@@ -1,50 +1,51 @@
 from __future__ import annotations
-import platform
 
-from typing import Callable, Iterator, Any, TypeVar, Awaitable
-from typing_extensions import ParamSpec, Concatenate
-from dataclasses import dataclass
-from functools import wraps
+import platform
 from base64 import urlsafe_b64decode, urlsafe_b64encode
 from contextlib import contextmanager
-from quart import jsonify, session, request
+from dataclasses import dataclass
+from functools import wraps
+from typing import Any, Awaitable, Callable, Iterator, TypeVar
+
+from quart import jsonify, request, session
+from typing_extensions import Concatenate, ParamSpec
 from werkzeug.exceptions import HTTPException
 
-from parsec._parsec import DateTime, UserID, HumanHandle
-from parsec.core.logged_core import LoggedCore
+from parsec._parsec import DateTime, HumanHandle, UserID
 from parsec.api.data import EntryID
-from parsec.api.protocol import OrganizationID, InvitationType, InvitationToken, DeviceLabel
-from parsec.core.types import BackendInvitationAddr, BackendOrganizationAddr
+from parsec.api.protocol import DeviceLabel, InvitationToken, InvitationType, OrganizationID
 from parsec.core.backend_connection import (
     BackendConnectionError,
-    BackendNotAvailable,
     BackendConnectionRefused,
-    BackendInvitationNotFound,
     BackendInvitationAlreadyUsed,
-    BackendNotFoundError,
+    BackendInvitationNotFound,
     BackendInvitationOnExistingMember,
     BackendInvitationShamirRecoveryNotSetup,
+    BackendNotAvailable,
+    BackendNotFoundError,
 )
 from parsec.core.fs.exceptions import (
-    FSWorkspaceNotFoundError,
-    FSSharingNotAllowedError,
     FSBackendOfflineError,
-    FSReadOnlyError,
-    FSNoAccessError,
     FSError,
+    FSNoAccessError,
+    FSReadOnlyError,
+    FSSharingNotAllowedError,
+    FSWorkspaceNotFoundError,
 )
+from parsec.core.fs.workspacefs import WorkspaceFS, WorkspaceFSTimestamped
 from parsec.core.invite import (
+    InviteAlreadyUsedError,
     InviteError,
     InviteNotFoundError,
-    InviteAlreadyUsedError,
     InvitePeerResetError,
 )
+from parsec.core.logged_core import LoggedCore
 from parsec.core.mountpoint import MountpointAlreadyMounted, MountpointNotMounted
-from parsec.core.fs.workspacefs import WorkspaceFS, WorkspaceFSTimestamped
+from parsec.core.types import BackendInvitationAddr, BackendOrganizationAddr
 
+from .app import current_app
 from .cores_manager import CoreNotLoggedError
 from .invites_manager import LongTermCtxNotStarted
-from .app import current_app
 
 
 class APIException(HTTPException):

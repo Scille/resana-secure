@@ -1,54 +1,51 @@
 from __future__ import annotations
 
+import multiprocessing
+import os
+import signal
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from importlib import resources
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, AsyncIterator, Awaitable
-from contextlib import asynccontextmanager, AbstractAsyncContextManager
-import trio
-import os
+from typing import TYPE_CHECKING, Any, AsyncIterator, Awaitable, Callable
+
 import qtrio
-import signal
-import multiprocessing
-from structlog import get_logger
+import trio
+from PyQt5.QtCore import QUrl, pyqtSignal
+from PyQt5.QtGui import QDesktopServices, QIcon
 from PyQt5.QtWidgets import (
     QApplication,
-    QSystemTrayIcon,
-    QMenu,
-    QLineEdit,
     QInputDialog,
+    QLineEdit,
+    QMenu,
     QMessageBox,
+    QSystemTrayIcon,
 )
-from PyQt5.QtGui import QDesktopServices, QIcon
-from PyQt5.QtCore import QUrl, pyqtSignal
+from structlog import get_logger
 
-from .cores_manager import (
-    CoreNotLoggedError,
-    CoreDeviceNotFoundError,
-    CoreDeviceInvalidPasswordError,
-    CoreDeviceEncryptedKeyNotFoundError,
-    CoresManager,
+from parsec.core.config import CoreConfig
+from parsec.core.fs import FsPath, WorkspaceFS
+from parsec.core.gui.custom_dialogs import QDialogInProcess
+from parsec.core.ipcinterface import (
+    IPCCommand,
+    IPCServerAlreadyRunning,
+    IPCServerNotRunning,
+    run_ipc_server,
+    send_to_ipc_server,
 )
-
 from parsec.core.local_device import (
     AvailableDevice,
 )
-from parsec.core.config import CoreConfig
-
 from parsec.core.types import DEFAULT_BLOCK_SIZE
-from parsec.core.fs import FsPath, WorkspaceFS
 
-from parsec.core.ipcinterface import (
-    run_ipc_server,
-    send_to_ipc_server,
-    IPCServerAlreadyRunning,
-    IPCServerNotRunning,
-    IPCCommand,
-)
-
-from parsec.core.gui.custom_dialogs import QDialogInProcess
-from .config import ResanaConfig
 from ._version import __version__ as RESANA_VERSION
-
+from .config import ResanaConfig
+from .cores_manager import (
+    CoreDeviceEncryptedKeyNotFoundError,
+    CoreDeviceInvalidPasswordError,
+    CoreDeviceNotFoundError,
+    CoreNotLoggedError,
+    CoresManager,
+)
 
 if TYPE_CHECKING:
     from .app import ResanaApp

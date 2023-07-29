@@ -1,13 +1,13 @@
-import trio
-import pytest
-import trio.testing
 from base64 import b64encode
-from unittest.mock import ANY
 from collections import namedtuple
+from unittest.mock import ANY
+
+import pytest
+import trio
+import trio.testing
 from quart.typing import TestAppProtocol, TestClientProtocol
 
 from .conftest import LocalDeviceTestbed
-
 
 InvitationInfo = namedtuple("InvitationInfo", "type,claimer_email,token")
 

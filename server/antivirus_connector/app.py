@@ -1,20 +1,21 @@
-import re
 import logging
-from typing import List
+import re
 from contextlib import asynccontextmanager
+from typing import List
+
+from hypercorn.config import Config as HyperConfig
+from hypercorn.trio import serve
 from quart import current_app
 from quart_cors import cors
 from quart_trio import QuartTrio
-from hypercorn.config import Config as HyperConfig
-from hypercorn.trio import serve
+
+from parsec.backend.blockstore import blockstore_factory
+from parsec.backend.postgresql.handler import PGHandler
 from parsec.event_bus import EventBus
 from parsec.utils import open_service_nursery
-from parsec.backend.postgresql.handler import PGHandler
-from parsec.backend.blockstore import blockstore_factory
 
-
-from .routes import bp
 from .config import AppConfig
+from .routes import bp
 
 
 @asynccontextmanager

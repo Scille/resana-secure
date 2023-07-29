@@ -1,21 +1,22 @@
 from __future__ import annotations
 
-from typing import cast, Any
-from quart import Blueprint, session
-from datetime import timedelta
-from quart_rate_limiter import rate_limit
 import base64
+from datetime import timedelta
+from typing import Any, cast
+
+from quart import Blueprint, session
+from quart_rate_limiter import rate_limit
 
 from parsec.api.protocol import OrganizationID
-from ..cores_manager import (
-    CoresManager,
-    CoreNotLoggedError,
-    CoreDeviceNotFoundError,
-    CoreDeviceInvalidPasswordError,
-)
-from ..utils import APIException, get_auth_token, get_data, Parser
-from ..app import current_app
 
+from ..app import current_app
+from ..cores_manager import (
+    CoreDeviceInvalidPasswordError,
+    CoreDeviceNotFoundError,
+    CoreNotLoggedError,
+    CoresManager,
+)
+from ..utils import APIException, Parser, get_auth_token, get_data
 
 auth_bp = Blueprint("auth_api", __name__)
 

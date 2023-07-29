@@ -1,36 +1,38 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from functools import partial
+from pathlib import Path
+
 import pytest
 import trio
-from functools import partial
-from quart.typing import TestAppProtocol, TestClientProtocol
 from hypercorn.config import Config as HyperConfig
 from hypercorn.trio.run import worker_serve
-from pathlib import Path
-from dataclasses import dataclass
+from quart.typing import TestAppProtocol, TestClientProtocol
 
 from parsec._parsec import (
     DateTime,
-    save_device_with_password_in_config,
+    LocalDevice,
     PrivateKey,
     SigningKey,
-    LocalDevice,
+    save_device_with_password_in_config,
 )
-from parsec.api.data import UserCertificate, DeviceCertificate
+from parsec.api.data import DeviceCertificate, UserCertificate
 from parsec.api.protocol import (
-    OrganizationID,
-    HumanHandle,
     DeviceID,
-    DeviceName,
     DeviceLabel,
+    DeviceName,
+    HumanHandle,
+    OrganizationID,
     UserProfile,
 )
-from parsec.core.types import BackendOrganizationBootstrapAddr, BackendAddr
-from parsec.core.invite import bootstrap_organization
-from parsec.backend import backend_app_factory, BackendApp
+from parsec.backend import BackendApp, backend_app_factory
 from parsec.backend.asgi import app_factory as backend_asgi_app_factory
-from parsec.backend.user import User as BackendUser, Device as BackendDevice
 from parsec.backend.config import BackendConfig, MockedBlockStoreConfig
+from parsec.backend.user import Device as BackendDevice
+from parsec.backend.user import User as BackendUser
+from parsec.core.invite import bootstrap_organization
+from parsec.core.types import BackendAddr, BackendOrganizationBootstrapAddr
 from resana_secure.app import app_factory
 from resana_secure.config import ResanaConfig, _CoreConfig
 

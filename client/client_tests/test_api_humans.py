@@ -1,6 +1,7 @@
 from typing import Optional
-import pytest
 from unittest.mock import ANY
+
+import pytest
 import trio
 from quart.typing import TestAppProtocol, TestClientProtocol
 

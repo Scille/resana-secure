@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-import pytest
 from unittest.mock import ANY
+
+import pytest
 from quart.typing import TestClientProtocol
 
 from parsec._parsec import DateTime
+
 from .conftest import LocalDeviceTestbed, TestAppProtocol
 
 

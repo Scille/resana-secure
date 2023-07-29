@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import attr
 from pathlib import Path
-from typing import List, Tuple, Any
+from typing import Any, List, Tuple
+
+import attr
 
 from parsec.core.config import CoreConfig
 

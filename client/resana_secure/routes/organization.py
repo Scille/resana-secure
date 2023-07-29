@@ -1,29 +1,29 @@
 from __future__ import annotations
 
-from quart import Blueprint
-
+import base64
+import binascii
 from typing import Any
 
-import binascii
-import base64
+from quart import Blueprint
 
-from parsec.core.invite import (
-    bootstrap_organization,
-    InviteNotFoundError,
-    InviteAlreadyUsedError,
-)
 from parsec._parsec import SequesterVerifyKeyDer, save_device_with_password_in_config
-from parsec.core.types import BackendOrganizationBootstrapAddr
-from parsec.core.fs.storage.user_storage import user_storage_non_speculative_init
 from parsec.api.protocol import HumanHandle
+from parsec.core.fs.storage.user_storage import user_storage_non_speculative_init
+from parsec.core.invite import (
+    InviteAlreadyUsedError,
+    InviteNotFoundError,
+    bootstrap_organization,
+)
+from parsec.core.types import BackendOrganizationBootstrapAddr
+
+from ..app import current_app
 from ..utils import (
     APIException,
+    Parser,
     backend_errors_to_api_exceptions,
     get_data,
-    Parser,
     get_default_device_label,
 )
-from ..app import current_app
 
 organization_bp = Blueprint("organization_api", __name__)
 

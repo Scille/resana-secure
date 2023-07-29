@@ -1,22 +1,21 @@
 from __future__ import annotations
 
 import argparse
-import random
-from unittest.mock import ANY
-import logging
-import requests
 import base64
 import concurrent.futures
+import contextlib
+import logging
+import random
 import time
 import urllib.parse
-import contextlib
 import uuid
 from dataclasses import dataclass
+from unittest.mock import ANY
+
+import requests
+
 from parsec._parsec import DateTime
-
-
 from resana_secure.cli import get_default_dirs
-
 
 logger = logging.getLogger("test-resana")
 

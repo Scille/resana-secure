@@ -4,51 +4,51 @@ from typing import Any, cast
 
 from quart import Blueprint
 
-from parsec.core.logged_core import LoggedCore
-from parsec.api.protocol import InvitationType, HumanHandle, UserProfile, InvitationToken, UserID
+from parsec._parsec import InvitationDeletedReason, LocalDevice, save_device_with_password_in_config
 from parsec.api.data import SASCode
-from parsec._parsec import save_device_with_password_in_config, InvitationDeletedReason, LocalDevice
+from parsec.api.protocol import HumanHandle, InvitationToken, InvitationType, UserID, UserProfile
+from parsec.core.backend_connection import backend_authenticated_cmds_factory
+from parsec.core.fs.storage.user_storage import user_storage_non_speculative_init
 from parsec.core.invite import (
-    UserClaimInitialCtx,
     DeviceClaimInitialCtx,
-    UserClaimInProgress1Ctx,
     DeviceClaimInProgress1Ctx,
-    UserClaimInProgress2Ctx,
     DeviceClaimInProgress2Ctx,
-    UserClaimInProgress3Ctx,
     DeviceClaimInProgress3Ctx,
-    UserGreetInProgress1Ctx,
     DeviceGreetInProgress1Ctx,
-    UserGreetInProgress2Ctx,
     DeviceGreetInProgress2Ctx,
-    UserGreetInProgress3Ctx,
     DeviceGreetInProgress3Ctx,
-    UserGreetInProgress4Ctx,
     DeviceGreetInProgress4Ctx,
-    ShamirRecoveryGreetInProgress1Ctx,
-    ShamirRecoveryGreetInProgress2Ctx,
-    ShamirRecoveryGreetInProgress3Ctx,
+    InviteNotFoundError,
     ShamirRecoveryClaimInProgress1Ctx,
     ShamirRecoveryClaimInProgress2Ctx,
     ShamirRecoveryClaimInProgress3Ctx,
     ShamirRecoveryClaimPreludeCtx,
-    InviteNotFoundError,
+    ShamirRecoveryGreetInProgress1Ctx,
+    ShamirRecoveryGreetInProgress2Ctx,
+    ShamirRecoveryGreetInProgress3Ctx,
+    UserClaimInitialCtx,
+    UserClaimInProgress1Ctx,
+    UserClaimInProgress2Ctx,
+    UserClaimInProgress3Ctx,
+    UserGreetInProgress1Ctx,
+    UserGreetInProgress2Ctx,
+    UserGreetInProgress3Ctx,
+    UserGreetInProgress4Ctx,
 )
-from parsec.core.fs.storage.user_storage import user_storage_non_speculative_init
-from parsec.core.backend_connection import backend_authenticated_cmds_factory
+from parsec.core.logged_core import LoggedCore
 from parsec.core.recovery import generate_new_device_from_recovery
 
-from ..utils import (
-    authenticated,
-    get_data,
-    Parser,
-    APIException,
-    apitoken_to_addr,
-    backend_errors_to_api_exceptions,
-    get_default_device_label,
-    email_validator,
-)
 from ..app import current_app
+from ..utils import (
+    APIException,
+    Parser,
+    apitoken_to_addr,
+    authenticated,
+    backend_errors_to_api_exceptions,
+    email_validator,
+    get_data,
+    get_default_device_label,
+)
 
 invite_bp = Blueprint("invite_api", __name__)
 

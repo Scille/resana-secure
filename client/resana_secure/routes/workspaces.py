@@ -5,23 +5,23 @@ from typing import Any
 
 from quart import Blueprint
 
-from parsec.core.logged_core import LoggedCore
-from parsec.core.fs.workspacefs import WorkspaceFS
-from parsec.core.fs.exceptions import FSWorkspaceNotFoundError
 from parsec.api.data import EntryID, EntryName
 from parsec.api.protocol import RealmRole
+from parsec.core.fs.exceptions import FSWorkspaceNotFoundError
+from parsec.core.fs.workspacefs import WorkspaceFS
+from parsec.core.logged_core import LoggedCore
 
 from ..utils import (
     APIException,
-    authenticated,
-    requires_rie,
-    get_data,
-    check_if_timestamp,
     Parser,
+    authenticated,
     backend_errors_to_api_exceptions,
-    get_workspace_type,
-    get_user_id_from_email,
+    check_if_timestamp,
     email_validator,
+    get_data,
+    get_user_id_from_email,
+    get_workspace_type,
+    requires_rie,
 )
 
 workspaces_bp = Blueprint("workspaces_api", __name__)

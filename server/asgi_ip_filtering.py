@@ -14,22 +14,23 @@ Add the following lines to a file `sitecustomize.py` accessible through the pyth
 
 import os
 from functools import wraps
-from typing import Union, Optional, cast
 from ipaddress import ip_address, ip_network
-
-from structlog import get_logger
+from typing import Optional, Union, cast
 
 import hypercorn
 from hypercorn.trio import serve
 from hypercorn.typing import (
-    Scope,
-    HTTPScope,
-    WebsocketScope,
+    ASGI3Framework,
     ASGIReceiveCallable,
     ASGISendCallable,
-    ASGI3Framework,
+    HTTPResponseBodyEvent,
+    HTTPResponseStartEvent,
+    HTTPScope,
+    Scope,
+    WebsocketCloseEvent,
+    WebsocketScope,
 )
-from hypercorn.typing import HTTPResponseStartEvent, HTTPResponseBodyEvent, WebsocketCloseEvent
+from structlog import get_logger
 
 logger = get_logger()
 
@@ -144,8 +145,8 @@ def patch_hypercorn_trio_serve() -> None:
 try:
     import pytest
     from quart import websocket
-    from quart_trio import QuartTrio
     from quart.testing.connections import WebsocketDisconnectError
+    from quart_trio import QuartTrio
 except ImportError:
     pass
 else:

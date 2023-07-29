@@ -3,6 +3,7 @@ from __future__ import annotations
 from werkzeug.routing import BaseConverter
 
 from parsec.api.data import EntryID
+
 from .utils import APIException
 
 

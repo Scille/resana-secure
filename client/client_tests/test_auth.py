@@ -1,24 +1,24 @@
-import pytest
 import re
 from typing import List, Tuple, cast
 from unittest.mock import ANY
+
+import pytest
 from quart_trio.testing import TrioTestApp
 
+from parsec._parsec import list_available_devices
 from parsec.api.protocol import OrganizationID
 from parsec.backend import BackendApp
 from parsec.core.types import BackendAddr, BackendOrganizationBootstrapAddr
-from parsec._parsec import list_available_devices
-
-from .conftest import LocalDeviceTestbed
-
+from resana_secure.app import ResanaApp
 from resana_secure.cores_manager import (
-    CoresManager,
+    CoreDeviceEncryptedKeyNotFoundError,
     CoreDeviceInvalidPasswordError,
     CoreDeviceNotFoundError,
-    CoreDeviceEncryptedKeyNotFoundError,
+    CoresManager,
 )
-from resana_secure.app import ResanaApp
 from resana_secure.crypto import encrypt_parsec_key
+
+from .conftest import LocalDeviceTestbed
 
 
 @pytest.mark.trio
