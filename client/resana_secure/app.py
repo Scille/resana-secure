@@ -41,7 +41,7 @@ class ResanaApp(QuartTrio):
 
     ltcm: LTCM
     cores_manager: CoresManager
-    greeters_managers: dict[DeviceID, GreetersManager]
+    greeters_managers: dict[str, GreetersManager]
     claimers_manager: ClaimersManager
     resana_config: ResanaConfig
     hyper_config: HyperConfig
