@@ -539,9 +539,11 @@ ou
 
 ## Enrôlement (claimer)
 
-### `POST /invitations/<token>/claimer/0-retreive-info`
+### `POST /invitations/<token>/claimer/0-retrieve-info`
 
 Démarre la phase d'enrôlement et récupère des informations de base sur l'invitation.
+
+Note: this route is also exposed as `POST /invitations/<token>/claimer/0-retreive-info` due to a legacy typo (`0-retrieve-info` vs `0-retreive-info``)
 
 Request:
 

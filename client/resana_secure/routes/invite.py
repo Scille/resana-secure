@@ -269,7 +269,12 @@ def _prelude_to_response(prelude: ShamirRecoveryClaimPreludeCtx) -> dict[str, An
 
 
 @invite_bp.route("/invitations/<string:apitoken>/claimer/0-retreive-info", methods=["POST"])
-async def claimer_0_retreive_info(apitoken: str) -> tuple[dict[str, Any], int]:
+async def claimer_0_retrieve_info_with_typo(apitoken: str) -> tuple[dict[str, Any], int]:
+    return await claimer_0_retrieve_info(apitoken)
+
+
+@invite_bp.route("/invitations/<string:apitoken>/claimer/0-retrieve-info", methods=["POST"])
+async def claimer_0_retrieve_info(apitoken: str) -> tuple[dict[str, Any], int]:
     try:
         addr = apitoken_to_addr(apitoken)
     except ValueError:

@@ -108,7 +108,7 @@ async def test_shamir_recovery_claim(
 
         # Alice starts the claimer process from a new machine
         response = await claimer_client.post(
-            f"/invitations/{token}/claimer/0-retreive-info", json={}
+            f"/invitations/{token}/claimer/0-retrieve-info", json={}
         )
         body = await response.get_json()
         assert response.status_code == 200
@@ -216,7 +216,7 @@ async def test_shamir_recovery_claim(
         # Diana is done, Alice might or might not get back to step 0
         if alice_retrieves_before_next_recipient:
             response = await claimer_client.post(
-                f"/invitations/{token}/claimer/0-retreive-info", json={}
+                f"/invitations/{token}/claimer/0-retrieve-info", json={}
             )
             body = await response.get_json()
             assert response.status_code == 200
@@ -272,7 +272,7 @@ async def test_shamir_recovery_claim(
 
     if alice_retrieves_before_finalize:
         response = await claimer_client.post(
-            f"/invitations/{token}/claimer/0-retreive-info", json={}
+            f"/invitations/{token}/claimer/0-retrieve-info", json={}
         )
         body = await response.get_json()
         assert response.status_code == 200

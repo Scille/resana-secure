@@ -40,7 +40,7 @@ class HumansTestBed:
 
             # Step 0
             response = await claimer_client.post(
-                f"/invitations/{invitation_token}/claimer/0-retreive-info", json={}
+                f"/invitations/{invitation_token}/claimer/0-retrieve-info", json={}
             )
             assert response.status_code == 200
 

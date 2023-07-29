@@ -900,7 +900,7 @@ def test_user_invitations(auth_token, resana_addr, org_id):
     with run_test("Claimer retrieve info") as context:
         r = make_request(
             "POST",
-            f"{resana_addr}/invitations/{VARIABLES['token']}/claimer/0-retreive-info",
+            f"{resana_addr}/invitations/{VARIABLES['token']}/claimer/0-retrieve-info",
         )
         context.request = r
         assert r.status_code == 200
@@ -1114,7 +1114,7 @@ def test_device_invitations(auth_token, resana_addr, org_id):
     with run_test("Claim device retrieve info") as context:
         r = make_request(
             "POST",
-            f"{resana_addr}/invitations/{VARIABLES['token']}/claimer/0-retreive-info",
+            f"{resana_addr}/invitations/{VARIABLES['token']}/claimer/0-retrieve-info",
         )
         context.request = r
         assert r.status_code == 200

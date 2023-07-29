@@ -71,7 +71,7 @@ async def test_claim_ok(
 
         # Step 0
         response = await claimer_client.post(
-            f"/invitations/{invitation.token}/claimer/0-retreive-info", json={}
+            f"/invitations/{invitation.token}/claimer/0-retrieve-info", json={}
         )
         body = await response.get_json()
         assert response.status_code == 200
@@ -269,7 +269,7 @@ async def test_claimer_step_1_before_0(
 
             # Go back to step 0 should allow to do step 1 fine
             response = await claimer_client.post(
-                f"/invitations/{device_invitation.token}/claimer/0-retreive-info", json={}
+                f"/invitations/{device_invitation.token}/claimer/0-retrieve-info", json={}
             )
             assert response.status_code == 200
             response = await claimer_client.post(
@@ -290,7 +290,7 @@ async def test_claimer_concurrent_requests_on_step_1(
     # Step 0
     claimer_client = test_app.test_client()
     response = await claimer_client.post(
-        f"/invitations/{device_invitation.token}/claimer/0-retreive-info", json={}
+        f"/invitations/{device_invitation.token}/claimer/0-retrieve-info", json={}
     )
     assert response.status_code == 200
 
@@ -332,7 +332,7 @@ async def test_cancel_step_request_then_retry(
     # Step 0
 
     response = await claimer_client.post(
-        f"/invitations/{device_invitation.token}/claimer/0-retreive-info", json={}
+        f"/invitations/{device_invitation.token}/claimer/0-retrieve-info", json={}
     )
     assert response.status_code == 200
 
@@ -374,7 +374,7 @@ async def test_cancel_step_request_then_retry(
     # Now retry the step 1, This time everything should run fine.
     if claimer_do_step0_before_final_step1:
         response = await claimer_client.post(
-            f"/invitations/{device_invitation.token}/claimer/0-retreive-info", json={}
+            f"/invitations/{device_invitation.token}/claimer/0-retrieve-info", json={}
         )
         assert response.status_code == 200
     with trio.fail_after(1):
@@ -404,7 +404,7 @@ async def test_greeter_claimer_start_order(
     async def _claimer():
         # Step 0
         response = await claimer_client.post(
-            f"/invitations/{device_invitation.token}/claimer/0-retreive-info", json={}
+            f"/invitations/{device_invitation.token}/claimer/0-retrieve-info", json={}
         )
         assert response.status_code == 200
         # Step 1
@@ -425,3 +425,15 @@ async def test_greeter_claimer_start_order(
             nursery.start_soon(first_cb)
             await trio.testing.wait_all_tasks_blocked()
             await second_cb()
+
+
+@pytest.mark.trio
+async def test_claimer_step_0_legacy_route_with_typo(
+    test_app: TestAppProtocol,
+    device_invitation: InvitationInfo,
+):
+    claimer_client = test_app.test_client()
+    response = await claimer_client.post(
+        f"/invitations/{device_invitation.token}/claimer/0-retreive-info", json={}
+    )
+    assert response.status_code == 200
