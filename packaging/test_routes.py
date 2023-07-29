@@ -1,3 +1,24 @@
+"""
+Test script for fresh resana client installers.
+
+In order to maintain this script, it's useful to run it without the actual installer.
+
+In this case, use the following commands:
+```shell
+# Running the parsec server
+$ parsec backend run \
+    --port 6888 --db MOCKED -b MOCKED --administration-token test  --email-host MOCKED \
+    --spontaneous-organization-bootstrap --backend-addr "parsec://localhost:6888?no_ssl=true"
+
+# Running the resana local server
+$ python -m resana_secure --rie-server-addr localhost:6888
+
+# Running the script (increment `TestOrg` after each run)
+$ python packagin/test_routes -o TestOrg1
+```
+"""
+
+
 from __future__ import annotations
 
 import argparse
