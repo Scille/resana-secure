@@ -16,6 +16,8 @@ $ python -m resana_secure --rie-server-addr localhost:6888
 # Running the test script
 $ python packagin/test_routes
 ```
+
+TODO: integrate this in the CI
 """
 
 
@@ -43,7 +45,9 @@ logger = logging.getLogger("test-resana")
 
 DEFAULT_EMAIL = "gordon.freeman@blackmesa.nm"
 INVITEE_EMAIL = "eli.vance@blackmesa.nm"
+INVITEE_EMAIL_2 = "richard-Keller@blackmesa.nm"
 DEFAULT_PASSWORD = "P@ssw0rd"
+INVITEE_PASSWORD = "ClaimUserNewP@ssw0rd"
 
 # Using a UUID in case of multiple launches in row,
 # so we can always have a unique name for the mountpoint
@@ -252,8 +256,8 @@ def test_humans(auth_token, resana_addr):
         context.request = r
         assert r.status_code == 200
         data = r.json()
-        assert data["total"] == 2
-        assert len(data["users"]) == 2
+        assert data["total"] == 3
+        assert len(data["users"]) == 3
         assert all(u["revoked_on"] is None for u in data["users"])
 
     # Revoking second user
@@ -269,8 +273,8 @@ def test_humans(auth_token, resana_addr):
         context.request = r
         assert r.status_code == 200
         data = r.json()
-        assert data["total"] == 2
-        assert len(data["users"]) == 2
+        assert data["total"] == 3
+        assert len(data["users"]) == 3
         assert any(
             u["revoked_on"] is not None and u["human_handle"]["email"] == INVITEE_EMAIL
             for u in data["users"]
@@ -831,8 +835,11 @@ def test_files(auth_token, resana_addr):
         }
 
 
-def test_user_invitations(auth_token, resana_addr, org_id):
+def test_user_invitations(auth_token, resana_addr, org_id, second_invitee=False, sleep_time=0.1):
     VARIABLES = {}
+
+    number_of_users = 3 if second_invitee else 2
+    invitee_email = INVITEE_EMAIL_2 if second_invitee else INVITEE_EMAIL
 
     def _claimer_wait():
         return make_request(
@@ -880,7 +887,7 @@ def test_user_invitations(auth_token, resana_addr, org_id):
             "POST",
             f"{resana_addr}/invitations/{VARIABLES['token']}/greeter/4-finalize",
             auth_token=auth_token,
-            json={"claimer_email": INVITEE_EMAIL, "granted_profile": "STANDARD"},
+            json={"claimer_email": invitee_email, "granted_profile": "STANDARD"},
         )
 
     def _claimer_finalize(password):
@@ -897,7 +904,7 @@ def test_user_invitations(auth_token, resana_addr, org_id):
                 "POST",
                 f"{resana_addr}/invitations",
                 auth_token=auth_token,
-                json={"type": "user", "claimer_email": INVITEE_EMAIL},
+                json={"type": "user", "claimer_email": invitee_email},
             )
             context.request = r
             assert r.status_code == 200
@@ -913,7 +920,7 @@ def test_user_invitations(auth_token, resana_addr, org_id):
                 "device": None,
                 "users": [
                     {
-                        "claimer_email": INVITEE_EMAIL,
+                        "claimer_email": invitee_email,
                         "created_on": ANY,
                         "status": "IDLE",
                         "token": token,
@@ -977,7 +984,7 @@ def test_user_invitations(auth_token, resana_addr, org_id):
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         greeter_future = executor.submit(_greeter_wait_peer_trust)
-        time.sleep(1.0)
+        time.sleep(sleep_time)
         claimer_future = executor.submit(_claimer_check_trust)
         greeter_ret = greeter_future.result()
         claimer_ret = claimer_future.result()
@@ -996,7 +1003,7 @@ def test_user_invitations(auth_token, resana_addr, org_id):
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         claimer_future = executor.submit(_claimer_wait_peer_trust)
-        time.sleep(1.0)
+        time.sleep(sleep_time)
         greeter_future = executor.submit(_greeter_check_trust)
         greeter_ret = greeter_future.result()
         claimer_ret = claimer_future.result()
@@ -1010,8 +1017,8 @@ def test_user_invitations(auth_token, resana_addr, org_id):
         assert claimer_ret.status_code == 200
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        claimer_future = executor.submit(_claimer_finalize, password="ClaimUserNewP@ssw0rd")
-        time.sleep(1.0)
+        claimer_future = executor.submit(_claimer_finalize, password=INVITEE_PASSWORD)
+        time.sleep(sleep_time)
         greeter_future = executor.submit(_greeter_finalize)
         greeter_ret = greeter_future.result()
         claimer_ret = claimer_future.result()
@@ -1028,8 +1035,8 @@ def test_user_invitations(auth_token, resana_addr, org_id):
         r = make_request("GET", f"{resana_addr}/humans", auth_token=auth_token)
         context.request = r
         assert r.status_code == 200
-        assert r.json()["total"] == 2
-        assert any(u["human_handle"]["email"] == INVITEE_EMAIL for u in r.json()["users"])
+        assert r.json()["total"] == number_of_users
+        assert any(u["human_handle"]["email"] == invitee_email for u in r.json()["users"])
 
     # Try to log with the new user
     with run_test("Log in with new user") as context:
@@ -1037,17 +1044,19 @@ def test_user_invitations(auth_token, resana_addr, org_id):
             "POST",
             f"{resana_addr}/auth",
             json={
-                "email": INVITEE_EMAIL,
-                "key": "ClaimUserNewP@ssw0rd",
+                "email": invitee_email,
+                "key": INVITEE_PASSWORD,
                 "organization": org_id,
             },
         )
         context.request = r
         assert r.status_code == 200
-        assert r.json()["token"] == ANY
+        invitee_auth_token = r.json()["token"]
+
+    return invitee_auth_token
 
 
-def test_device_invitations(auth_token, resana_addr, org_id):
+def test_device_invitations(auth_token, resana_addr, org_id, sleep_time=0.1):
     VARIABLES = {}
 
     def _claimer_wait():
@@ -1191,7 +1200,7 @@ def test_device_invitations(auth_token, resana_addr, org_id):
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         greeter_future = executor.submit(_greeter_wait_peer_trust)
-        time.sleep(1.0)
+        time.sleep(sleep_time)
         claimer_future = executor.submit(_claimer_check_trust)
         greeter_ret = greeter_future.result()
         claimer_ret = claimer_future.result()
@@ -1210,7 +1219,7 @@ def test_device_invitations(auth_token, resana_addr, org_id):
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         claimer_future = executor.submit(_claimer_wait_peer_trust)
-        time.sleep(1.0)
+        time.sleep(sleep_time)
         greeter_future = executor.submit(_greeter_check_trust)
         greeter_ret = greeter_future.result()
         claimer_ret = claimer_future.result()
@@ -1225,7 +1234,7 @@ def test_device_invitations(auth_token, resana_addr, org_id):
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         claimer_future = executor.submit(_claimer_finalize, password="ClaimDeviceNewP@ssw0rd")
-        time.sleep(1.0)
+        time.sleep(sleep_time)
         greeter_future = executor.submit(_greeter_finalize)
         greeter_ret = greeter_future.result()
         claimer_ret = claimer_future.result()
@@ -1298,6 +1307,440 @@ def test_recovery(auth_token, resana_addr, org_id):
         assert r.json()["token"] == ANY
 
 
+def test_shamir_recovery(
+    auth_token, resana_addr, org_id, invitee_auth_token, invitee_auth_token_2, sleep_time=0.1
+):
+    gordon_token = auth_token
+    eli_token = invitee_auth_token
+    richard_token = invitee_auth_token_2
+
+    # Create shamir recovery
+    with run_test("Create shamir recovery") as context:
+        shamir_config = {
+            "threshold": 2,
+            "recipients": [
+                {
+                    "email": INVITEE_EMAIL,
+                    "weight": 1,
+                },
+                {
+                    "email": INVITEE_EMAIL_2,
+                    "weight": 1,
+                },
+            ],
+        }
+        r = make_request(
+            "POST",
+            f"{resana_addr}/recovery/shamir/setup",
+            auth_token=auth_token,
+            json=shamir_config,
+        )
+        context.request = r
+        assert r.status_code == 200, (r.status_code, r.json())
+
+    # Get current shamir recovery
+    with run_test("Get current shamir recovery") as context:
+        r = make_request(
+            "GET",
+            f"{resana_addr}/recovery/shamir/setup",
+            auth_token=gordon_token,
+        )
+        context.request = r
+        assert r.status_code == 200, (r.status_code, r.json())
+        expected = {"device_label": ANY, **shamir_config}
+        assert r.json() == expected, r.json()
+
+    # Delete current shamir recovery
+    with run_test("Delete current shamir recovery") as context:
+        r = make_request(
+            "DELETE",
+            f"{resana_addr}/recovery/shamir/setup",
+            auth_token=gordon_token,
+        )
+        context.request = r
+        assert r.status_code == 200
+
+    # Get current shamir recovery
+    with run_test("Get current shamir recovery after deletion") as context:
+        r = make_request(
+            "GET",
+            f"{resana_addr}/recovery/shamir/setup",
+            auth_token=gordon_token,
+        )
+        context.request = r
+        assert r.status_code == 404, (r.status_code, r.json())
+        assert r.json() == {"error": "not_setup"}, r.json()
+
+    # Recreate shamir recovery
+    with run_test("Create shamir recovery") as context:
+        shamir_config = {
+            "threshold": 3,
+            "recipients": [
+                {
+                    "email": INVITEE_EMAIL,
+                    "weight": 1,
+                },
+                {
+                    "email": INVITEE_EMAIL_2,
+                    "weight": 2,
+                },
+            ],
+        }
+        r = make_request(
+            "POST",
+            f"{resana_addr}/recovery/shamir/setup",
+            auth_token=auth_token,
+            json=shamir_config,
+        )
+        context.request = r
+        assert r.status_code == 200, (r.status_code, r.json())
+
+    # Get current shamir recovery
+    with run_test("Get current shamir recovery, after recreation") as context:
+        r = make_request(
+            "GET",
+            f"{resana_addr}/recovery/shamir/setup",
+            auth_token=gordon_token,
+        )
+        context.request = r
+        assert r.status_code == 200, (r.status_code, r.json())
+        expected = {"device_label": ANY, **shamir_config}
+        assert r.json() == expected, r.json()
+
+    # List other shamir recoveries
+    with run_test("List other shamir recoveries (invitee 1)") as context:
+        r = make_request(
+            "GET",
+            f"{resana_addr}/recovery/shamir/setup/others",
+            auth_token=eli_token,
+        )
+        context.request = r
+        assert r.status_code == 200, (r.status_code, r.json())
+        expected = {
+            "setups": [
+                {
+                    "device_label": ANY,
+                    "label": ANY,
+                    "email": DEFAULT_EMAIL,
+                    "my_weight": 1,
+                    **shamir_config,
+                }
+            ]
+        }
+        assert r.json() == expected, r.json()
+
+    # List other shamir recoveries
+    with run_test("List other shamir recoveries (invitee 2)") as context:
+        r = make_request(
+            "GET",
+            f"{resana_addr}/recovery/shamir/setup/others",
+            auth_token=richard_token,
+        )
+        context.request = r
+        assert r.status_code == 200, (r.status_code, r.json())
+        expected = {
+            "setups": [
+                {
+                    "device_label": ANY,
+                    "label": ANY,
+                    "email": DEFAULT_EMAIL,
+                    "my_weight": 2,
+                    **shamir_config,
+                }
+            ]
+        }
+        assert r.json() == expected, r.json()
+
+    # Create shamir recovery invitation
+    with run_test("Create shamir recovery invitation") as context:
+        r = make_request(
+            "POST",
+            f"{resana_addr}/invitations",
+            json={"type": "shamir_recovery", "claimer_email": DEFAULT_EMAIL},
+            auth_token=eli_token,
+        )
+        context.request = r
+        assert r.status_code == 200, (r.status_code, r.json())
+        invitation_token = r.json()["token"]
+        assert r.json() == {"token": invitation_token}, r.json()
+
+    # Delete shamir recovery invitation
+    with run_test("Delete shamir recovery invitation") as context:
+        r = make_request(
+            "DELETE",
+            f"{resana_addr}/invitations/{invitation_token}",
+            auth_token=richard_token,
+        )
+        context.request = r
+        assert r.status_code == 204
+
+    # List shamir recovery invitation
+    with run_test("List shamir recovery invitations (empty)") as context:
+        r = make_request(
+            "GET",
+            f"{resana_addr}/invitations",
+            auth_token=richard_token,
+        )
+        context.request = r
+        assert r.status_code == 200
+        assert r.json() == {"device": None, "shamir_recoveries": [], "users": []}, r.json()
+
+    # Rereate shamir recovery invitation
+    with run_test("Recreate shamir recovery invitation") as context:
+        r = make_request(
+            "POST",
+            f"{resana_addr}/invitations",
+            json={"type": "shamir_recovery", "claimer_email": DEFAULT_EMAIL},
+            auth_token=richard_token,
+        )
+        context.request = r
+        assert r.status_code == 200, (r.status_code, r.json())
+        invitation_token = r.json()["token"]
+        assert r.json() == {"token": invitation_token}, r.json()
+
+    # List shamir recovery invitation
+    with run_test("List shamir recovery invitations") as context:
+        r = make_request(
+            "GET",
+            f"{resana_addr}/invitations",
+            auth_token=richard_token,
+        )
+        context.request = r
+        assert r.status_code == 200
+        shamir_recovery = {
+            "claimer_email": DEFAULT_EMAIL,
+            "created_on": ANY,
+            "token": invitation_token,
+            "status": "IDLE",
+        }
+        assert r.json() == {
+            "device": None,
+            "shamir_recoveries": [shamir_recovery],
+            "users": [],
+        }, r.json()
+
+    # Helpers for the claim
+
+    def _claimer_wait(email):
+        return make_request(
+            "POST",
+            f"{resana_addr}/invitations/{invitation_token}/claimer/1-wait-peer-ready",
+            json={"greeter_email": email},
+        )
+
+    def _greeter_wait(auth_token):
+        return make_request(
+            "POST",
+            f"{resana_addr}/invitations/{invitation_token}/greeter/1-wait-peer-ready",
+            auth_token=auth_token,
+        )
+
+    def _greeter_wait_peer_trust(auth_token):
+        return make_request(
+            "POST",
+            f"{resana_addr}/invitations/{invitation_token}/greeter/2-wait-peer-trust",
+            auth_token=auth_token,
+        )
+
+    def _claimer_check_trust(greeter_sas):
+        return make_request(
+            "POST",
+            f"{resana_addr}/invitations/{invitation_token}/claimer/2-check-trust",
+            json={"greeter_sas": greeter_sas},
+        )
+
+    def _claimer_wait_peer_trust():
+        return make_request(
+            "POST",
+            f"{resana_addr}/invitations/{invitation_token}/claimer/3-wait-peer-trust",
+        )
+
+    def _greeter_check_trust_and_finalize(auth_token, claimer_sas):
+        check_trust = make_request(
+            "POST",
+            f"{resana_addr}/invitations/{invitation_token}/greeter/3-check-trust",
+            auth_token=auth_token,
+            json={"claimer_sas": claimer_sas},
+        )
+        finalize = make_request(
+            "POST",
+            f"{resana_addr}/invitations/{invitation_token}/greeter/4-finalize",
+            auth_token=auth_token,
+        )
+        return check_trust, finalize
+
+    # Now the actual claim
+
+    # Claimer retrieve info
+    with run_test("Claimer retrieve info") as context:
+        r = make_request(
+            "POST",
+            f"{resana_addr}/invitations/{invitation_token}/claimer/0-retrieve-info",
+        )
+        context.request = r
+        assert r.status_code == 200
+        assert r.json() == {
+            "enough_shares": False,
+            "recipients": [
+                {"email": INVITEE_EMAIL, "retrieved": False, "weight": 1},
+                {"email": INVITEE_EMAIL_2, "retrieved": False, "weight": 2},
+            ],
+            "threshold": 3,
+            "type": "shamir_recovery",
+        }, r.json()
+
+    claimer_ret = None
+    greeter_ret = None
+
+    # First exchange
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        claimer_future = executor.submit(_claimer_wait, INVITEE_EMAIL)
+        greeter_future = executor.submit(_greeter_wait, eli_token)
+        claimer_ret = claimer_future.result()
+        greeter_ret = greeter_future.result()
+
+    with run_test("Invite shamir recovery greeter wait") as context:
+        context.request = greeter_ret
+        context.request = r
+        assert greeter_ret.status_code == 200
+        assert greeter_ret.json() == {"greeter_sas": ANY, "type": "shamir_recovery"}
+
+    with run_test("Invite shamir recovery claimer wait") as context:
+        context.request = claimer_ret
+        assert claimer_ret.status_code == 200
+        assert claimer_ret.json() == {"candidate_greeter_sas": [ANY, ANY, ANY, ANY]}
+        assert greeter_ret.json()["greeter_sas"] in claimer_ret.json()["candidate_greeter_sas"]
+        greeter_sas = greeter_ret.json()["greeter_sas"]
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        greeter_future = executor.submit(_greeter_wait_peer_trust, eli_token)
+        time.sleep(sleep_time)
+        claimer_future = executor.submit(_claimer_check_trust, greeter_sas)
+        greeter_ret = greeter_future.result()
+        claimer_ret = claimer_future.result()
+
+    with run_test("Invite shamir recovery wait peer trust") as context:
+        context.request = greeter_ret
+        assert greeter_ret.status_code == 200
+        greeter_ret.json() == {"candidate_claimer_sas": [ANY, ANY, ANY, ANY]}
+
+    with run_test("Invite shamir recovery claimer check trust") as context:
+        context.request = claimer_ret
+        assert claimer_ret.status_code == 200
+        claimer_ret.json() == {"claimer_sas": ANY}
+        assert claimer_ret.json()["claimer_sas"] in greeter_ret.json()["candidate_claimer_sas"]
+        claimer_sas = claimer_ret.json()["claimer_sas"]
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        claimer_future = executor.submit(_claimer_wait_peer_trust)
+        time.sleep(sleep_time)
+        greeter_future = executor.submit(_greeter_check_trust_and_finalize, eli_token, claimer_sas)
+        greeter_check_trust_ret, greeter_finalize_ret = greeter_future.result()
+        claimer_ret = claimer_future.result()
+
+    with run_test("Invite shamir recovery greeter check trust") as context:
+        context.request = greeter_check_trust_ret
+        assert greeter_ret.status_code == 200
+
+    with run_test("Invite shamir recovery greeter finalize") as context:
+        context.request = greeter_finalize_ret
+        assert greeter_ret.status_code == 200
+
+    with run_test("Invite shamir recovery claimer wait peer trust") as context:
+        context.request = claimer_ret
+        assert claimer_ret.status_code == 200
+        assert claimer_ret.json() == {"enough_shares": False}
+
+    # Second exchange
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        claimer_future = executor.submit(_claimer_wait, INVITEE_EMAIL_2)
+        greeter_future = executor.submit(_greeter_wait, richard_token)
+        claimer_ret = claimer_future.result()
+        greeter_ret = greeter_future.result()
+
+    with run_test("Invite shamir recovery 2 greeter wait") as context:
+        context.request = greeter_ret
+        context.request = r
+        assert greeter_ret.status_code == 200
+        assert greeter_ret.json() == {"greeter_sas": ANY, "type": "shamir_recovery"}
+
+    with run_test("Invite shamir recovery 2 claimer wait") as context:
+        context.request = claimer_ret
+        assert claimer_ret.status_code == 200
+        assert claimer_ret.json() == {"candidate_greeter_sas": [ANY, ANY, ANY, ANY]}
+        assert greeter_ret.json()["greeter_sas"] in claimer_ret.json()["candidate_greeter_sas"]
+        greeter_sas = greeter_ret.json()["greeter_sas"]
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        greeter_future = executor.submit(_greeter_wait_peer_trust, richard_token)
+        time.sleep(sleep_time)
+        claimer_future = executor.submit(_claimer_check_trust, greeter_sas)
+        greeter_ret = greeter_future.result()
+        claimer_ret = claimer_future.result()
+
+    with run_test("Invite shamir recovery 2 greeter wait peer trust") as context:
+        context.request = greeter_ret
+        assert greeter_ret.status_code == 200
+        greeter_ret.json() == {"candidate_claimer_sas": [ANY, ANY, ANY, ANY]}
+
+    with run_test("Invite shamir recovery 2 claimer check trust") as context:
+        context.request = claimer_ret
+        assert claimer_ret.status_code == 200
+        claimer_ret.json() == {"claimer_sas": ANY}
+        assert claimer_ret.json()["claimer_sas"] in greeter_ret.json()["candidate_claimer_sas"]
+        claimer_sas = claimer_ret.json()["claimer_sas"]
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        claimer_future = executor.submit(_claimer_wait_peer_trust)
+        time.sleep(sleep_time)
+        greeter_future = executor.submit(
+            _greeter_check_trust_and_finalize, richard_token, claimer_sas
+        )
+        greeter_check_trust_ret, greeter_finalize_ret = greeter_future.result()
+        claimer_ret = claimer_future.result()
+
+    with run_test("Invite shamir recovery 2 greeter check trust") as context:
+        context.request = greeter_check_trust_ret
+        assert greeter_ret.status_code == 200
+
+    with run_test("Invite shamir recovery 2 greeter finalize") as context:
+        context.request = greeter_finalize_ret
+        assert greeter_ret.status_code == 200
+
+    with run_test("Invite shamir recovery 2 claimer wait peer trust") as context:
+        context.request = claimer_ret
+        assert claimer_ret.status_code == 200
+        assert claimer_ret.json() == {"enough_shares": True}
+
+    # Now the claimer can finalize
+
+    with run_test("Invite shamir recovery claimer finalize") as context:
+        new_password = "<new-password>"
+        r = make_request(
+            "POST",
+            f"{resana_addr}/invitations/{invitation_token}/claimer/4-finalize",
+            json={"key": new_password},
+        )
+        context.request = r
+        assert r.status_code == 200
+
+    # Try to log with the new device
+    with run_test("Log in after shamir recovery") as context:
+        r = make_request(
+            "POST",
+            f"{resana_addr}/auth",
+            json={
+                "email": DEFAULT_EMAIL,
+                "key": new_password,
+                "organization": org_id,
+            },
+        )
+        context.request = r
+        assert r.status_code == 200
+
+
 def main(
     resana_addr,
     bootstrap_addr,
@@ -1309,6 +1752,7 @@ def main(
     skip_user_invite=False,
     skip_device_invite=False,
     skip_recovery=False,
+    skip_shamir_recovery=False,
 ):
     """Test all Resana routes.
 
@@ -1341,10 +1785,14 @@ def main(
     )
     assert r.status_code == 200
     auth_token = r.json()["token"]
+    invitee_auth_token = invitee_auth_token_2 = None
 
     # Start with invitation, so we can have another user
     if not skip_user_invite:
-        test_user_invitations(auth_token, resana_addr, org_id)
+        invitee_auth_token = test_user_invitations(auth_token, resana_addr, org_id)
+        invitee_auth_token_2 = test_user_invitations(
+            auth_token, resana_addr, org_id, second_invitee=True
+        )
     if not skip_device_invite:
         test_device_invitations(auth_token, resana_addr, org_id)
     # Continue with workspaces, share/unshare
@@ -1353,17 +1801,22 @@ def main(
     # Upload, rename, delete files
     if not skip_files:
         test_files(auth_token, resana_addr)
-    # Humans to test the revoke
-    if not skip_humans:
-        test_humans(auth_token, resana_addr)
     # Device recovery
     if not skip_recovery:
         test_recovery(auth_token, resana_addr, org_id)
+    # Shamir recovery
+    if not skip_user_invite and not skip_shamir_recovery:
+        test_shamir_recovery(
+            auth_token, resana_addr, org_id, invitee_auth_token, invitee_auth_token_2
+        )
+    # Humans to test the revoke
+    if not skip_humans:
+        test_humans(auth_token, resana_addr)
 
     logger.info("Logging out...")
     r = make_request(
         "DELETE",
-        f"{resana_addr}/auth",
+        f"{resana_addr}/auth/all",
     )
     assert r.status_code == 200
 
@@ -1423,11 +1876,16 @@ if __name__ == "__main__":
         action="store_true",
         help="Skip device invite API (this may have an impact on other APIs)",
     )
+    parser.add_argument(
+        "--skip-shamir-recovery",
+        action="store_true",
+        help="Skip shamir recovery invite API (this may have an impact on other APIs)",
+    )
     parser.add_argument("--skip-recovery", action="store_true", help="Skip the recovery API")
 
     args = parser.parse_args()
     if args.org is None:
-        args.org = f"RS-test-routes-{datetime.now().strftime('%y-%m-%d-%H-%M')}"
+        args.org = f"RS-test-routes-{datetime.now().strftime('%y-%m-%d-%H-%M-%S')}"
         print(f"Using {args.org} as organization name")
 
     if args.debug:
@@ -1453,6 +1911,7 @@ if __name__ == "__main__":
         skip_user_invite=args.skip_user_invite,
         skip_device_invite=args.skip_device_invite,
         skip_recovery=args.skip_recovery,
+        skip_shamir_recovery=args.skip_shamir_recovery,
     )
 
     ret_code = 0
