@@ -13,8 +13,8 @@ $ parsec backend run \
 # Running the resana local server
 $ python -m resana_secure --rie-server-addr localhost:6888
 
-# Running the script (increment `TestOrg` after each run)
-$ python packagin/test_routes -o TestOrg1
+# Running the test script
+$ python packagin/test_routes
 ```
 """
 
@@ -31,6 +31,7 @@ import time
 import urllib.parse
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 from unittest.mock import ANY
 
 import requests
@@ -1388,7 +1389,7 @@ if __name__ == "__main__":
         "-o",
         "--org",
         type=str,
-        required=True,
+        default=None,
         help="Organization ID",
     )
     parser.add_argument("-d", "--debug", action="store_true", help="Adds extra debugging info")
@@ -1425,6 +1426,9 @@ if __name__ == "__main__":
     parser.add_argument("--skip-recovery", action="store_true", help="Skip the recovery API")
 
     args = parser.parse_args()
+    if args.org is None:
+        args.org = f"RS-test-routes-{datetime.now().strftime('%y-%m-%d-%H-%M')}"
+        print(f"Using {args.org} as organization name")
 
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
