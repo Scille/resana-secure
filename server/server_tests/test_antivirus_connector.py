@@ -1,15 +1,15 @@
-import pytest
+from dataclasses import dataclass
 from io import BytesIO
 from unittest.mock import AsyncMock, MagicMock
-import httpx
-from oscrypto import asymmetric
-from dataclasses import dataclass
 
+import httpx
+import pytest
+from oscrypto import asymmetric
+
+from antivirus_connector.app import AppConfig, app_factory
+from antivirus_connector.routes import ManifestError, ReassemblyError
 from parsec.api.protocol import OrganizationID, SequesterServiceID
 from parsec.backend.config import MockedBlockStoreConfig
-
-from antivirus_connector.app import app_factory, AppConfig
-from antivirus_connector.routes import ManifestError, ReassemblyError
 
 
 @dataclass

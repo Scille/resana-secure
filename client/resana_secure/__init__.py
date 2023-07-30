@@ -12,9 +12,10 @@ def _monkeypatch_parsec_version() -> None:
 
 
 def _monkeypatch_user_agent() -> None:
-    from ._version import __version__
     import parsec.api.transport
     import parsec.core.backend_connection.proxy
+
+    from ._version import __version__
 
     USER_AGENT = f"resana-secure/{__version__}"
     parsec.api.transport.USER_AGENT = USER_AGENT

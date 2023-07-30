@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+from functools import partial
+from typing import AsyncContextManager, AsyncIterator, Awaitable, Callable, Dict
+
 import trio
 from trio_typing import TaskStatus
-from typing import Callable, Dict, AsyncIterator, AsyncContextManager, Awaitable
-from contextlib import asynccontextmanager
 
 
 class ReadCancelledByWriter(Exception):
@@ -86,8 +88,9 @@ class ComponentNotRegistered(Exception):
 class ManagedComponent:
     def __init__(self, component: object, stop_component: Callable[[], Awaitable[None]]) -> None:
         self._rwlock = ReadWriteLock()
-        self._component: object | None = component
+        self._component: object = component
         self._stop_component_callback = stop_component
+        self._done: bool = False
 
     @classmethod
     async def run(
@@ -118,7 +121,7 @@ class ManagedComponent:
                         # Do this before entering the component's __aexit__ to ensure
                         # the component cannot be acquired while it is tearing down
                         if managed_component is not None:
-                            managed_component._component = None
+                            managed_component._done = True
             finally:
                 component_stopped.set()
 
@@ -138,7 +141,7 @@ class ManagedComponent:
         """
         try:
             async with self._rwlock.read_acquire():
-                if self._component is None:
+                if self._done:
                     raise ComponentNotRegistered
                 yield self._component
 
@@ -170,12 +173,26 @@ class LTCM:
             nursery.cancel_scope.cancel()
 
     async def register_component(
-        self, component_factory: Callable[[], AsyncContextManager[object]]
+        self,
+        component_factory: Callable[[object | None], AsyncContextManager[object]],
+        replacing: int | None = None,
     ) -> int:
         """
         Raises: Nothing
         """
-        managed_component = await self._nursery.start(ManagedComponent.run, component_factory)
+        previous_managed_component = (
+            self._components.get(replacing) if replacing is not None else None
+        )
+        previous_component = (
+            previous_managed_component._component
+            if previous_managed_component is not None
+            else None
+        )
+        wrapped_factory = partial(component_factory, previous_component=previous_component)
+        managed_component = await self._nursery.start(
+            ManagedComponent.run,
+            wrapped_factory,
+        )
         handle = id(managed_component)
         self._components[handle] = managed_component
         return handle

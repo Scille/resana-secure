@@ -1,5 +1,12 @@
 exclude: ^subtree/
 repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v2.3.0
+    hooks:
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
   - repo: https://github.com/ambv/black
     rev: 22.10.0
     hooks:
@@ -7,6 +14,14 @@ repos:
         args:
           - --line-length=100
         language_version: python3
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version.
+    rev: v0.0.272
+    hooks:
+      - id: ruff
+        args: [ --fix, --exit-non-zero-on-fix, --ignore, E501 ]
+
 
   - repo: https://github.com/PyCQA/flake8.git
     rev: 3.8.3
@@ -22,7 +37,8 @@ repos:
           # W503 line break before binary operator
           # Misc:
           # E266 too many leading '#' for block comment
-          - --ignore=E501,E127,E128,E203,W503,E266
+          # E402 Module level import not at top of file (useful for `packaging/windows/launch_script.py`)
+          - --ignore=E501,E127,E128,E203,W503,E266,E402
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v2.2.3  # Use the ref you want to point at

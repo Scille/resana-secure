@@ -1,17 +1,16 @@
 #! /usr/bin/env python3
 
-import os
-import sys
-import re
-from typing import List
-from json import dumps as json_dumps
-from urllib.request import Request, urlopen
 import argparse
-import subprocess
-import threading
-import signal
+import os
 import queue
-
+import re
+import signal
+import subprocess
+import sys
+import threading
+from json import dumps as json_dumps
+from typing import List
+from urllib.request import Request, urlopen
 
 NOTIFICATION_BASE_MSG = f"Application `{os.environ.get('APP', '<unknown app>')}` (container `{os.environ.get('CONTAINER', '<unknown container>')}`) got error/warning log:\n> "
 

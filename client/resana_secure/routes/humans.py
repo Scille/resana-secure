@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from quart import Blueprint, request
-
 from typing import Any
 
-from parsec.core.logged_core import LoggedCore
-from ..utils import authenticated, backend_errors_to_api_exceptions, APIException
+from quart import Blueprint, request
 
+from parsec.core.logged_core import LoggedCore
+
+from ..utils import APIException, authenticated, backend_errors_to_api_exceptions
 
 humans_bp = Blueprint("humans_api", __name__)
 

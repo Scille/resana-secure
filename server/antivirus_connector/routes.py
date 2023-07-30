@@ -1,20 +1,20 @@
 from __future__ import annotations
 
-from typing import Optional
 from io import BytesIO
-import structlog
+from typing import Optional
+
 import oscrypto
-from quart import Blueprint, request, current_app
+import structlog
+from quart import Blueprint, current_app, request
 from werkzeug.exceptions import RequestEntityTooLarge
 
+from parsec._parsec import CryptoError, SecretKey
 from parsec.api.data import FileManifest
 from parsec.api.data.manifest import manifest_unverified_load
-from parsec.api.protocol import SequesterServiceID, OrganizationID
-from parsec._parsec import CryptoError, SecretKey
+from parsec.api.protocol import OrganizationID, SequesterServiceID
 
-from .antivirus import check_for_malwares, AntivirusError
+from .antivirus import AntivirusError, check_for_malwares
 from .config import AppConfig
-
 
 logger = structlog.get_logger()
 

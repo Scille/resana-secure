@@ -67,5 +67,3 @@ You need to be on linux with the following requirement
     ```
 
    You can find more information about it [here](https://documentation.ubuntu.com/lxd/en/latest/howto/initialize/).
-
-

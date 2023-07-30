@@ -1,13 +1,14 @@
+from collections import namedtuple
+from unittest.mock import ANY, Mock
+
 import pytest
 import trio
-from unittest.mock import ANY, Mock
-from collections import namedtuple
-from quart.typing import TestClientProtocol, TestAppProtocol
+from quart.typing import TestAppProtocol, TestClientProtocol
 
-from .conftest import RemoteDeviceTestbed
 from parsec._parsec import DateTime
 from parsec.api.data import EntryID
 
+from .conftest import RemoteDeviceTestbed
 
 WorkspaceInfo = namedtuple("WorkspaceInfo", "id,name")
 

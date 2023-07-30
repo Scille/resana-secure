@@ -1,42 +1,41 @@
 from __future__ import annotations
 
-import sys
 import os
-import trio
 import subprocess
-from pathlib import PurePath
-from quart import Blueprint, request
+import sys
 from base64 import b64decode
+from pathlib import PurePath
+from typing import Any, List, Sequence, Tuple, TypedDict, cast
 
+import trio
 from PyQt5.QtWidgets import QApplication
-from typing import Sequence, cast, TypedDict, Any, List, Tuple
+from quart import Blueprint, request
 
 from parsec._parsec import DateTime
-from parsec.core.logged_core import LoggedCore
-from parsec.core.backend_connection import BackendConnectionError
 from parsec.api.data import EntryID, EntryName
-from parsec.core.mountpoint import MountpointNotMounted
+from parsec.core.backend_connection import BackendConnectionError
 from parsec.core.fs import FsPath, WorkspaceFS, WorkspaceFSTimestamped
 from parsec.core.fs.exceptions import (
-    FSNotADirectoryError,
-    FSFileNotFoundError,
-    FSPermissionError,
-    FSIsADirectoryError,
     FSBackendOfflineError,
+    FSFileNotFoundError,
+    FSIsADirectoryError,
+    FSNotADirectoryError,
+    FSPermissionError,
     FSRemoteManifestNotFound,
 )
+from parsec.core.logged_core import LoggedCore
+from parsec.core.mountpoint import MountpointNotMounted
+from resana_secure.gui import ResanaGuiApp
 
 from ..utils import (
     APIException,
-    authenticated,
-    get_data,
-    check_if_timestamp,
-    backend_errors_to_api_exceptions,
-    get_workspace_type,
     Parser,
+    authenticated,
+    backend_errors_to_api_exceptions,
+    check_if_timestamp,
+    get_data,
+    get_workspace_type,
 )
-
-from resana_secure.gui import ResanaGuiApp
 
 files_bp = Blueprint("files_api", __name__)
 

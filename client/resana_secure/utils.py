@@ -1,49 +1,51 @@
 from __future__ import annotations
-import platform
 
-from typing import Callable, Iterator, Any, TypeVar, Awaitable
-from typing_extensions import ParamSpec, Concatenate
-from dataclasses import dataclass
-from functools import wraps
+import platform
 from base64 import urlsafe_b64decode, urlsafe_b64encode
 from contextlib import contextmanager
-from quart import jsonify, session, request
+from dataclasses import dataclass
+from functools import wraps
+from typing import Any, Awaitable, Callable, Iterator, TypeVar
+
+from quart import jsonify, request, session
+from typing_extensions import Concatenate, ParamSpec
 from werkzeug.exceptions import HTTPException
 
-from parsec._parsec import DateTime
-from parsec.core.logged_core import LoggedCore
+from parsec._parsec import DateTime, HumanHandle, UserID
 from parsec.api.data import EntryID
-from parsec.api.protocol import OrganizationID, InvitationType, InvitationToken, DeviceLabel
-from parsec.core.types import BackendInvitationAddr, BackendOrganizationAddr
+from parsec.api.protocol import DeviceLabel, InvitationToken, InvitationType, OrganizationID
 from parsec.core.backend_connection import (
     BackendConnectionError,
-    BackendNotAvailable,
     BackendConnectionRefused,
-    BackendInvitationNotFound,
     BackendInvitationAlreadyUsed,
-    BackendNotFoundError,
+    BackendInvitationNotFound,
     BackendInvitationOnExistingMember,
+    BackendInvitationShamirRecoveryNotSetup,
+    BackendNotAvailable,
+    BackendNotFoundError,
 )
 from parsec.core.fs.exceptions import (
-    FSWorkspaceNotFoundError,
-    FSSharingNotAllowedError,
     FSBackendOfflineError,
-    FSReadOnlyError,
-    FSNoAccessError,
     FSError,
+    FSNoAccessError,
+    FSReadOnlyError,
+    FSSharingNotAllowedError,
+    FSWorkspaceNotFoundError,
 )
+from parsec.core.fs.workspacefs import WorkspaceFS, WorkspaceFSTimestamped
 from parsec.core.invite import (
+    InviteAlreadyUsedError,
     InviteError,
     InviteNotFoundError,
-    InviteAlreadyUsedError,
     InvitePeerResetError,
 )
+from parsec.core.logged_core import LoggedCore
 from parsec.core.mountpoint import MountpointAlreadyMounted, MountpointNotMounted
-from parsec.core.fs.workspacefs import WorkspaceFS, WorkspaceFSTimestamped
+from parsec.core.types import BackendInvitationAddr, BackendOrganizationAddr
 
+from .app import current_app
 from .cores_manager import CoreNotLoggedError
 from .invites_manager import LongTermCtxNotStarted
-from .app import current_app
 
 
 class APIException(HTTPException):
@@ -106,12 +108,34 @@ class BadField(Exception):
     def __init__(self, name: str):
         self.name = name
 
+    def nested(self, name: str) -> BadField:
+        return BadField(f"{name}.{self.name}")
+
+
+class BadFields(Exception):
+    def __init__(self, names: list[str]):
+        self.names = names
+
+    def nested(self, name: str) -> BadFields:
+        return BadFields([f"{name}.{subname}" for subname in self.names])
+
+    @classmethod
+    def from_indexed_bad_fields(cls, indexed_bad_fields: dict[int, list[str]]) -> BadFields:
+        return cls(
+            [
+                f"[{index}].{bad_field}"
+                for index, bad_fields in indexed_bad_fields.items()
+                for bad_field in bad_fields
+            ]
+        )
+
 
 @dataclass
 class Argument:
     name: str
     type: Any | None
     converter: Callable[[Any], T] | None
+    validator: Callable[[Any], None] | None
     new_name: str | None
     default: Any | None
     required: bool
@@ -130,6 +154,7 @@ class Parser:
         name: str,
         type: Any | None = None,
         converter: Callable[[Any], T] | None = None,
+        validator: Callable[[Any], None] | None = None,
         new_name: str | None = None,
         default: T | None = None,
         required: bool = False,
@@ -139,6 +164,7 @@ class Parser:
                 name,
                 type=type,
                 converter=converter,
+                validator=validator,
                 new_name=new_name,
                 default=default,
                 required=required,
@@ -155,6 +181,8 @@ class Parser:
                 args[name] = r
             except BadField as f:
                 bad_fields.append(f.name)
+            except BadFields as f:
+                bad_fields.extend(f.names)
         return args, bad_fields
 
     def _parse_arg(self, data: dict[str, Any], arg: Argument) -> Any:
@@ -163,11 +191,17 @@ class Parser:
             if arg.required:
                 raise BadField(arg.name)
             return arg.default
-        if arg.converter:
-            try:
+
+        try:
+            if arg.validator:
+                arg.validator(val)
+            if arg.converter:
                 return arg.converter(val)
-            except (ValueError, TypeError) as exc:
-                raise BadField(arg.name) from exc
+        except (ValueError, TypeError, AssertionError) as exc:
+            raise BadField(arg.name) from exc
+        except (BadField, BadFields) as exc:
+            raise exc.nested(arg.name)
+
         if arg.type and not isinstance(val, arg.type):
             raise BadField(arg.name)
         return val
@@ -258,6 +292,8 @@ def backend_errors_to_api_exceptions() -> Iterator[None]:
         raise APIException(404, {"error": "not_found"})
     except BackendInvitationOnExistingMember:
         raise APIException(400, {"error": "claimer_already_member"})
+    except BackendInvitationShamirRecoveryNotSetup:
+        raise APIException(400, {"error": "no_shamir_recovery_setup"})
     except BackendConnectionError as exc:
         # Should mainly catch `BackendProtocolError`
         raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
@@ -296,3 +332,28 @@ def get_default_device_label() -> DeviceLabel:
         return DeviceLabel(platform.node() or "-unknown-")
     except ValueError:
         return DeviceLabel("-unknown-")
+
+
+def email_validator(email: str) -> None:
+    HumanHandle(email, "email validation")
+
+
+async def get_user_id_from_email(
+    core: LoggedCore, email: str, *, omit_revoked: bool
+) -> UserID | None:
+    # Note: even with a valid email, we might get more than 1 result here
+    # Example:
+    # - query: billy@example.co
+    # - user1: billy@example.co
+    # - user2: billy@example.co.uk
+    # Still, checking only the first page should be ok
+    user_infos, _ = await core.find_humans(
+        query=email, omit_revoked=omit_revoked, omit_non_human=True
+    )
+    for user_info in user_infos:
+        if user_info.human_handle is None:
+            continue
+        if user_info.human_handle.email != email:
+            continue
+        return user_info.user_id
+    return None

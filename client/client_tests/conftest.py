@@ -1,34 +1,63 @@
-import pytest
-import trio
+from __future__ import annotations
+
+from dataclasses import dataclass
 from functools import partial
-from collections import namedtuple
-from quart.typing import TestAppProtocol
-from hypercorn.config import Config as HyperConfig
-from hypercorn.trio.run import worker_serve
 from pathlib import Path
 
-from parsec._parsec import DateTime, save_device_with_password_in_config, PrivateKey, SigningKey
-from parsec.api.data import UserCertificate, DeviceCertificate
+import pytest
+import trio
+from hypercorn.config import Config as HyperConfig
+from hypercorn.trio.run import worker_serve
+from quart.typing import TestAppProtocol, TestClientProtocol
+
+from parsec._parsec import (
+    DateTime,
+    LocalDevice,
+    PrivateKey,
+    SigningKey,
+    save_device_with_password_in_config,
+)
+from parsec.api.data import DeviceCertificate, UserCertificate
 from parsec.api.protocol import (
-    OrganizationID,
-    HumanHandle,
     DeviceID,
-    DeviceName,
     DeviceLabel,
+    DeviceName,
+    HumanHandle,
+    OrganizationID,
     UserProfile,
 )
-from parsec.core.types import BackendOrganizationBootstrapAddr, BackendAddr
-from parsec.core.invite import bootstrap_organization
-from parsec.backend import backend_app_factory, BackendApp
+from parsec.backend import BackendApp, backend_app_factory
 from parsec.backend.asgi import app_factory as backend_asgi_app_factory
-from parsec.backend.user import User as BackendUser, Device as BackendDevice
 from parsec.backend.config import BackendConfig, MockedBlockStoreConfig
-
+from parsec.backend.user import Device as BackendDevice
+from parsec.backend.user import User as BackendUser
+from parsec.core.invite import bootstrap_organization
+from parsec.core.types import BackendAddr, BackendOrganizationBootstrapAddr
 from resana_secure.app import app_factory
 from resana_secure.config import ResanaConfig, _CoreConfig
 
 
-LocalDeviceTestbed = namedtuple("LocalDeviceTestbed", "device,email,key,organization")
+@dataclass
+class LocalDeviceTestbed:
+    device: LocalDevice
+    email: str
+    key: str
+    organization: OrganizationID
+
+    async def authenticated_client(self, test_app: TestAppProtocol) -> TestClientProtocol:
+        test_client = test_app.test_client()
+
+        response = await test_client.post(
+            "/auth",
+            json={
+                "email": self.email,
+                "key": self.key,
+                "organization": self.organization.str,
+            },
+        )
+        assert response.status_code == 200
+        # Note cookie is automatically added to test_client's cookie jar
+        return test_client
 
 
 @pytest.fixture(scope="session")
@@ -103,19 +132,7 @@ async def test_app(core_config: ResanaConfig, client_origin: str):
 
 @pytest.fixture
 async def authenticated_client(test_app: TestAppProtocol, local_device: LocalDeviceTestbed):
-    test_client = test_app.test_client()
-
-    response = await test_client.post(
-        "/auth",
-        json={
-            "email": local_device.email,
-            "key": local_device.key,
-            "organization": local_device.organization.str,
-        },
-    )
-    assert response.status_code == 200
-    # Note cookie is automatically added to test_client's cookie jar
-    return test_client
+    return await local_device.authenticated_client(test_app)
 
 
 @pytest.fixture
@@ -201,7 +218,10 @@ async def other_local_device(
     )
 
 
-RemoteDeviceTestbed = namedtuple("RemoteDeviceTestbed", "device_id,email")
+@dataclass
+class RemoteDeviceTestbed:
+    device_id: DeviceID
+    email: str
 
 
 @pytest.fixture
@@ -233,30 +253,37 @@ async def other_device(running_backend: BackendApp, local_device: LocalDeviceTes
     return RemoteDeviceTestbed(device.device_id, email=local_device.email)
 
 
-@pytest.fixture
-async def other_user(running_backend: BackendApp, local_device: LocalDeviceTestbed):
+async def _other_user(
+    running_backend: BackendApp,
+    author: LocalDeviceTestbed,
+    core_config_dir: Path,
+    email: str,
+    label: str = "-unknown-",
+):
     organization_id = OrganizationID("CoolOrg")
     now = DateTime.now()
-    author = local_device.device.device_id
-    author_key = local_device.device.signing_key
+    author_user_id = author.device.device_id
+    author_key = author.device.signing_key
 
+    private_key = PrivateKey.generate()
     device_id = DeviceID.new()
     user_certificate = UserCertificate(
-        author=author,
+        author=author_user_id,
         timestamp=now,
         user_id=device_id.user_id,
-        human_handle=HumanHandle(email="bob@example.com", label="-unknown-"),
-        public_key=PrivateKey.generate().public_key,
+        human_handle=HumanHandle(email=email, label=label),
+        public_key=private_key.public_key,
         profile=UserProfile.STANDARD,
     )
     redacted_user_certificate = user_certificate.evolve(human_handle=None)
 
+    signing_key = SigningKey.generate()
     device_certificate = DeviceCertificate(
-        author=author,
+        author=author_user_id,
         timestamp=now,
         device_id=device_id,
         device_label=DeviceLabel("-unknown-"),
-        verify_key=SigningKey.generate().verify_key,
+        verify_key=signing_key.verify_key,
     )
     redacted_device_certificate = device_certificate.evolve(device_label=None)
 
@@ -282,7 +309,71 @@ async def other_user(running_backend: BackendApp, local_device: LocalDeviceTestb
         organization_id=organization_id, user=user, first_device=device
     )
     assert user.human_handle is not None
-    return RemoteDeviceTestbed(device.device_id, email=user.human_handle.email)
+    new_local_device = LocalDevice.generate_new_device(
+        organization_addr=author.device.organization_addr,
+        profile=UserProfile.STANDARD,
+        device_id=device_certificate.device_id,
+        human_handle=user_certificate.human_handle,
+        device_label=device_certificate.device_label,
+        signing_key=signing_key,
+        private_key=private_key,
+    )
+    password = "P@ssw0rd."
+    save_device_with_password_in_config(core_config_dir, new_local_device, password)
+    return LocalDeviceTestbed(
+        device=new_local_device,
+        email=user.human_handle.email,
+        key=password,
+        organization=organization_id,
+    )
+
+
+@pytest.fixture
+async def other_user(
+    running_backend: BackendApp, local_device: LocalDeviceTestbed, core_config_dir: Path
+):
+    return await _other_user(
+        running_backend, local_device, core_config_dir, email="bob@example.com"
+    )
+
+
+@pytest.fixture
+async def bob_user(
+    running_backend: BackendApp, local_device: LocalDeviceTestbed, core_config_dir: Path
+):
+    return await _other_user(
+        running_backend,
+        local_device,
+        core_config_dir,
+        label="Bob",
+        email="bob@example.com",
+    )
+
+
+@pytest.fixture
+async def carl_user(
+    running_backend: BackendApp, local_device: LocalDeviceTestbed, core_config_dir: Path
+):
+    return await _other_user(
+        running_backend,
+        local_device,
+        core_config_dir,
+        label="Carl",
+        email="carl@example.com",
+    )
+
+
+@pytest.fixture
+async def diana_user(
+    running_backend: BackendApp, local_device: LocalDeviceTestbed, core_config_dir: Path
+):
+    return await _other_user(
+        running_backend,
+        local_device,
+        core_config_dir,
+        label="Diana",
+        email="diana@example.com",
+    )
 
 
 # Copied from parsec's test/core/conftest.py

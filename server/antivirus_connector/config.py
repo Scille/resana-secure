@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from typing import Dict
 from dataclasses import dataclass
+from typing import Dict
+
 import oscrypto
 
 from parsec.api.protocol import SequesterServiceID

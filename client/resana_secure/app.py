@@ -1,36 +1,36 @@
 from __future__ import annotations
 
+import logging
 import re
 import secrets
-import logging
-from typing import AsyncIterator, List, cast
+from collections import defaultdict
 from contextlib import asynccontextmanager
+from typing import AsyncIterator, List, cast
 
-from quart_cors import cors
-from quart_trio import QuartTrio
-from quart_rate_limiter import RateLimiter
-from quart import current_app as quart_current_app
 from hypercorn.config import Config as HyperConfig
 from hypercorn.trio import serve as hypercorn_trio_serve
+from quart import current_app as quart_current_app
+from quart_cors import cors
+from quart_rate_limiter import RateLimiter
+from quart_trio import QuartTrio
 
 # Expose current_app as a ResanaApp for all modules
 if True:  # Hack to please flake8
     current_app = cast("ResanaApp", quart_current_app)
 
-from .ltcm import LTCM
 from .config import ResanaConfig
+from .converters import WorkspaceConverter
 from .cores_manager import CoresManager
 from .invites_manager import ClaimersManager, GreetersManager
-from .converters import WorkspaceConverter
-
+from .ltcm import LTCM
 from .routes.auth import auth_bp
-from .routes.humans import humans_bp
 from .routes.files import files_bp
-from .routes.invite import invite_bp
-from .routes.workspaces import workspaces_bp
+from .routes.humans import humans_bp
 from .routes.invitations import invitations_bp
-from .routes.recovery import recovery_bp
+from .routes.invite import invite_bp
 from .routes.organization import organization_bp
+from .routes.recovery import recovery_bp
+from .routes.workspaces import workspaces_bp
 
 
 class ResanaApp(QuartTrio):
@@ -38,7 +38,7 @@ class ResanaApp(QuartTrio):
 
     ltcm: LTCM
     cores_manager: CoresManager
-    greeters_manager: GreetersManager
+    greeters_managers: dict[str, GreetersManager]
     claimers_manager: ClaimersManager
     resana_config: ResanaConfig
     hyper_config: HyperConfig
@@ -124,7 +124,7 @@ async def app_factory(
             config=config,
             ltcm=ltcm,
         )
-        app.greeters_manager = GreetersManager()
+        app.greeters_managers = defaultdict(GreetersManager)
         app.claimers_manager = ClaimersManager()
         yield app
 

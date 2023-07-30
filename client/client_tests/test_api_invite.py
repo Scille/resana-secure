@@ -1,13 +1,13 @@
-import trio
-import pytest
-import trio.testing
 from base64 import b64encode
-from unittest.mock import ANY
 from collections import namedtuple
+from unittest.mock import ANY
+
+import pytest
+import trio
+import trio.testing
 from quart.typing import TestAppProtocol, TestClientProtocol
 
 from .conftest import LocalDeviceTestbed
-
 
 InvitationInfo = namedtuple("InvitationInfo", "type,claimer_email,token")
 
@@ -60,6 +60,7 @@ async def test_claim_ok(
         assert response.status_code == 200
         invitation = InvitationInfo("device", None, body["token"])
 
+    assert local_device.device.human_handle is not None
     new_device_email = (
         invitation.claimer_email if type == "user" else local_device.device.human_handle.email
     )
@@ -70,7 +71,7 @@ async def test_claim_ok(
 
         # Step 0
         response = await claimer_client.post(
-            f"/invitations/{invitation.token}/claimer/0-retreive-info", json={}
+            f"/invitations/{invitation.token}/claimer/0-retrieve-info", json={}
         )
         body = await response.get_json()
         assert response.status_code == 200
@@ -172,7 +173,7 @@ async def test_claim_ok(
     response = await authenticated_client.get("/invitations")
     body = await response.get_json()
     assert response.status_code == 200
-    assert body == {"users": [], "device": None}
+    assert body == {"users": [], "device": None, "shamir_recoveries": []}
 
     # And the new user should be visible
     if type == "user":
@@ -268,7 +269,7 @@ async def test_claimer_step_1_before_0(
 
             # Go back to step 0 should allow to do step 1 fine
             response = await claimer_client.post(
-                f"/invitations/{device_invitation.token}/claimer/0-retreive-info", json={}
+                f"/invitations/{device_invitation.token}/claimer/0-retrieve-info", json={}
             )
             assert response.status_code == 200
             response = await claimer_client.post(
@@ -289,7 +290,7 @@ async def test_claimer_concurrent_requests_on_step_1(
     # Step 0
     claimer_client = test_app.test_client()
     response = await claimer_client.post(
-        f"/invitations/{device_invitation.token}/claimer/0-retreive-info", json={}
+        f"/invitations/{device_invitation.token}/claimer/0-retrieve-info", json={}
     )
     assert response.status_code == 200
 
@@ -331,7 +332,7 @@ async def test_cancel_step_request_then_retry(
     # Step 0
 
     response = await claimer_client.post(
-        f"/invitations/{device_invitation.token}/claimer/0-retreive-info", json={}
+        f"/invitations/{device_invitation.token}/claimer/0-retrieve-info", json={}
     )
     assert response.status_code == 200
 
@@ -373,7 +374,7 @@ async def test_cancel_step_request_then_retry(
     # Now retry the step 1, This time everything should run fine.
     if claimer_do_step0_before_final_step1:
         response = await claimer_client.post(
-            f"/invitations/{device_invitation.token}/claimer/0-retreive-info", json={}
+            f"/invitations/{device_invitation.token}/claimer/0-retrieve-info", json={}
         )
         assert response.status_code == 200
     with trio.fail_after(1):
@@ -403,7 +404,7 @@ async def test_greeter_claimer_start_order(
     async def _claimer():
         # Step 0
         response = await claimer_client.post(
-            f"/invitations/{device_invitation.token}/claimer/0-retreive-info", json={}
+            f"/invitations/{device_invitation.token}/claimer/0-retrieve-info", json={}
         )
         assert response.status_code == 200
         # Step 1
@@ -424,3 +425,15 @@ async def test_greeter_claimer_start_order(
             nursery.start_soon(first_cb)
             await trio.testing.wait_all_tasks_blocked()
             await second_cb()
+
+
+@pytest.mark.trio
+async def test_claimer_step_0_legacy_route_with_typo(
+    test_app: TestAppProtocol,
+    device_invitation: InvitationInfo,
+):
+    claimer_client = test_app.test_client()
+    response = await claimer_client.post(
+        f"/invitations/{device_invitation.token}/claimer/0-retreive-info", json={}
+    )
+    assert response.status_code == 200

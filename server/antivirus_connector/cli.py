@@ -1,24 +1,24 @@
 from __future__ import annotations
 
-import click
-import os
-from typing import Optional, Tuple, List
-from pathlib import Path
-from functools import partial
-import sys
 import logging
+import os
+import sys
+from functools import partial
+from pathlib import Path
+from typing import List, Optional, Tuple
+
+import click
+import oscrypto.asymmetric
 import structlog
 import trio_asyncio
-import oscrypto.asymmetric
 
 from parsec.api.protocol import SequesterServiceID
-from parsec.backend.config import BaseBlockStoreConfig
 from parsec.backend.blockstore import PostgreSQLBlockStoreConfig
 from parsec.backend.cli.utils import _parse_blockstore_params
+from parsec.backend.config import BaseBlockStoreConfig
 
-from .app import serve_app, AppConfig
 from ._version import __version__
-
+from .app import AppConfig, serve_app
 
 logger = structlog.get_logger()
 

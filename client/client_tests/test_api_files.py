@@ -1,17 +1,18 @@
-import pytest
-import trio
-import httpx
 import random
 from base64 import b64encode
+from typing import Optional
 from unittest.mock import ANY, Mock
-from quart.typing import TestClientProtocol
+
+import httpx
+import pytest
+import trio
 from hypercorn.config import Config as HyperConfig
 from hypercorn.trio import serve
+from quart.typing import TestClientProtocol
 from quart_trio.testing import TrioTestApp
-from typing import Optional
 
-from parsec.core.config import CoreConfig
 from parsec._parsec import DateTime
+from parsec.core.config import CoreConfig
 
 
 def get_session_cookie(authenticated_client: TestClientProtocol) -> str:

@@ -1,15 +1,14 @@
 # Resana Secure (https://parsec.cloud) Copyright (c) 2021 Scille SAS
 
-import os
-import sys
-import shutil
 import argparse
+import os
 import platform
+import shutil
 import subprocess
+import sys
 from hashlib import sha256
-from urllib.request import urlopen
 from pathlib import Path
-
+from urllib.request import urlopen
 
 BUILD_DIR = Path("build").resolve()
 

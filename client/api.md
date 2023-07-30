@@ -261,6 +261,15 @@ HTTP 200
             "created_on" <datetime>,
             "status": <string>
         }
+    "shamir_recoveries": [
+        {
+            "token": <uuid>,
+            "created_on": <datetime>,
+            "claimer_email": <string>,
+            "status": <string>
+        },
+        …
+    ]
 }
 ```
 
@@ -298,6 +307,14 @@ ou pour un device
 }
 ```
 
+ou pour une récupération partagée
+```python
+{
+    "type": "shamir_recovery"
+    "claimer_email": <string>
+}
+```
+
 Response:
 
 ```python
@@ -313,6 +330,24 @@ ou
 HTTP 400
 {
     "error":  "claimer_already_member"
+}
+```
+
+ou (seulement pour les récupérations partagées)
+
+```python
+HTTP 400
+{
+    "error":  "claimer_not_a_member"
+}
+```
+
+ou (seulement pour les récupérations partagées)
+
+```python
+HTTP 400
+{
+    "error":  "no_shamir_recovery_setup"
 }
 ```
 
@@ -332,7 +367,6 @@ Request:
 
 ```python
 {
-    "token": <uuid>
 }
 ```
 
@@ -504,35 +538,67 @@ ou
 
 ## Enrôlement (claimer)
 
-### `POST /invitations/<token>/claimer/0-retreive-info`
+### `POST /invitations/<token>/claimer/0-retrieve-info`
 
 Démarre la phase d'enrôlement et récupère des informations de base sur l'invitation.
+
+Note: this route is also exposed as `POST /invitations/<token>/claimer/0-retreive-info` due to a legacy typo (`0-retrieve-info` vs `0-retreive-info``)
 
 Request:
 
 ```python
 {
-    "token": <uuid>
 }
 ```
 
-Response:
+Les champs de la réponse dépendent de la valeur du champs `type`.
+
+Pour une invitation de type utilisateur:
 
 ```python
 HTTP 200
 {
-    "type": <string>,
-    "greeter_email": <string>,
+    "type": "user",
+    "greeter_email": <string>
 }
 ```
 
-ou
+Pour une invitation de type device:
+
+```python
+HTTP 200
+{
+    "type": "device",
+    "greeter_email": <string>
+}
+```
+
+Pour une invitation de type shamir:
+
+```python
+HTTP 200
+{
+    "type": "shamir_recovery",
+    "threshold": <int>,
+    "enough_shares": <bool>,
+    "recipients": [
+        {
+            "email": <str>,
+            "weight": <int>,
+            "retrieved": <bool>,
+        },
+        ...
+    ]
+}
+```
+
+Si `enough_share` est vrai, le client doit passer directement à l'étape 4.
 
 - HTTP 404 si le token est inconnu
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
 - HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
-`type` est `DEVICE` ou `USER`
+`type` est `device`, `user` or `shamir_recovery`
 `candidate_greeter_sas` est une liste de quatre codes dont un seul correspond
 au code SAS du pair. L'utilisateur est donc obligé de se concerter avec le pair
 pour déterminer lequel est le bon.
@@ -541,11 +607,18 @@ pour déterminer lequel est le bon.
 
 Attend que le pair qui enrôle ait rejoint le serveur Parsec.
 
-Request:
+Request pour une invitation de type user ou device:
 
 ```python
 {
-    "token": <uuid>
+}
+```
+
+Request pour une invitation de type shamir
+
+```python
+{
+    "greeter_email": str
 }
 ```
 
@@ -558,7 +631,23 @@ HTTP 200
 }
 ```
 
-ou
+ou, dans le cas d'une invitation shamir quand l'email fournit ne correspond à aucun des destinataires:
+
+```python
+HTTP 400
+{
+    "error": "email_not_in_recipients"
+}
+```
+
+ou, dans le cas d'une invitation shamir quand l'email fournit correspond à un destinataire déjà contacté:
+
+```python
+HTTP 400
+{
+    "error": "recipient_already_recovered"
+}
+```
 
 - HTTP 404 si le token est inconnu
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
@@ -619,6 +708,19 @@ HTTP 200
 }
 ```
 
+ou, dans le cadre d'une invitation de type shamir:
+
+```python
+HTTP 200
+{
+    "enough_shares": bool
+}
+```
+
+Si `enough_shares` est faux, le client doit recommencer à l'étape 0 (ou directement l'étape 1) pour récupérer une nouvelle part du secret.
+
+Si `enough_shares` est vrai, le client peut continuer à l'étape 4 pour finalizer la création de l'appareil.
+
 ou
 
 - HTTP 404 si le token est inconnu
@@ -643,6 +745,15 @@ Response:
 ```python
 HTTP 200
 {
+}
+```
+
+ou dans le cas d'une invitation shamir avec un nombre de parts insuffisant:
+
+```python
+HTTP 400
+{
+    "error": "not-enough-shares"
 }
 ```
 
@@ -1676,5 +1787,137 @@ ou
 HTTP 400
 {
     "error": "invalid_passphrase"
+}
+```
+
+### `POST /recovery/shamir/setup`
+
+Configure un nouvel appareil de récupération partagé.
+
+Request:
+
+```python
+{
+    "threshold": <int>
+    "recipients": [
+        {
+            "email": <str>,
+            "weight": <int>
+        },
+        ...
+    ]
+}
+```
+
+Response:
+
+```python
+HTTP 200
+{
+}
+```
+
+ou
+
+```python
+HTTP 400
+{
+    "error": "users_not_found",
+    "emails": [<string>, ...]
+}
+```
+
+ou
+
+```python
+HTTP 400
+{
+    "error": "invalid_configuration"
+}
+```
+
+
+### `DELETE /recovery/shamir/setup`
+
+Supprime l'appareil de récupération partagé courant.
+
+Request:
+
+```python
+{
+}
+```
+
+Response:
+
+```python
+HTTP 200
+{
+}
+```
+
+### `GET /recovery/shamir/setup`
+
+Retourne l'appareil de récupération partagé courant
+
+```python
+{
+}
+```
+
+Response:
+
+```python
+HTTP 200
+{
+    "device_label": str,
+    "threshold": int,
+    "recipients": [
+        {
+            "email": <str>,
+            "weight": <int>
+        },
+        ...
+    ]
+}
+```
+or
+```python
+HTTP 404
+{
+    "error": "not_setup"
+}
+```
+
+
+### `GET /recovery/shamir/setup/others`
+
+Retourne l'appareil de récupération partagé courant
+
+```python
+{
+}
+```
+
+Response:
+
+```python
+HTTP 200
+{
+    "setups": [
+        {
+            "email": <str>,
+            "label": <str>,
+            "device_label": <str>,
+            "threshold": <int>,
+            "recipients": [
+                {
+                    "email": <str>,
+                    "weight": <int>
+                },
+            "my_weight": <int>,
+        },
+        ...
+    ]
 }
 ```

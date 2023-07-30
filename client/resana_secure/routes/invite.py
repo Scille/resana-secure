@@ -1,46 +1,78 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from quart import Blueprint
 
-from parsec.core.logged_core import LoggedCore
-from parsec.api.protocol import InvitationType, HumanHandle, UserProfile
+from parsec._parsec import InvitationDeletedReason, LocalDevice, save_device_with_password_in_config
 from parsec.api.data import SASCode
-from parsec._parsec import save_device_with_password_in_config
-from parsec.core.invite import (
-    UserClaimInitialCtx,
-    DeviceClaimInitialCtx,
-    UserClaimInProgress1Ctx,
-    DeviceClaimInProgress1Ctx,
-    UserClaimInProgress2Ctx,
-    DeviceClaimInProgress2Ctx,
-    UserClaimInProgress3Ctx,
-    DeviceClaimInProgress3Ctx,
-    UserGreetInProgress1Ctx,
-    DeviceGreetInProgress1Ctx,
-    UserGreetInProgress2Ctx,
-    DeviceGreetInProgress2Ctx,
-    UserGreetInProgress3Ctx,
-    DeviceGreetInProgress3Ctx,
-    UserGreetInProgress4Ctx,
-    DeviceGreetInProgress4Ctx,
-)
+from parsec.api.protocol import HumanHandle, InvitationToken, InvitationType, UserID, UserProfile
+from parsec.core.backend_connection import backend_authenticated_cmds_factory
 from parsec.core.fs.storage.user_storage import user_storage_non_speculative_init
+from parsec.core.invite import (
+    DeviceClaimInitialCtx,
+    DeviceClaimInProgress1Ctx,
+    DeviceClaimInProgress2Ctx,
+    DeviceClaimInProgress3Ctx,
+    DeviceGreetInProgress1Ctx,
+    DeviceGreetInProgress2Ctx,
+    DeviceGreetInProgress3Ctx,
+    DeviceGreetInProgress4Ctx,
+    InviteNotFoundError,
+    ShamirRecoveryClaimInProgress1Ctx,
+    ShamirRecoveryClaimInProgress2Ctx,
+    ShamirRecoveryClaimInProgress3Ctx,
+    ShamirRecoveryClaimPreludeCtx,
+    ShamirRecoveryGreetInProgress1Ctx,
+    ShamirRecoveryGreetInProgress2Ctx,
+    ShamirRecoveryGreetInProgress3Ctx,
+    UserClaimInitialCtx,
+    UserClaimInProgress1Ctx,
+    UserClaimInProgress2Ctx,
+    UserClaimInProgress3Ctx,
+    UserGreetInProgress1Ctx,
+    UserGreetInProgress2Ctx,
+    UserGreetInProgress3Ctx,
+    UserGreetInProgress4Ctx,
+)
+from parsec.core.logged_core import LoggedCore
+from parsec.core.recovery import generate_new_device_from_recovery
 
+from ..app import current_app
 from ..utils import (
-    authenticated,
-    get_data,
-    Parser,
     APIException,
+    Parser,
     apitoken_to_addr,
+    authenticated,
     backend_errors_to_api_exceptions,
+    email_validator,
+    get_data,
     get_default_device_label,
 )
-from ..app import current_app
-
 
 invite_bp = Blueprint("invite_api", __name__)
+
+
+# Helper
+
+
+async def _get_claimer_user_id_from_token(
+    core: LoggedCore,
+    token: InvitationToken,
+) -> UserID:
+    for invitation in await core.list_invitations():
+        if invitation.token == token:
+            return invitation.claimer_user_id
+    raise InviteNotFoundError(token)
+
+
+async def _delete_shamir_invitation(device: LocalDevice, token: InvitationToken) -> None:
+    async with backend_authenticated_cmds_factory(
+        addr=device.organization_addr,
+        device_id=device.device_id,
+        signing_key=device.signing_key,
+    ) as cmds:
+        await cmds.invite_delete(token=token, reason=InvitationDeletedReason.FINISHED)
 
 
 ### Greeter ###
@@ -55,16 +87,21 @@ async def greeter_1_wait_peer_ready(core: LoggedCore, apitoken: str) -> tuple[di
         raise APIException(404, {"error": "unknown_token"})
 
     with backend_errors_to_api_exceptions():
-        async with current_app.greeters_manager.start_ctx(
+        async with current_app.greeters_managers[core.device.slug].start_ctx(
             device=core.device, addr=addr
         ) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
             # `do_wait_peer` has been done in `start_greeting_ctx` so nothing more to do
-    if not isinstance(in_progress_ctx, (UserGreetInProgress1Ctx, DeviceGreetInProgress1Ctx)):
+    if not isinstance(
+        in_progress_ctx,
+        (UserGreetInProgress1Ctx, DeviceGreetInProgress1Ctx, ShamirRecoveryGreetInProgress1Ctx),
+    ):
         raise APIException(409, {"error": "invalid_state"})
+    type = addr.invitation_type.str.lower()
+    assert type in ("user", "device", "shamir_recovery")
     return (
         {
-            "type": "user" if addr.invitation_type == InvitationType.USER else "device",
+            "type": type,
             "greeter_sas": in_progress_ctx.greeter_sas.str,
         },
         200,
@@ -80,10 +117,17 @@ async def greeter_2_wait_peer_trust(core: LoggedCore, apitoken: str) -> tuple[di
         raise APIException(404, {"error": "unknown_token"})
 
     with backend_errors_to_api_exceptions():
-        async with current_app.greeters_manager.retreive_ctx(addr) as lifetime_ctx:
+        async with current_app.greeters_managers[core.device.slug].retrieve_ctx(
+            addr
+        ) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
             if not isinstance(
-                in_progress_ctx, (UserGreetInProgress1Ctx, DeviceGreetInProgress1Ctx)
+                in_progress_ctx,
+                (
+                    UserGreetInProgress1Ctx,
+                    DeviceGreetInProgress1Ctx,
+                    ShamirRecoveryGreetInProgress1Ctx,
+                ),
             ):
                 raise APIException(409, {"error": "invalid_state"})
 
@@ -113,10 +157,17 @@ async def greeter_3_check_trust(core: LoggedCore, apitoken: str) -> tuple[dict[s
         raise APIException.from_bad_fields(bad_fields)
 
     with backend_errors_to_api_exceptions():
-        async with current_app.greeters_manager.retreive_ctx(addr) as lifetime_ctx:
+        async with current_app.greeters_managers[core.device.slug].retrieve_ctx(
+            addr
+        ) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
             if not isinstance(
-                in_progress_ctx, (UserGreetInProgress2Ctx, DeviceGreetInProgress2Ctx)
+                in_progress_ctx,
+                (
+                    UserGreetInProgress2Ctx,
+                    DeviceGreetInProgress2Ctx,
+                    ShamirRecoveryGreetInProgress2Ctx,
+                ),
             ):
                 raise APIException(409, {"error": "invalid_state"})
 
@@ -155,7 +206,9 @@ async def greeter_4_finalize(core: LoggedCore, apitoken: str) -> tuple[dict[str,
         granted_profile = None
 
     with backend_errors_to_api_exceptions():
-        async with current_app.greeters_manager.retreive_ctx(addr) as lifetime_ctx:
+        async with current_app.greeters_managers[core.device.slug].retrieve_ctx(
+            addr
+        ) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
             in_progress_4_ctx: UserGreetInProgress4Ctx | DeviceGreetInProgress4Ctx
 
@@ -175,6 +228,11 @@ async def greeter_4_finalize(core: LoggedCore, apitoken: str) -> tuple[dict[str,
                     author=core.device, device_label=in_progress_4_ctx.requested_device_label
                 )
 
+            elif isinstance(in_progress_ctx, ShamirRecoveryGreetInProgress3Ctx):
+                claimer_user_id = await _get_claimer_user_id_from_token(core, addr.token)
+                share_data = await core.get_shamir_recovery_share_data(claimer_user_id)
+                await in_progress_ctx.send_share_data(share_data)
+
             else:
                 raise APIException(409, {"error": "invalid_state"})
 
@@ -186,26 +244,66 @@ async def greeter_4_finalize(core: LoggedCore, apitoken: str) -> tuple[dict[str,
 ### Claimer ###
 
 
-# Note claimer routes are not authentication
+def _prelude_to_response(prelude: ShamirRecoveryClaimPreludeCtx) -> dict[str, Any]:
+    threshold = prelude.threshold
+    enough_shares = prelude.has_enough_shares()
+    recipients = []
+    for recipient in prelude.recipients:
+        assert recipient.human_handle is not None
+        email = recipient.human_handle.email
+        weight = recipient.shares
+        retrieved = recipient.user_id in prelude.recovered
+        recipients.append({"email": email, "weight": weight, "retrieved": retrieved})
+    recipients.sort(key=lambda x: cast(str, x["email"]))
+    return {
+        "type": "shamir_recovery",
+        "threshold": threshold,
+        "enough_shares": enough_shares,
+        "recipients": recipients,
+    }
+
+
+# Note: claimer routes are not authenticated
 
 
 @invite_bp.route("/invitations/<string:apitoken>/claimer/0-retreive-info", methods=["POST"])
-async def claimer_0_retreive_info(apitoken: str) -> tuple[dict[str, Any], int]:
+async def claimer_0_retrieve_info_with_typo(apitoken: str) -> tuple[dict[str, Any], int]:
+    return await claimer_0_retrieve_info(apitoken)
+
+
+@invite_bp.route("/invitations/<string:apitoken>/claimer/0-retrieve-info", methods=["POST"])
+async def claimer_0_retrieve_info(apitoken: str) -> tuple[dict[str, Any], int]:
     try:
         addr = apitoken_to_addr(apitoken)
     except ValueError:
         raise APIException(404, {"error": "unknown_token"})
 
     with backend_errors_to_api_exceptions():
+
         async with current_app.claimers_manager.start_ctx(addr) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
-            type = "user" if addr.invitation_type == InvitationType.USER else "device"
-            if not isinstance(in_progress_ctx, (UserClaimInitialCtx, DeviceClaimInitialCtx)):
-                raise APIException(409, {"error": "invalid_state"})
-            assert in_progress_ctx.greeter_human_handle is not None
-            greeter_email = in_progress_ctx.greeter_human_handle.email
 
-    return {"type": type, "greeter_email": greeter_email}, 200
+            # Get invitation type
+            type = addr.invitation_type.str.lower()
+            assert type in ("user", "device", "shamir_recovery")
+
+            # User/Device
+            if isinstance(in_progress_ctx, (UserClaimInitialCtx, DeviceClaimInitialCtx)):
+                assert in_progress_ctx.greeter_human_handle is not None
+                greeter_email = in_progress_ctx.greeter_human_handle.email
+                return {
+                    "type": type,
+                    "greeter_email": greeter_email,
+                }, 200
+
+            # Shamir Recovery
+            elif isinstance(in_progress_ctx, ShamirRecoveryClaimPreludeCtx):
+                response = _prelude_to_response(in_progress_ctx)
+                return response, 200
+
+            # Invalid state
+            else:
+                raise APIException(409, {"error": "invalid_state"})
 
 
 @invite_bp.route("/invitations/<string:apitoken>/claimer/1-wait-peer-ready", methods=["POST"])
@@ -215,11 +313,35 @@ async def claimer_1_wait_peer_ready(apitoken: str) -> tuple[dict[str, Any], int]
     except ValueError:
         raise APIException(404, {"error": "unknown_token"})
 
+    data = await get_data(allow_empty=True)
+    parser = Parser()
+    parser.add_argument("greeter_email", type=str, validator=email_validator, required=False)
+    args, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
+
     with backend_errors_to_api_exceptions():
-        async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
+        async with current_app.claimers_manager.retrieve_ctx(addr) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
-            if not isinstance(in_progress_ctx, (UserClaimInitialCtx, DeviceClaimInitialCtx)):
+            if not isinstance(
+                in_progress_ctx,
+                (UserClaimInitialCtx, DeviceClaimInitialCtx, ShamirRecoveryClaimPreludeCtx),
+            ):
                 raise APIException(409, {"error": "invalid_state"})
+
+            if isinstance(in_progress_ctx, ShamirRecoveryClaimPreludeCtx):
+                greeter_email = cast("str | None", args["greeter_email"])
+                if greeter_email is None:
+                    raise APIException.from_bad_fields(["greeter_email"])
+                for recipient in in_progress_ctx.recipients:
+                    assert recipient.human_handle is not None
+                    if recipient.human_handle.email == greeter_email:
+                        break
+                else:
+                    return {"error": "email_not_in_recipients"}, 400
+                if recipient.user_id in in_progress_ctx.recovered:
+                    return {"error": "recipient_already_recovered"}, 400
+                in_progress_ctx = in_progress_ctx.get_initial_ctx(recipient)
 
             in_progress_1_ctx = await in_progress_ctx.do_wait_peer()
             lifetime_ctx.update_in_progress_ctx(in_progress_1_ctx)
@@ -245,10 +367,15 @@ async def claimer_2_check_trust(apitoken: str) -> tuple[dict[str, Any], int]:
         raise APIException.from_bad_fields(bad_fields)
 
     with backend_errors_to_api_exceptions():
-        async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
+        async with current_app.claimers_manager.retrieve_ctx(addr) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
             if not isinstance(
-                in_progress_ctx, (UserClaimInProgress1Ctx, DeviceClaimInProgress1Ctx)
+                in_progress_ctx,
+                (
+                    UserClaimInProgress1Ctx,
+                    DeviceClaimInProgress1Ctx,
+                    ShamirRecoveryClaimInProgress1Ctx,
+                ),
             ):
                 raise APIException(409, {"error": "invalid_state"})
 
@@ -270,17 +397,35 @@ async def claimer_3_wait_peer_trust(apitoken: str) -> tuple[dict[str, Any], int]
         raise APIException(404, {"error": "unknown_token"})
 
     with backend_errors_to_api_exceptions():
-        async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
+        async with current_app.claimers_manager.retrieve_ctx(addr) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
             if not isinstance(
-                in_progress_ctx, (UserClaimInProgress2Ctx, DeviceClaimInProgress2Ctx)
+                in_progress_ctx,
+                (
+                    UserClaimInProgress2Ctx,
+                    DeviceClaimInProgress2Ctx,
+                    ShamirRecoveryClaimInProgress2Ctx,
+                ),
             ):
                 raise APIException(409, {"error": "invalid_state"})
 
             in_progress_ctx = await in_progress_ctx.do_wait_peer_trust()
+            response: dict[str, Any]
+
+            # In the case of shamir recovery, recover the share right away
+            # This way, we can tell the client to either:
+            # - get back to step 0 to get more shares
+            # - continue to step 4 to finalize
+            if isinstance(in_progress_ctx, ShamirRecoveryClaimInProgress3Ctx):
+                enough_shares = await in_progress_ctx.do_recover_share()
+                in_progress_ctx = in_progress_ctx.prelude
+                response = {"enough_shares": enough_shares}
+            else:
+                response = {}
+
             lifetime_ctx.update_in_progress_ctx(in_progress_ctx)
 
-    return {}, 200
+    return response, 200
 
 
 @invite_bp.route("/invitations/<string:apitoken>/claimer/4-finalize", methods=["POST"])
@@ -301,7 +446,7 @@ async def claimer_4_finalize(apitoken: str) -> tuple[dict[str, Any], int]:
         raise APIException.from_bad_fields(bad_fields)
 
     with backend_errors_to_api_exceptions():
-        async with current_app.claimers_manager.retreive_ctx(addr) as lifetime_ctx:
+        async with current_app.claimers_manager.retrieve_ctx(addr) as lifetime_ctx:
             in_progress_ctx = lifetime_ctx.get_in_progress_ctx()
 
             requested_device_label = get_default_device_label()
@@ -313,6 +458,14 @@ async def claimer_4_finalize(apitoken: str) -> tuple[dict[str, Any], int]:
             elif isinstance(in_progress_ctx, DeviceClaimInProgress3Ctx):
                 new_device = await in_progress_ctx.do_claim_device(
                     requested_device_label=requested_device_label
+                )
+
+            elif isinstance(in_progress_ctx, ShamirRecoveryClaimPreludeCtx):
+                if not in_progress_ctx.has_enough_shares():
+                    return {"error": "not-enough-shares"}, 400
+                recovery_device = await in_progress_ctx.retrieve_recovery_device()
+                new_device = await generate_new_device_from_recovery(
+                    recovery_device, requested_device_label
                 )
 
             else:
@@ -331,6 +484,11 @@ async def claimer_4_finalize(apitoken: str) -> tuple[dict[str, Any], int]:
                 device=new_device,
                 password=args["password"],
             )
+
+            # In the case of a shamir recovery, it is the claimer that deletes the invitation
+            if isinstance(in_progress_ctx, ShamirRecoveryClaimPreludeCtx):
+                await _delete_shamir_invitation(new_device, addr.token)
+
             lifetime_ctx.mark_as_terminated()
 
     return {}, 200

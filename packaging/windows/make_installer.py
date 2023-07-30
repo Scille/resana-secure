@@ -1,12 +1,11 @@
 # Resana Secure (https://parsec.cloud) Copyright (c) 2021 Scille SAS
 
-import re
 import argparse
 import itertools
+import re
 import subprocess
-from shutil import which
 from pathlib import Path
-
+from shutil import which
 
 SIGNATURE_AUTHOR = "Scille"
 SIGNATURE_DESCRIPTION = f"Resana Secure by {SIGNATURE_AUTHOR}"

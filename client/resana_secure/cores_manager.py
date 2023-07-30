@@ -1,25 +1,28 @@
-import trio
-from uuid import uuid4
-from typing import TYPE_CHECKING, AsyncIterator, Callable, Dict, Optional, Tuple, List, cast
+from __future__ import annotations
+
+from contextlib import asynccontextmanager
 from functools import partial
 from pathlib import Path
-from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING, AsyncIterator, Callable, Dict, List, Optional, Tuple, cast
+from uuid import uuid4
+
 import structlog
+import trio
 from PyQt5.QtWidgets import QApplication
 
 from parsec._parsec import CoreEvent, list_available_devices
-from parsec.core.types import LocalDevice, BackendOrganizationAddr
-from parsec.core.logged_core import logged_core_factory, LoggedCore
-from parsec.core.local_device import (
-    LocalDeviceError,
-    AvailableDevice,
-)
-from parsec.event_bus import EventCallback
 from parsec.api.protocol import OrganizationID
+from parsec.core.local_device import (
+    AvailableDevice,
+    LocalDeviceError,
+)
+from parsec.core.logged_core import LoggedCore, logged_core_factory
+from parsec.core.types import BackendOrganizationAddr, LocalDevice
+from parsec.event_bus import EventCallback
 
 from .config import ResanaConfig
-from .crypto import decrypt_parsec_key, CryptoError
-from .ltcm import ComponentNotRegistered, LTCM
+from .crypto import CryptoError, decrypt_parsec_key
+from .ltcm import LTCM, ComponentNotRegistered
 
 if TYPE_CHECKING:
     from .gui import ResanaGuiApp
@@ -104,7 +107,10 @@ def is_org_hosted_on_rie(
 
 @asynccontextmanager
 async def start_core(
-    config: ResanaConfig, device: LocalDevice, on_stopped: Callable[[], None]
+    config: ResanaConfig,
+    device: LocalDevice,
+    on_stopped: Callable[[], None],
+    previous_component: object | None = None,
 ) -> AsyncIterator[LoggedCore]:
 
     core_config = config.core_config.evolve(
