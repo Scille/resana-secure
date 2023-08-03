@@ -1,1 +1,1 @@
-git+ssh://git@github.com/Scille/resana-secure.git@v0.13.1#subdirectory=server
+git+ssh://git@github.com/Scille/resana-secure.git@fix_wsgi_ip_filter#subdirectory=server
