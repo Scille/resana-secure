@@ -1,5 +1,7 @@
+import os
 from base64 import b64encode
 from collections import namedtuple
+from pathlib import Path
 from unittest.mock import ANY
 
 import pytest
@@ -435,5 +437,158 @@ async def test_claimer_step_0_legacy_route_with_typo(
     claimer_client = test_app.test_client()
     response = await claimer_client.post(
         f"/invitations/{device_invitation.token}/claimer/0-retreive-info", json={}
+    )
+    assert response.status_code == 200
+
+
+@pytest.mark.trio
+async def test_rename_old_device_files(
+    test_app: TestAppProtocol,
+    core_config_dir: Path,
+    local_device: LocalDeviceTestbed,
+    authenticated_client: TestClientProtocol,
+):
+    claimer_client = test_app.test_client()
+    greeter_sas_available = trio.Event()
+    greeter_sas = None
+    claimer_sas_available = trio.Event()
+    claimer_sas = None
+
+    # First create the first invitation
+    claimer_email = "bob@example.com"
+    response = await authenticated_client.post(
+        "/invitations", json={"type": "user", "claimer_email": claimer_email}
+    )
+    body = await response.get_json()
+    invitation = InvitationInfo("user", claimer_email, body["token"])
+    new_device_email = invitation.claimer_email
+    new_device_key = b"P@ssw0rd."
+
+    greeter_device_file = os.listdir(f"{core_config_dir}/devices")[0]
+
+    async def _claimer():
+        nonlocal claimer_sas
+
+        # Step 0
+        response = await claimer_client.post(
+            f"/invitations/{invitation.token}/claimer/0-retrieve-info", json={}
+        )
+        body = await response.get_json()
+
+        # Step 1
+        response = await claimer_client.post(
+            f"/invitations/{invitation.token}/claimer/1-wait-peer-ready", json={}
+        )
+        body = await response.get_json()
+
+        await greeter_sas_available.wait()
+
+        # Step 2
+        response = await claimer_client.post(
+            f"/invitations/{invitation.token}/claimer/2-check-trust",
+            json={"greeter_sas": greeter_sas},
+        )
+        body = await response.get_json()
+        claimer_sas = body["claimer_sas"]
+        claimer_sas_available.set()
+
+        # Step 3
+        response = await claimer_client.post(
+            f"/invitations/{invitation.token}/claimer/3-wait-peer-trust", json={}
+        )
+        body = await response.get_json()
+
+        # Step 4
+        response = await claimer_client.post(
+            f"/invitations/{invitation.token}/claimer/4-finalize",
+            json={"key": b64encode(new_device_key).decode("ascii")},
+        )
+        body = await response.get_json()
+
+    async def _greeter():
+        nonlocal greeter_sas
+
+        # Step 1
+        response = await authenticated_client.post(
+            f"/invitations/{invitation.token}/greeter/1-wait-peer-ready", json={}
+        )
+        body = await response.get_json()
+        greeter_sas = body["greeter_sas"]
+        greeter_sas_available.set()
+
+        # Step 2
+        response = await authenticated_client.post(
+            f"/invitations/{invitation.token}/greeter/2-wait-peer-trust", json={}
+        )
+        body = await response.get_json()
+
+        await claimer_sas_available.wait()
+
+        # Step 3
+        response = await authenticated_client.post(
+            f"/invitations/{invitation.token}/greeter/3-check-trust",
+            json={"claimer_sas": claimer_sas},
+        )
+        body = await response.get_json()
+
+        # Step 4
+        json = {"granted_profile": "ADMIN", "claimer_email": invitation.claimer_email}
+        response = await authenticated_client.post(
+            f"/invitations/{invitation.token}/greeter/4-finalize", json=json
+        )
+        body = await response.get_json()
+
+    with trio.fail_after(1):
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(_claimer)
+            nursery.start_soon(_greeter)
+
+    # get claimer device file
+    first_claimer_device_file = [
+        filename
+        for filename in os.listdir(f"{core_config_dir}/devices")
+        if filename != greeter_device_file
+    ][0]
+
+    # revoke claimer
+    response = await authenticated_client.post(f"/humans/{claimer_email}/revoke")
+    body = await response.get_json()
+    assert response.status_code == 200
+
+    # 2 device files are always present
+    assert len(os.listdir(f"{core_config_dir}/devices")) == 2
+
+    # new invitation with same info
+    greeter_sas_available = trio.Event()
+    claimer_sas_available = trio.Event()
+
+    claimer_email = "bob@example.com"
+    response = await authenticated_client.post(
+        "/invitations", json={"type": "user", "claimer_email": claimer_email}
+    )
+    body = await response.get_json()
+    invitation = InvitationInfo("user", claimer_email, body["token"])
+    new_device_email = invitation.claimer_email
+    new_device_key = b"P@ssw0rd."
+
+    with trio.fail_after(1):
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(_claimer)
+            nursery.start_soon(_greeter)
+
+    # Bob old key file should be rename
+    list_key_file = os.listdir(f"{core_config_dir}/devices")
+    assert len(list_key_file) == 3
+    assert greeter_device_file in list_key_file
+    assert first_claimer_device_file.replace(".keys", ".old_key") in list_key_file
+
+    # New user should be able to connect
+    response = await claimer_client.post(
+        "/auth",
+        json={
+            "email": new_device_email,
+            "key": b64encode(new_device_key).decode("ascii"),
+            "organization": local_device.organization.str,
+        },
     )
     assert response.status_code == 200

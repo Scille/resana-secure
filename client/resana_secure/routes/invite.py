@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any, cast
 
 from quart import Blueprint
@@ -39,6 +40,7 @@ from parsec.core.logged_core import LoggedCore
 from parsec.core.recovery import generate_new_device_from_recovery
 
 from ..app import current_app
+from ..cores_manager import find_matching_devices
 from ..utils import (
     APIException,
     Parser,
@@ -478,6 +480,16 @@ async def claimer_4_finalize(apitoken: str) -> tuple[dict[str, Any], int]:
                     data_base_dir=current_app.resana_config.core_config.data_base_dir,
                     device=new_device,
                 )
+
+            # rename old key files
+            matching_devices = find_matching_devices(
+                current_app.resana_config.core_config.config_dir,
+                email=new_device.human_handle.email,  # type: ignore[union-attr]
+                organization_id=new_device.organization_id,
+            )
+            for device in matching_devices:
+                new_key_file_path = str(device.key_file_path).replace(".keys", ".old_key")
+                os.rename(device.key_file_path, new_key_file_path)
 
             save_device_with_password_in_config(
                 config_dir=current_app.resana_config.core_config.config_dir,
