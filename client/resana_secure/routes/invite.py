@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from typing import Any, cast
 
 from quart import Blueprint
@@ -40,7 +39,6 @@ from parsec.core.logged_core import LoggedCore
 from parsec.core.recovery import generate_new_device_from_recovery
 
 from ..app import current_app
-from ..cores_manager import find_matching_devices
 from ..utils import (
     APIException,
     Parser,
@@ -50,6 +48,7 @@ from ..utils import (
     email_validator,
     get_data,
     get_default_device_label,
+    rename_old_user_key_file,
 )
 
 invite_bp = Blueprint("invite_api", __name__)
@@ -481,21 +480,16 @@ async def claimer_4_finalize(apitoken: str) -> tuple[dict[str, Any], int]:
                     device=new_device,
                 )
 
-            # rename old key files
-            matching_devices = find_matching_devices(
-                current_app.resana_config.core_config.config_dir,
-                email=new_device.human_handle.email,  # type: ignore[union-attr]
-                organization_id=new_device.organization_id,
-            )
-            for device in matching_devices:
-                new_key_file_path = str(device.key_file_path).replace(".keys", ".old_key")
-                os.rename(device.key_file_path, new_key_file_path)
-
-            save_device_with_password_in_config(
+            key_file_path = save_device_with_password_in_config(
                 config_dir=current_app.resana_config.core_config.config_dir,
                 device=new_device,
                 password=args["password"],
             )
+
+            # rename old key files
+            rename_old_user_key_file(
+                new_device.human_handle.email, new_device.organization_id, key_file_path
+            )  # type: ignore[union-attr]
 
             # In the case of a shamir recovery, it is the claimer that deletes the invitation
             if isinstance(in_progress_ctx, ShamirRecoveryClaimPreludeCtx):

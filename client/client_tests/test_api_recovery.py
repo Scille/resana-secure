@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import pathlib
 from base64 import b64encode
 from tempfile import mkstemp
@@ -15,9 +16,11 @@ from .conftest import LocalDeviceTestbed
 @pytest.mark.trio
 async def test_recovery_ok(
     test_app: TestAppProtocol,
+    core_config_dir: pathlib.Path,
     local_device: LocalDeviceTestbed,
     authenticated_client: TestClientProtocol,
 ):
+    first_key_file = os.listdir(f"{core_config_dir}/devices")[0]
     response = await authenticated_client.post("/recovery/export", json={})
     body = await response.get_json()
     assert response.status_code == 200
@@ -53,6 +56,11 @@ async def test_recovery_ok(
         },
     )
     assert response.status_code == 200
+
+    # Old key file should be rename
+    list_key_file = os.listdir(f"{core_config_dir}/devices")
+    assert len(list_key_file) == 2
+    assert first_key_file.replace(".keys", ".old_key") in list_key_file
 
 
 @pytest.mark.trio
