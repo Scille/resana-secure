@@ -15,7 +15,6 @@ on:
       - .github/workflows/build.yml
   workflow_dispatch:
 
-
 # Global Settings
 env:
   PYTHON_VERSION: "3.9"
@@ -84,6 +83,8 @@ jobs:
           path: |
             packaging/windows/build/tools_venv
             packaging/windows/build/pyinstaller_venv
+            packaging/windows/build-conformity/tools_venv
+            packaging/windows/build-conformity/pyinstaller_venv
 
       # Building OpenSSL requires a perl interpreter.
       # The default one does not provide windows-style filesystem
@@ -93,8 +94,12 @@ jobs:
         run: echo OPENSSL_SRC_PERL=C:/Strawberry/perl/bin/perl >> $GITHUB_ENV
         timeout-minutes: 1
 
-      - name: Freeze Parsec
+      - name: Freeze Resana
         run: python freeze_program.py ../../client
+        working-directory: packaging/windows/
+
+      - name: Freeze Resana with conformity
+        run: python freeze_program.py ../../client --conformity
         working-directory: packaging/windows/
 
       - name: Upload installer as artifact
@@ -107,3 +112,14 @@ jobs:
             packaging/windows/build/uninstall_files.nsh
             packaging/windows/build/resana_secure-*/
             packaging/windows/build/winfsp-*
+
+      - name: Upload installer with conformity as artifact
+        uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # pin v3.1.2
+        with:
+          name: ${{ runner.os }}-${{ runner.arch }}-installer-content-conformity
+          path: |
+            packaging/windows/build-conformity/manifest.ini
+            packaging/windows/build-conformity/install_files.nsh
+            packaging/windows/build-conformity/uninstall_files.nsh
+            packaging/windows/build-conformity/resana_secure-*/
+            packaging/windows/build-conformity/winfsp-*

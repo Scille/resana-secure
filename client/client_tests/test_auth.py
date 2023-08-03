@@ -1,6 +1,6 @@
 import re
 from typing import List, Tuple, cast
-from unittest.mock import ANY
+from unittest.mock import ANY, MagicMock
 
 import pytest
 from quart_trio.testing import TrioTestApp
@@ -9,7 +9,8 @@ from parsec._parsec import list_available_devices
 from parsec.api.protocol import OrganizationID
 from parsec.backend import BackendApp
 from parsec.core.types import BackendAddr, BackendOrganizationBootstrapAddr
-from resana_secure.app import ResanaApp
+from resana_secure.app import ResanaApp, app_factory
+from resana_secure.config import ResanaConfig
 from resana_secure.cores_manager import (
     CoreDeviceEncryptedKeyNotFoundError,
     CoreDeviceInvalidPasswordError,
@@ -589,3 +590,41 @@ async def test_encrypted_key_auth(
         await cores_manager.login(
             email=EMAIL, organization_id=ORG_ID, user_password="IncorrectPassword"
         )
+
+
+@pytest.mark.trio
+@pytest.mark.parametrize("compliant", [True, False])
+async def test_auth_with_conformity_check(
+    local_device: LocalDeviceTestbed,
+    core_config: ResanaConfig,
+    client_origin: str,
+    compliant: bool,
+):
+    tgb = MagicMock()
+    tgb.is_compliant = lambda: compliant
+
+    async with app_factory(
+        config=core_config,
+        client_allowed_origins=[client_origin],
+        with_rate_limiter=False,
+        tgb=tgb,
+    ) as app:
+        async with app.test_app() as test_app:
+            test_client = test_app.test_client()
+
+            response = await test_client.post(
+                "/auth",
+                json={
+                    "email": local_device.email,
+                    "key": local_device.key,
+                    "organization": local_device.organization.str,
+                },
+            )
+            body = await response.get_json()
+
+            if compliant:
+                assert response.status_code == 200
+                assert "token" in body
+            else:
+                assert response.status_code == 401
+                assert body["error"] == "host machine is not compliant"

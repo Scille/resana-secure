@@ -7,6 +7,7 @@ from collections import defaultdict
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, List, cast
 
+import structlog
 from hypercorn.config import Config as HyperConfig
 from hypercorn.trio import serve as hypercorn_trio_serve
 from quart import current_app as quart_current_app
@@ -31,6 +32,9 @@ from .routes.invite import invite_bp
 from .routes.organization import organization_bp
 from .routes.recovery import recovery_bp
 from .routes.workspaces import workspaces_bp
+from .tgb import TGB
+
+logger = structlog.get_logger()
 
 
 class ResanaApp(QuartTrio):
@@ -42,6 +46,7 @@ class ResanaApp(QuartTrio):
     claimers_manager: ClaimersManager
     resana_config: ResanaConfig
     hyper_config: HyperConfig
+    tgb: TGB | None = None
 
     async def serve(self) -> None:
         return await hypercorn_trio_serve(self, self.hyper_config)
@@ -52,6 +57,7 @@ async def app_factory(
     config: ResanaConfig,
     client_allowed_origins: List[str],
     with_rate_limiter: bool = True,
+    tgb: TGB | None = None,
 ) -> AsyncIterator[ResanaApp]:
     app = ResanaApp(__name__, static_folder=None)
     app.config.from_mapping(
@@ -126,6 +132,7 @@ async def app_factory(
         )
         app.greeters_managers = defaultdict(GreetersManager)
         app.claimers_manager = ClaimersManager()
+        app.tgb = tgb
         yield app
 
 
@@ -135,6 +142,7 @@ async def serve_app(
     port: int,
     config: ResanaConfig,
     client_allowed_origins: List[str],
+    tgb: TGB | None = None,
 ) -> AsyncIterator[ResanaApp]:
     hyper_config = HyperConfig.from_mapping(
         {
@@ -149,6 +157,7 @@ async def serve_app(
         config=config,
         client_allowed_origins=client_allowed_origins,
         with_rate_limiter=True,
+        tgb=tgb,
     ) as app:
         app.hyper_config = hyper_config
         yield app
