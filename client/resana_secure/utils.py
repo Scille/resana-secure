@@ -5,6 +5,7 @@ from base64 import urlsafe_b64decode, urlsafe_b64encode
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import wraps
+from pathlib import Path
 from typing import Any, Awaitable, Callable, Iterator, TypeVar
 
 from quart import jsonify, request, session
@@ -44,7 +45,7 @@ from parsec.core.mountpoint import MountpointAlreadyMounted, MountpointNotMounte
 from parsec.core.types import BackendInvitationAddr, BackendOrganizationAddr
 
 from .app import current_app
-from .cores_manager import CoreNotLoggedError
+from .cores_manager import CoreNotLoggedError, find_matching_devices
 from .invites_manager import LongTermCtxNotStarted
 
 
@@ -357,3 +358,18 @@ async def get_user_id_from_email(
             continue
         return user_info.user_id
     return None
+
+
+def rename_old_user_key_file(
+    email: str, organization_id: OrganizationID, exclude_key_file_path: Path
+) -> None:
+    matching_devices = find_matching_devices(
+        current_app.resana_config.core_config.config_dir,
+        email=email,
+        organization_id=organization_id,
+    )
+    for device in matching_devices:
+        if exclude_key_file_path and device.key_file_path == exclude_key_file_path:
+            continue
+        new_key_file_path = str(device.key_file_path).replace(".keys", ".old_key")
+        device.key_file_path.rename(new_key_file_path)

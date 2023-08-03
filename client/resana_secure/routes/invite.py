@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, cast
 
 from quart import Blueprint
@@ -48,6 +49,7 @@ from ..utils import (
     email_validator,
     get_data,
     get_default_device_label,
+    rename_old_user_key_file,
 )
 
 invite_bp = Blueprint("invite_api", __name__)
@@ -479,10 +481,17 @@ async def claimer_4_finalize(apitoken: str) -> tuple[dict[str, Any], int]:
                     device=new_device,
                 )
 
-            save_device_with_password_in_config(
+            key_file_path = save_device_with_password_in_config(
                 config_dir=current_app.resana_config.core_config.config_dir,
                 device=new_device,
                 password=args["password"],
+            )
+
+            # rename old key files
+            rename_old_user_key_file(
+                new_device.human_handle.email if new_device.human_handle else "",
+                new_device.organization_id,
+                Path(key_file_path),
             )
 
             # In the case of a shamir recovery, it is the claimer that deletes the invitation
