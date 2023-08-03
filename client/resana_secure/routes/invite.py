@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, cast
 
 from quart import Blueprint
@@ -488,8 +489,10 @@ async def claimer_4_finalize(apitoken: str) -> tuple[dict[str, Any], int]:
 
             # rename old key files
             rename_old_user_key_file(
-                new_device.human_handle.email, new_device.organization_id, key_file_path
-            )  # type: ignore[union-attr]
+                new_device.human_handle.email if new_device.human_handle else "",
+                new_device.organization_id,
+                Path(key_file_path),
+            )
 
             # In the case of a shamir recovery, it is the claimer that deletes the invitation
             if isinstance(in_progress_ctx, ShamirRecoveryClaimPreludeCtx):

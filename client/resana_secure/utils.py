@@ -369,7 +369,7 @@ def rename_old_user_key_file(
         organization_id=organization_id,
     )
     for device in matching_devices:
-        if exclude_key_file_path and device.key_file_path == Path(exclude_key_file_path):
+        if exclude_key_file_path and device.key_file_path == exclude_key_file_path:
             continue
         new_key_file_path = str(device.key_file_path).replace(".keys", ".old_key")
-        Path(device.key_file_path).rename(new_key_file_path)
+        device.key_file_path.rename(new_key_file_path)

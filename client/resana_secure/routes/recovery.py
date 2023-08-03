@@ -140,8 +140,10 @@ async def import_device() -> tuple[dict[str, Any], int]:
 
     # rename old key files
     rename_old_user_key_file(
-        new_device.human_handle.email, new_device.organization_id, key_file_path
-    )  # type: ignore[union-attr]
+        new_device.human_handle.email if new_device.human_handle else "",
+        new_device.organization_id,
+        Path(key_file_path),
+    )
 
     return {}, 200
 
