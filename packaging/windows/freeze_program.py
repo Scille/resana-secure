@@ -35,13 +35,13 @@ def run(cmd, **kwargs):
     return subprocess.check_call(cmd, shell=True, **kwargs)
 
 
-def main(program_source):
+def main(program_source: Path):
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
 
     print(f"### Detected Python version {PYTHON_VERSION} ###")
 
     # Retrieve program version
-    global_dict = {}
+    global_dict: dict[str, str] = {}
     exec((program_source / "resana_secure/_version.py").read_text(), global_dict)
     program_version = global_dict.get("__version__")
     print(f"### Detected Resana Secure version {program_version} ###")
@@ -63,8 +63,7 @@ def main(program_source):
         print("### Create tool virtualenv ###")
         run(f"python -m venv {TOOLS_VENV_DIR}")
         run(f"{ TOOLS_VENV_DIR / 'Scripts/python' } -m pip install pip --upgrade")
-        # TODO: cannot update to 1.4 yet, see https://github.com/python-poetry/poetry/issues/7611
-        run(f"{ TOOLS_VENV_DIR / 'Scripts/python' } -m pip install poetry==1.3.1")
+        run(f"{ TOOLS_VENV_DIR / 'Scripts/python' } -m pip install poetry --upgrade")
 
     # Bootstrap PyInstaller virtualenv
     if not PYINSTALLER_VENV_DIR.is_dir():
@@ -72,10 +71,15 @@ def main(program_source):
             "### Installing Resana Secure, Parsec, dependencies & PyInstaller in temporary virtualenv ###"
         )
         run(f"{ PYTHON_EXECUTABLE } -m venv {PYINSTALLER_VENV_DIR}")
+
     run(
         f"{ TOOLS_VENV_DIR.absolute() / 'Scripts/python' } -m poetry install --with=packaging --no-interaction",
         cwd=program_source.absolute(),
-        env={**os.environ, "VIRTUAL_ENV": str(PYINSTALLER_VENV_DIR.absolute())},
+        env={
+            **os.environ,
+            "VIRTUAL_ENV": str(PYINSTALLER_VENV_DIR.absolute()),
+            "POETRY_VIRTUALENVS_PATH": str(PYINSTALLER_VENV_DIR.absolute()),
+        },
     )
 
     pyinstaller_build = BUILD_DIR / "pyinstaller_build"
@@ -152,9 +156,9 @@ def check_python_version():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Freeze Resana Secure")
-    parser.add_argument("program_source")
+    parser.add_argument("program_source", type=Path)
     parser.add_argument("--disable-check-python", action="store_true")
     args = parser.parse_args()
     if not args.disable_check_python:
         check_python_version()
-    main(Path(args.program_source))
+    main(args.program_source)
