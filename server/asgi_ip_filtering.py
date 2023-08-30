@@ -89,7 +89,7 @@ class AsgiIpFilteringMiddleware:
         self.authorized_proxies = [ip_network(word) for word in authorized_proxies.split()]
         self.authorized_ips_per_org = {}
         for org in authorized_ips_per_orgs.split(";"):
-            tmp_list = org.split(",")
+            tmp_list = org.split()
             self.authorized_ips_per_org[tmp_list[0]] = [ip_network(word) for word in tmp_list[1:]]
 
         logger.info(
@@ -246,7 +246,7 @@ else:
             await websocket.accept()
             await websocket.send("WS event")
 
-        app.asgi_app = AsgiIpFilteringMiddleware(app.asgi_app, "130.0.0.0/24 131.0.0.0/24", "127.0.0.0/24 128.0.0.0/24", "Org, 130.0.0.0/24")  # type: ignore[assignment]
+        app.asgi_app = AsgiIpFilteringMiddleware(app.asgi_app, "130.0.0.0/24 131.0.0.0/24", "127.0.0.0/24 128.0.0.0/24", "Org 130.0.0.0/24")  # type: ignore[assignment]
 
         client = app.test_client()
 
