@@ -14,7 +14,6 @@ Add the following lines to a file `sitecustomize.py` accessible through the pyth
 
 import os
 from functools import wraps
-from typing import Union, Optional, cast
 from ipaddress import ip_address, ip_network
 from typing import Optional, Union, cast
 
@@ -32,7 +31,6 @@ from hypercorn.typing import (
     WebsocketScope,
 )
 from structlog import get_logger
-
 
 logger = get_logger()
 
@@ -84,15 +82,15 @@ class AsgiIpFilteringMiddleware:
         if authorized_ips_per_orgs is None:
             raise ValueError(
                 "No authorized ips per organization provided"
-                f" (use `{self.ENV_VAR_NAME_ORG_IDS}` environment variable)"
+                f" (use `{self.ENV_VAR_NAME_ORGANIZATION}` environment variable)"
             )
 
         self.authorized_networks = [ip_network(word) for word in authorized_networks.split()]
         self.authorized_proxies = [ip_network(word) for word in authorized_proxies.split()]
         self.authorized_ips_per_org = {}
-        for org in authorized_ips_per_orgs.split(';'):
-            tmp_list = org.split(',')
-            self.authorized_ips_per_org[tmp_list[0]] = tmp_list[1:]
+        for org in authorized_ips_per_orgs.split(";"):
+            tmp_list = org.split(",")
+            self.authorized_ips_per_org[tmp_list[0]] = [ip_network(word) for word in tmp_list[1:]]
 
         logger.info(
             "IP filtering is enabled",
@@ -110,7 +108,9 @@ class AsgiIpFilteringMiddleware:
             return False
         if organization_id:
             try:
-                return any(host_ip in network for network in self.authorized_ips_per_org[organization_id])
+                return any(
+                    host_ip in network for network in (self.authorized_ips_per_org)[organization_id]
+                )
             except KeyError:
                 return False  # Which value to return if the org is not given ?
         return any(host_ip in network for network in self.authorized_networks)
@@ -131,10 +131,12 @@ class AsgiIpFilteringMiddleware:
         """
         ASGI entry point for new connections.
         """
+
         async def wrapped_receive():
             result = await receive()
             if "bytes" in result.keys() and b"organization_id" in result["bytes"]:
                 import msgpack
+
                 self.org_id = msgpack.unpackb(result["bytes"])["organization_id"]
             return result
 
