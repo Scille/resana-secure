@@ -96,6 +96,7 @@ class AsgiIpFilteringMiddleware:
             "IP filtering is enabled",
             authorized_networks=self.authorized_networks,
             authorized_proxies=self.authorized_proxies,
+            authorized_ips_per_orgs=self.authorized_ips_per_org,
         )
 
     def is_network_authorized(self, host: str, organization_id: Optional[str] = None) -> bool:
@@ -132,14 +133,6 @@ class AsgiIpFilteringMiddleware:
         ASGI entry point for new connections.
         """
 
-        async def wrapped_receive():
-            result = await receive()
-            if "bytes" in result.keys() and b"organization_id" in result["bytes"]:
-                import msgpack
-
-                self.org_id = msgpack.unpackb(result["bytes"])["organization_id"]
-            return result
-
         if scope["type"] in ("http", "websocket"):
             scope = cast(Union[HTTPScope, WebsocketScope], scope)
             client = scope.get("client")
@@ -166,12 +159,23 @@ class AsgiIpFilteringMiddleware:
             if not self.is_network_authorized(ip_host.decode()):
                 logger.info("A connection has been rejected", **scope)
                 return await self.http_reject(scope, send, ip_host.decode())
-            if self.org_id and not self.is_network_authorized(ip_host.decode(), self.org_id):
-                return await self.http_reject(scope, send, ip_host.decode())
 
-        if not self.org_id:
-            return await self.asgi_app(scope, wrapped_receive, send)
-        return await self.asgi_app(scope, receive, send)
+        async def wrapped_receive() -> None:
+            result = await receive()
+            if (
+                scope["type"] in ("http", "websocket")
+                and "bytes" in result.keys()
+                and b"organization_id" in result["bytes"]
+            ):
+                import msgpack
+
+                org_id = msgpack.unpackb(result["bytes"])["organization_id"]
+                if not self.is_network_authorized(ip_host.decode(), org_id):
+                    return await self.http_reject(scope, send, ip_host.decode())
+                    # Check for proper websocket close here
+            return result
+
+        return await self.asgi_app(scope, wrapped_receive, send)
 
     async def http_reject(
         self,
@@ -246,7 +250,7 @@ else:
             await websocket.accept()
             await websocket.send("WS event")
 
-        app.asgi_app = AsgiIpFilteringMiddleware(app.asgi_app, "130.0.0.0/24 131.0.0.0/24", "127.0.0.0/24 128.0.0.0/24", "Org 130.0.0.0/24")  # type: ignore[assignment]
+        app.asgi_app = AsgiIpFilteringMiddleware(app.asgi_app, "130.0.0.0/24 131.0.0.0/24", "127.0.0.0/24 128.0.0.0/24", "Org1 130.0.0.0/24 131.0.0.0/24, Org2 131.0.0.0/24")  # type: ignore[assignment]
 
         client = app.test_client()
 
