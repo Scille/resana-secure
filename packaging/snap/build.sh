@@ -7,6 +7,8 @@ SCRIPT_DIR=${SCRIPT_DIR:=$(dirname $(realpath -s "$0"))}
 # Allow the user to overwrite `ROOT_DIR` by exporting it beforehand.
 ROOT_DIR=${ROOT_DIR:=$(realpath -s "$SCRIPT_DIR/../..")}
 
+SNAPCRAFT_ARGS=${SNAPCRAFT_ARGS:=--use-lxd}
+
 export SNAPCRAFT_BUILD_ENVIRONMENT_CPU=${SNAPCRAFT_BUILD_ENVIRONMENT_CPU:=4}
 export SNAPCRAFT_BUILD_ENVIRONMENT_MEMORY=${SNAPCRAFT_BUILD_ENVIRONMENT_MEMORY:=4G}
 
@@ -19,7 +21,7 @@ if [ "$NO_CLEANUP" != "1" ]; then
         set -x
         (
             cd $ROOT_DIR;
-            snapcraft clean --use-lxd;
+            snapcraft clean $SNAPCRAFT_ARGS;
             rm -rf snap bin;
         )
     }
@@ -31,5 +33,5 @@ cp -R $ROOT_DIR/packaging/snap/{bin,snap} $ROOT_DIR
 
 (
     cd $ROOT_DIR;
-    TERM=xterm-256color snapcraft snap --use-lxd
+    TERM=xterm-256color snapcraft snap $SNAPCRAFT_ARGS
 )
