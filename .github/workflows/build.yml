@@ -32,6 +32,7 @@ jobs:
     needs:
       - linux-test-client
       - linux-test-server
+      - linux-packaging
       - windows-test-client
       - windows-packaging
     runs-on: ubuntu-latest
@@ -241,6 +242,32 @@ jobs:
       - name: Run Tests
         run: poetry run py.test server_tests ${{ env.PYTEST_ARGS }}
         timeout-minutes: 10
+
+  linux-packaging:
+    name: 🐧 Linux packaging
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Install snapcraft
+        run: sudo snap install snapcraft --classic
+
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+
+      - name: Package snap
+        run: bash packaging/snap/build.sh
+        env:
+          NO_CLEANUP: 1
+          SNAPCRAFT_ARGS: --destructive-mode
+        timeout-minutes: 30
+
+      - name: Upload installer as artifact
+        uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # pin v3.1.2
+        with:
+          name: ${{ runner.os }}-${{ runner.arch }}-snap
+          path: |
+            resana-secure_*.snap
 
   #################################
   #           Windows             #
