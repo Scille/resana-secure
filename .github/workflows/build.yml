@@ -30,9 +30,9 @@ jobs:
   ci-is-happy:
     name: ⭐ CI is happy ⭐
     needs:
-      - linux-check-test-build-client
-      - linux-server
-      - windows-build
+      - linux-test-client
+      - linux-test-server
+      - windows-test-client
       - windows-packaging
     runs-on: ubuntu-latest
     if: always()
@@ -66,8 +66,8 @@ jobs:
   #           Linux               #
   #################################
 
-  linux-check-test-build-client:
-    name: 🐧 Linux check, test & build
+  linux-test-client:
+    name: 🐧 Linux test client
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -185,8 +185,8 @@ jobs:
       - name: "[Quality] Run pre-commit with mypy-client"
         uses: pre-commit/action@v3.0.0
 
-  linux-server:
-    name: 🐧 Linux server
+  linux-test-server:
+    name: 🐧 Linux test server
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -246,8 +246,8 @@ jobs:
   #           Windows             #
   #################################
 
-  windows-build:
-    name: 🏁 Windows build
+  windows-test-client:
+    name: 🏁 Windows test client
     runs-on: windows-latest
     defaults:
       run:
