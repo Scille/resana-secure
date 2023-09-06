@@ -127,7 +127,7 @@ jobs:
           path: /home/runner/.cache/pypoetry/virtualenvs/resana-secure-ZeXD18oj-py3.9
 
       - name: Cache rust artifact
-        uses: Swatinem/rust-cache@dd05243424bd5c0e585e4b55eb2d7615cdd32f1f # pin v2.5.1
+        uses: Swatinem/rust-cache@e207df5d269b42b69c8bc5101da26f7d31feddb4 # pin v2.6.2
         with:
           workspaces: client/submodules/parsec-cloud -> target
           cache-targets: true
@@ -327,7 +327,7 @@ jobs:
           path: C:\Users\runneradmin\AppData\Local\pypoetry\Cache\virtualenvs\resana-secure-*
 
       - name: Cache rust artifact
-        uses: Swatinem/rust-cache@dd05243424bd5c0e585e4b55eb2d7615cdd32f1f # pin v2.5.1
+        uses: Swatinem/rust-cache@e207df5d269b42b69c8bc5101da26f7d31feddb4 # pin v2.6.2
         with:
           workspaces: client/submodules/parsec-cloud -> target
           cache-targets: true
