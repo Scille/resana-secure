@@ -14,6 +14,11 @@ from urllib.request import Request, urlopen
 
 NOTIFICATION_BASE_MSG = f"Application `{os.environ.get('APP', '<unknown app>')}` (container `{os.environ.get('CONTAINER', '<unknown container>')}`) got error/warning log:\n> "
 
+# Do not notify on this error messages
+IGNORE_MESSAGES = [
+    "Database connection lost (PostgreSQL notification query has been lost), retrying in 1.0 seconds",
+]
+
 
 def notify_webhook(args: argparse.Namespace, line: str) -> None:
     data = {"text": NOTIFICATION_BASE_MSG + line}
@@ -40,6 +45,11 @@ def run_cmd_with_log_scan(args: argparse.Namespace, cmd: List[str]) -> subproces
             if not line:
                 # Command has finished
                 return
+
+            # Filter unwanted error messages
+            if any((msg in line for msg in IGNORE_MESSAGES)):
+                continue
+
             stream_out.write(line)
             stream_out.flush()
             if regex.search(line):
