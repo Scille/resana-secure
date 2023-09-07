@@ -2,7 +2,7 @@ name: CI build
 
 # Trigger the workflow when:
 # - A commit on the branches `master` or `releases/*`
-# - A PR request that modify `packaging/*`
+# - A PR that modify `packaging/*` or the workflow itself
 # - A manual trigger
 on:
   push:
