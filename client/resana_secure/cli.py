@@ -70,9 +70,9 @@ def _setup_logging(log_level: str, log_file: Path | None) -> None:
         logging.basicConfig(format=format, datefmt=datefmt, stream=sys.stdout, level=level)
 
 
-def get_default_dirs() -> Tuple[Path, Path, Path, Path]:
+def get_default_dirs() -> Tuple[Path, Path | None, Path, Path]:
     mountpoint_base_dir = Path.home() / "Resana Secure"
-    personal_mountpoint_base_dir = Path.home()
+    personal_mountpoint_base_dir = None
 
     if os.name == "nt":
         appdata = Path(os.environ["APPDATA"])
