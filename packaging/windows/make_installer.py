@@ -42,66 +42,65 @@ if __name__ == "__main__":
 
     assert which("makensis"), "makensis command not in PATH !"
 
+    # Given `manifest.ini` is often generated on the CI, then consumed on a dev machine
+    # to sign the release, we must provide paths as relative (given there is no guarantee
+    # both machine will put the build at the same place).
+    # However when running the build we'd rather work with absolute paths, so we patch
+    # the file on the fly here !
+    build_manifest = (BUILD_DIR / "manifest.ini").read_text()
+    manifest_ini_need_path = False
+
+    # 1) Patch `target`` field
+    match = re.search(r"^target = \"(.*)\"$", build_manifest, re.MULTILINE)
+    assert match, "`target` field not found in manifest.ini"
+    maybe_relative_path = Path(match.group(1))
+    if maybe_relative_path.is_absolute():
+        freeze_program = maybe_relative_path
+    else:
+        manifest_ini_need_path = True
+        freeze_program = BUILD_DIR / match.group(1)
+    assert (
+        freeze_program.exists()
+    ), f"`target` field in manifest.ini point to an invalid path: `{freeze_program}`"
+    build_manifest = (
+        build_manifest[: match.start()]
+        + 'target = "'
+        + str(freeze_program.absolute())
+        + build_manifest[match.end() - 1 :]
+    )
+
+    # 2) Patch `winfsp_installer_path`` field
+    match = re.search(r"^winfsp_installer_path = \"(.*)\"$", build_manifest, re.MULTILINE)
+    assert match, "`winfsp_installer_path` field not found in manifest.ini"
+    maybe_relative_path = Path(match.group(1))
+    if maybe_relative_path.is_absolute():
+        winfsp_installer_path = maybe_relative_path
+    else:
+        manifest_ini_need_path = True
+        winfsp_installer_path = BUILD_DIR / match.group(1)
+    assert (
+        winfsp_installer_path.exists()
+    ), f"`winfsp_installer_path` field in manifest.ini point to an invalid path: `{winfsp_installer_path}`"
+    build_manifest = (
+        build_manifest[: match.start()]
+        + 'winfsp_installer_path = "'
+        + str(winfsp_installer_path.absolute())
+        + build_manifest[match.end() - 1 :]
+    )
+
+    # 3) Finally overwrite the manifest (needed by `installer.nsi`)
+    if manifest_ini_need_path:
+        print("### Patching manifest.ini to turn paths absolute ###")
+        (BUILD_DIR / "manifest.ini").write_text(build_manifest)
+
     if args.sign_mode == "none":
         print("### Building installer ###")
         run(f"makensis { BASE_DIR / 'installer.nsi' }")
         print("/!\\ Installer generated with no signature /!\\")
         (installer,) = BUILD_DIR.glob("resana_secure-*-setup.exe")
         print(f"{installer} is ready")
-
     else:
         assert which("signtool"), "signtool command not in PATH !"
-
-        # Given `manifest.ini` is often generated on the CI, then consumed on a dev machine
-        # to sign the release, we must provide paths as relative (given there is no guarantee
-        # both machine will put the build at the same place).
-        # However when running the build we'd rather work with absolute paths, so we patch
-        # the file on the fly here !
-        build_manifest = (BUILD_DIR / "manifest.ini").read_text()
-        manifest_ini_need_path = False
-
-        # 1) Patch `target`` field
-        match = re.search(r"^target = \"(.*)\"$", build_manifest, re.MULTILINE)
-        assert match, "`target` field not found in manifest.ini"
-        maybe_relative_path = Path(match.group(1))
-        if maybe_relative_path.is_absolute():
-            freeze_program = maybe_relative_path
-        else:
-            manifest_ini_need_path = True
-            freeze_program = BUILD_DIR / match.group(1)
-        assert (
-            freeze_program.exists()
-        ), f"`target` field in manifest.ini point to an invalid path: `{freeze_program}`"
-        build_manifest = (
-            build_manifest[: match.start()]
-            + 'target = "'
-            + str(freeze_program.absolute())
-            + build_manifest[match.end() - 1 :]
-        )
-
-        # 2) Patch `winfsp_installer_path`` field
-        match = re.search(r"^winfsp_installer_path = \"(.*)\"$", build_manifest, re.MULTILINE)
-        assert match, "`winfsp_installer_path` field not found in manifest.ini"
-        maybe_relative_path = Path(match.group(1))
-        if maybe_relative_path.is_absolute():
-            winfsp_installer_path = maybe_relative_path
-        else:
-            manifest_ini_need_path = True
-            winfsp_installer_path = BUILD_DIR / match.group(1)
-        assert (
-            winfsp_installer_path.exists()
-        ), f"`winfsp_installer_path` field in manifest.ini point to an invalid path: `{winfsp_installer_path}`"
-        build_manifest = (
-            build_manifest[: match.start()]
-            + 'winfsp_installer_path = "'
-            + str(winfsp_installer_path.absolute())
-            + build_manifest[match.end() - 1 :]
-        )
-
-        # 3) Finally overwrite the manifest (needed by `installer.nsi`)
-        if manifest_ini_need_path:
-            print("### Patching manifest.ini to turn paths absolute ###")
-            (BUILD_DIR / "manifest.ini").write_text(build_manifest)
 
         # Retrieve frozen program and sign all .dll and .exe
         print("### Signing application executable ###")
