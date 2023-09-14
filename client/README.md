@@ -26,6 +26,7 @@ git checkout -b MAJOR.MINOR
 ```
 
 1) Modify version in `resana_secure/_version.py`
+2) Modify version in `packaging/snap/snap/snapcraft.yaml`
 3) Modify version in `pyproject.toml`
 4) Create the release commit
 
