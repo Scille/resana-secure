@@ -5,6 +5,7 @@ from typing import Any
 
 from quart import Blueprint
 
+from parsec._parsec import DateTime, RealmArchivingConfiguration
 from parsec.api.data import EntryID, EntryName
 from parsec.api.protocol import RealmRole
 from parsec.core.logged_core import LoggedCore
@@ -28,19 +29,21 @@ workspaces_bp = Blueprint("workspaces_api", __name__)
 @workspaces_bp.route("/workspaces", methods=["GET"])
 @authenticated
 async def list_workspaces(core: LoggedCore) -> tuple[dict[str, Any], int]:
-    # `get_user_manifest()` never raise exception
-    available_entries = core.user_fs.get_available_workspace_entries()
+    workspaces = []
+    for entry in core.user_fs.get_available_workspace_entries():
+        assert entry.role is not None
+        workspace = core.user_fs.get_workspace(entry.id)
+        archiving_configuration, _, _ = workspace.get_archiving_configuration()
+        item = {
+            "id": entry.id.hex,
+            "name": entry.name.str,
+            "role": entry.role.str,
+            "archiving_configuration": archiving_configuration.str,
+        }
+        workspaces.append(item)
+    workspaces.sort(key=lambda elem: elem["name"])
     return (
-        {
-            "workspaces": sorted(
-                [
-                    {"id": entry.id.hex, "name": entry.name.str, "role": entry.role.str}
-                    for entry in available_entries
-                    if entry.role is not None  # Always true, acts as an assert
-                ],
-                key=lambda elem: elem["name"],
-            )
-        },
+        {"workspaces": workspaces},
         200,
     )
 
@@ -266,3 +269,82 @@ async def get_offline_availability_status(
         "remote_only_size": info.remote_only_size,
         "local_and_remote_size": info.local_and_remote_size,
     }, 200
+
+
+@workspaces_bp.route("/workspaces/<WorkspaceID:workspace_id>/archiving", methods=["GET"])
+@authenticated
+@requires_rie
+async def get_archiving_configuration(
+    core: LoggedCore, workspace_id: EntryID
+) -> tuple[dict[str, Any], int]:
+    workspace_fs = get_workspace_type(core, workspace_id)
+    configuration, configured_on, configured_by = workspace_fs.get_archiving_configuration()
+    configured_on_str = None if configured_on is None else configured_on.to_rfc3339()
+    deletion_date_str = (
+        configuration.deletion_date.to_rfc3339() if configuration.is_deletion_planned() else None
+    )
+    organization_config = core.get_organization_config()
+
+    configured_by_email = None
+    if configured_by is not None:
+        user_info = await core.get_user_info(configured_by.user_id)
+        if user_info.human_handle is not None:
+            configured_by_email = user_info.human_handle.email
+
+    return {
+        "configuration": configuration.str,
+        "configured_on": configured_on_str,
+        "configured_by": configured_by_email,
+        "deletion_date": deletion_date_str,
+        "minimum_archiving_period": organization_config.minimum_archiving_period,
+    }, 200
+
+
+@workspaces_bp.route("/workspaces/<WorkspaceID:workspace_id>/archiving", methods=["POST"])
+@authenticated
+@requires_rie
+async def set_archiving_configuration(
+    core: LoggedCore, workspace_id: EntryID
+) -> tuple[dict[str, Any], int]:
+    def archiving_configuration_validator(value: str) -> None:
+        try:
+            RealmArchivingConfiguration.from_str(value, None)
+        except ValueError:
+            RealmArchivingConfiguration.from_str(value, DateTime.now())
+
+    data = await get_data()
+    parser = Parser()
+    parser.add_argument(
+        "configuration", type=str, validator=archiving_configuration_validator, required=True
+    )
+    parser.add_argument("deletion_date", converter=DateTime.from_rfc3339, required=False)
+    args, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
+
+    # `configuration` and `deletion_date` have been validate independently
+    # They also have to be validated together
+    configuration: str = args["configuration"]
+    deletion_date: DateTime | None = args["deletion_date"]
+    try:
+        archiving_configuration = RealmArchivingConfiguration.from_str(
+            configuration,
+            deletion_date,
+        )
+    except ValueError:
+        raise APIException.from_bad_fields(["configuration", "deletion_date"])
+
+    # Adapt the deletion date if necessary
+    now = core.device.time_provider.now()
+    if (
+        archiving_configuration.is_deletion_planned()
+        and deletion_date is not None
+        and now.subtract(minutes=5) < deletion_date < now
+    ):
+        archiving_configuration = RealmArchivingConfiguration.deletion_planned(now)
+
+    workspace_fs = get_workspace_type(core, workspace_id)
+    with backend_errors_to_api_exceptions():
+        await workspace_fs.configure_archiving(archiving_configuration, now=now)
+
+    return {}, 200
