@@ -8,7 +8,7 @@ from quart.typing import TestAppProtocol, TestClientProtocol
 from parsec._parsec import DateTime
 from parsec.api.data import EntryID
 
-from .conftest import RemoteDeviceTestbed
+from .conftest import LocalDeviceTestbed, RemoteDeviceTestbed
 
 WorkspaceInfo = namedtuple("WorkspaceInfo", "id,name")
 
@@ -46,8 +46,8 @@ async def test_create_and_list_workspaces(authenticated_client: TestClientProtoc
     assert response.status_code == 200
     assert await response.get_json() == {
         "workspaces": [
-            {"id": bar_id, "name": "bar", "role": "OWNER"},
-            {"id": foo_id, "name": "foo", "role": "OWNER"},
+            {"id": bar_id, "name": "bar", "role": "OWNER", "archiving_configuration": "AVAILABLE"},
+            {"id": foo_id, "name": "foo", "role": "OWNER", "archiving_configuration": "AVAILABLE"},
         ]
     }
 
@@ -92,7 +92,12 @@ async def test_create_with_block_remanence_workspaces(authenticated_client: Test
     assert response.status_code == 200
     assert await response.get_json() == {
         "workspaces": [
-            {"id": foo_id, "name": "Block_Reman", "role": "OWNER"},
+            {
+                "id": foo_id,
+                "name": "Block_Reman",
+                "role": "OWNER",
+                "archiving_configuration": "AVAILABLE",
+            },
         ]
     }
 
@@ -122,7 +127,16 @@ async def test_rename_workspace(authenticated_client: TestClientProtocol, worksp
         response = await authenticated_client.get("/workspaces")
         body = await response.get_json()
         assert response.status_code == 200
-        assert body == {"workspaces": [{"id": workspace.id, "name": "bar", "role": "OWNER"}]}
+        assert body == {
+            "workspaces": [
+                {
+                    "id": workspace.id,
+                    "name": "bar",
+                    "role": "OWNER",
+                    "archiving_configuration": "AVAILABLE",
+                }
+            ]
+        }
 
 
 @pytest.mark.trio
@@ -550,3 +564,205 @@ async def test_get_offline_availability_status(
         "remote_only_size": 0,
         "local_and_remote_size": 0,
     }
+
+
+@pytest.mark.trio
+async def test_workspace_archiving(
+    authenticated_client: TestClientProtocol,
+    workspace: WorkspaceInfo,
+):
+    # Default archiving configuration
+    response = await authenticated_client.get(f"/workspaces/{workspace.id}/archiving")
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {
+        "configuration": "AVAILABLE",
+        "configured_by": None,
+        "configured_on": None,
+        "deletion_date": None,
+        "minimum_archiving_period": 2592000,
+    }
+
+    # Archive the workpace
+    response = await authenticated_client.post(
+        f"/workspaces/{workspace.id}/archiving", json={"configuration": "ARCHIVED"}
+    )
+    body = await response.get_json()
+    assert response.status_code == 200, body
+
+    # Check the archiving status
+    response = await authenticated_client.get(f"/workspaces/{workspace.id}/archiving")
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {
+        "configuration": "ARCHIVED",
+        "configured_by": "alice@example.com",
+        "configured_on": ANY,
+        "deletion_date": None,
+        "minimum_archiving_period": 2592000,
+    }
+    DateTime.from_rfc3339(body["configured_on"])
+
+    # Check the workspace list
+    response = await authenticated_client.get("/workspaces")
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {
+        "workspaces": [
+            {"id": ANY, "name": "wksp1", "role": "OWNER", "archiving_configuration": "ARCHIVED"}
+        ]
+    }
+
+    # Unarchive the workspace
+    response = await authenticated_client.post(
+        f"/workspaces/{workspace.id}/archiving",
+        json={"configuration": "AVAILABLE", "deletion_date": None},
+    )
+    body = await response.get_json()
+    assert response.status_code == 200, body
+
+    # Check the archiving status
+    response = await authenticated_client.get(f"/workspaces/{workspace.id}/archiving")
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {
+        "configuration": "AVAILABLE",
+        "configured_by": "alice@example.com",
+        "configured_on": ANY,
+        "deletion_date": None,
+        "minimum_archiving_period": 2592000,
+    }
+    DateTime.from_rfc3339(body["configured_on"])
+
+    # Check the workspace list
+    response = await authenticated_client.get("/workspaces")
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {
+        "workspaces": [
+            {"id": ANY, "name": "wksp1", "role": "OWNER", "archiving_configuration": "AVAILABLE"}
+        ]
+    }
+
+    # Plan a deletion for the workspace
+    deletion_date = DateTime.now().add(days=31).to_rfc3339()
+    response = await authenticated_client.post(
+        f"/workspaces/{workspace.id}/archiving",
+        json={"configuration": "DELETION_PLANNED", "deletion_date": deletion_date},
+    )
+    body = await response.get_json()
+    assert response.status_code == 200, body
+
+    # Check the archiving status
+    response = await authenticated_client.get(f"/workspaces/{workspace.id}/archiving")
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {
+        "configuration": "DELETION_PLANNED",
+        "configured_by": "alice@example.com",
+        "configured_on": ANY,
+        "deletion_date": deletion_date,
+        "minimum_archiving_period": 2592000,
+    }
+    DateTime.from_rfc3339(body["configured_on"])
+
+    # Check the workspace list
+    response = await authenticated_client.get("/workspaces")
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {
+        "workspaces": [
+            {
+                "id": ANY,
+                "name": "wksp1",
+                "role": "OWNER",
+                "archiving_configuration": "DELETION_PLANNED",
+            }
+        ]
+    }
+
+
+@pytest.mark.trio
+async def test_delete_workspace(
+    running_backend,
+    local_device: LocalDeviceTestbed,
+    authenticated_client: TestClientProtocol,
+    workspace: WorkspaceInfo,
+):
+    await running_backend.organization.update(
+        id=local_device.device.organization_id, minimum_archiving_period=0
+    )
+
+    deletion_date = DateTime.now().to_rfc3339()
+    response = await authenticated_client.post(
+        f"/workspaces/{workspace.id}/archiving",
+        json={"configuration": "DELETION_PLANNED", "deletion_date": deletion_date},
+    )
+    body = await response.get_json()
+    assert response.status_code == 200, body
+
+    # Check the archiving status
+    response = await authenticated_client.get(f"/workspaces/{workspace.id}/archiving")
+    body = await response.get_json()
+    assert response.status_code == 410
+    assert body == {"error": "deleted_workspace"}
+
+    # Check the workspace list
+    response = await authenticated_client.get("/workspaces")
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {"workspaces": []}
+
+
+@pytest.mark.trio
+async def test_workspace_archiving_bad_fields(
+    authenticated_client: TestClientProtocol,
+    workspace: WorkspaceInfo,
+):
+    now_str = DateTime.now().to_rfc3339()
+
+    response = await authenticated_client.post(
+        f"/workspaces/{workspace.id}/archiving", json={"configuration": "NOT_A_CONFIG"}
+    )
+    body = await response.get_json()
+    assert response.status_code == 400, body
+    assert body == {"error": "bad_data", "fields": ["configuration"]}
+
+    response = await authenticated_client.post(
+        f"/workspaces/{workspace.id}/archiving",
+        json={"configuration": "NOT_A_CONFIG", "deletion_date": now_str},
+    )
+    body = await response.get_json()
+    assert response.status_code == 400, body
+    assert body == {"error": "bad_data", "fields": ["configuration"]}
+
+    response = await authenticated_client.post(
+        f"/workspaces/{workspace.id}/archiving",
+        json={"configuration": "ARCHIVED", "deletion_date": now_str},
+    )
+    body = await response.get_json()
+    assert response.status_code == 400, body
+    assert body == {"error": "bad_data", "fields": ["configuration", "deletion_date"]}
+
+    response = await authenticated_client.post(
+        f"/workspaces/{workspace.id}/archiving", json={"configuration": "DELETION_PLANNED"}
+    )
+    body = await response.get_json()
+    assert response.status_code == 400, body
+    assert body == {"error": "bad_data", "fields": ["configuration", "deletion_date"]}
+
+    response = await authenticated_client.post(
+        f"/workspaces/{workspace.id}/archiving",
+        json={"configuration": "DELETION_PLANNED", "deletion_date": None},
+    )
+    body = await response.get_json()
+    assert response.status_code == 400, body
+    assert body == {"error": "bad_data", "fields": ["configuration", "deletion_date"]}
+
+    response = await authenticated_client.post(
+        f"/workspaces/{workspace.id}/archiving",
+        json={"configuration": "DELETION_PLANNED", "deletion_date": "214"},
+    )
+    body = await response.get_json()
+    assert response.status_code == 400, body
+    assert body == {"error": "bad_data", "fields": ["deletion_date"]}
