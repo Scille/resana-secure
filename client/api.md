@@ -781,14 +781,24 @@ HTTP 200
         {
             "id": <uuid>,
             "name": <string>,
-            "role": <string>
+            "role": <string> = "OWNER", "MANAGER", "CONTRIBUTOR", "READER",
+            "archiving_configuration": <string> = "AVAILABLE" | "ARCHIVED" | "DELETION_PLANNED"
         }
     ]
     …
 }
 ```
+​
+Note: la configuration d'archivage peut-etre dans 3 états:
 
-`role` peut être: `OWNER`, `MANAGER`, `CONTRIBUTOR`, `READER`.
+- Disponible (`AVAILABLE`): l'état par défaut, le workspace est disponible en lecture/écriture (si le role de l'utilisateur le permet).
+- Archivé (`ARCHIVED`): le worspace est en lecture-seul jusqu'au prochain changement de configuration.
+- Suppression planifié (`DELETION_PLANNED`): le workspace est en lecture-seul et une suppression de l'espace est planifié a une date donné.
+
+Les workspaces en état archivé ou suppression planifié sont typiquement caché de la liste des workspaces à l'affichage.
+Ils sont néamoins rendu disponible ici car leur accès peut etre nécéssaire dans des usages avancés:
+- Changement de la configuration de l'archivage via `POST /workspaces/<id>/archiving`
+- Accès aux données en lecture-seul lorsque l'utilisateur souhaite accédé au contenu du workspace malgré son archivage.
 
 ### `POST /workspaces`
 
@@ -842,6 +852,7 @@ ou
 
 - HTTP 409: le workspace a déjà eu son nom changé
 - HTTP 404: le workspace n'existe pas
+- HTTP 410: le workspace a été supprimé
 
 **Notes:**
 
@@ -872,6 +883,7 @@ HTTP 200
 ou
 
 - HTTP 404: le workspace n'existe pas
+- HTTP 410: le workspace a été supprimé
 - HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
 - HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
@@ -904,6 +916,15 @@ ou
 HTTP 404
 {
     "error": "unknown_workspace"
+}
+```
+
+ou
+
+```python
+HTTP 410
+{
+    "error": "deleted_workspace"
 }
 ```
 
@@ -997,6 +1018,15 @@ HTTP 404
 }
 ```
 
+ou
+
+```python
+HTTP 410
+{
+    "error": "deleted_workspace"
+}
+```
+
 
 ### `POST /workspaces/<id>/unmount`
 
@@ -1036,6 +1066,15 @@ HTTP 404
 }
 ```
 
+ou
+
+```python
+HTTP 410
+{
+    "error": "deleted_workspace"
+}
+```
+
 ### `POST /workspaces/<id>/toggle_offline_availability`
 
 Active ou désactive la rémanence des données d'un workspace. Si désactivé, les fichiers seront téléchargés de manière paresseuse, uniquement lorsqu'une demande de consultation est faite. Si activé, tout est mis en oeuvre pour télécharger tous les fichiers présents dans le workspace afin qu'ils soient autant que possible disponibles même en étant hors-ligne.
@@ -1061,6 +1100,15 @@ ou
 HTTP 404
 {
     "error": "unknown_workspace"
+}
+```
+
+ou
+
+```python
+HTTP 410
+{
+    "error": "deleted_workspace"
 }
 ```
 
@@ -1115,6 +1163,136 @@ HTTP 404
     "error": "unknown_workspace"
 }
 ```
+
+ou
+
+```python
+HTTP 410
+{
+    "error": "deleted_workspace"
+}
+```
+
+## `GET /workspaces/<id>/archiving`
+
+Récupère des informations sur l'état de l'archivage/suppression pour ce workspace.
+
+Note: la configuration d'archivage peut-etre dans 3 états:
+- Disponible (`AVAILABLE`): l'état par défaut, le workspace est disponible en lecture/écriture (si le role de l'utilisateur le permet).e
+- Archivé (`ARCHIVED`): le worspace est en lecture-seul jusqu'au prochain changement de configuration.
+- Suppression planifié (`DELETION_PlANNED`): le workspace est en lecture-seul et une suppression de l'espace est planifié a une date donné.
+
+En plus de l'état de la configuration courante, 4 informations sont fournis:
+- La date de la configuration courante (`configured_on`). Elle peut etre `null` si le workspace n'a jamais été configuré.
+- L'email de l'utilisateur responsable de la configuration courante (`configured_by`). Elle peut etre `null` si le workspace n'a jamais été configuré.
+- La date de suppression planifiée (`deletion_date`). Elle n'est fourni que dans l'état de suppression planifié. Elle peut être déja passée.
+- Un booléen indiquant que le workspace est effectivement supprimé. Cela signifie que la date courante a dépassé la date de suppression planifié.
+- La période d'archivage minimale en secondes (`minimum_archiving_period`). C'est la période minimale à respecter lors d'une suppression planifiée.
+
+Request:
+```python
+{
+}
+```
+
+Response:
+
+```python
+HTTP 200
+{
+    "configuration": <str> = "AVAILABLE" | "ARCHIVED" | "DELETION_PlANNED",
+    "configured_on": <datetime or null>,
+    "configured_by": <str or null>,
+    "deletion_date": <datetime or null>,
+    "minimum_archiving_period": <int> # in seconds
+}
+```
+
+ou
+
+```python
+HTTP 404
+{
+    "error": "unknown_workspace"
+}
+```
+
+ou
+
+```python
+HTTP 410
+{
+    "error": "deleted_workspace"
+}
+```
+
+## `POST /workspaces/<id>/archiving`
+
+Configure l'archivage ou planifie une suppression pour ce workspace.
+
+Note: la configuration d'archivage peut-etre dans 3 états:
+- Disponible (`AVAILABLE`): l'état par défaut, le workspace est disponible en lecture/écriture (si le role de l'utilisateur le permet).e
+- Archivé (`ARCHIVED`): le worspace est en lecture-seul jusqu'au prochain changement de configuration.
+- Suppression planifié (`DELETION_PlANNED`): le workspace est en lecture-seul et une suppression de l'espace est planifié a une date donné.
+
+Note 1: La date de suppression (`deletion_date`) n'est fourni que dans le cas d'une suppression planifiée.
+
+Note 2: Cette date de suppression doit respecté le délai d'archivage minimum, . configuré au niveau de l'organization.
+
+Note 3: Les droits de propriétaire (`OWNER`) sont nécéssaires pour réaliser cette opération.
+
+Request:
+```python
+{
+    "configuration": <str> = "AVAILABLE" | "ARCHIVED" | "DELETION_PlANNED",
+    "deletion_date": <datetime or null>,
+}
+```
+
+Response:
+
+```python
+HTTP 200
+{
+}
+```
+
+ou
+
+```python
+HTTP 404
+{
+    "error": "unknown_workspace"
+}
+```
+
+ou
+
+```python
+HTTP 403
+{
+    "error": "no_owner_rights"
+}
+```
+
+ou
+
+```python
+HTTP 410
+{
+    "error": "deleted_workspace"
+}
+```
+
+ou
+
+```python
+HTTP 400
+{
+    "error": "archiving_period_is_too_short"
+}
+```
+
 
 ## Dossiers
 
@@ -1271,6 +1449,15 @@ HTTP 404
 ou
 
 ```python
+HTTP 410
+{
+    "error": "deleted_workspace"
+}
+```
+
+ou
+
+```python
 HTTP 404
 {
     "error": "unknown_source_folder"
@@ -1331,6 +1518,15 @@ HTTP 403
 ou
 
 ```python
+HTTP 403
+{
+    "error": "archived_workspace"
+}
+```
+
+ou
+
+```python
 HTTP 404
 {
     "error": "not_a_folder"
@@ -1343,6 +1539,15 @@ ou
 HTTP 404
 {
     "error": "unknown_workspace"
+}
+```
+
+ou
+
+```python
+HTTP 410
+{
+    "error": "deleted_workspace"
 }
 ```
 
@@ -1405,6 +1610,15 @@ HTTP 404
 ou
 
 ```python
+HTTP 410
+{
+    "error": "deleted_workspace"
+}
+```
+
+ou
+
+```python
 HTTP 404
 {
     "error": "unknown_path"
@@ -1455,6 +1669,15 @@ ou
 HTTP 404
 {
     "error": "unknown_workspace"
+}
+```
+
+ou
+
+```python
+HTTP 410
+{
+    "error": "deleted_workspace"
 }
 ```
 
@@ -1514,6 +1737,15 @@ HTTP 404
 ou
 
 ```python
+HTTP 410
+{
+    "error": "deleted_workspace"
+}
+```
+
+ou
+
+```python
 HTTP 404
 {
     "error": "unknown_path"
@@ -1549,6 +1781,15 @@ ou
 HTTP 404
 {
     "error": "unknown_workspace"
+}
+```
+
+ou
+
+```python
+HTTP 410
+{
+    "error": "deleted_workspace"
 }
 ```
 
@@ -1591,6 +1832,15 @@ ou
 HTTP 404
 {
     "error": "unknown_workspace"
+}
+```
+
+ou
+
+```python
+HTTP 410
+{
+    "error": "deleted_workspace"
 }
 ```
 
@@ -1650,6 +1900,15 @@ HTTP 404
 }
 ```
 
+ou
+
+```python
+HTTP 410
+{
+    "error": "deleted_workspace"
+}
+```
+
 ### [NOT IMPLEMENTED] `GET /workspaces/<id>/reencryption`
 
 Récupère les information de rechiffrement du workspace.
@@ -1672,6 +1931,15 @@ ou
 HTTP 404
 {
     "error": "unknown_workspace"
+}
+```
+
+ou
+
+```python
+HTTP 410
+{
+    "error": "deleted_workspace"
 }
 ```
 
@@ -1717,6 +1985,15 @@ ou
 HTTP 404
 {
     "error": "unknown_workspace"
+}
+```
+
+ou
+
+```python
+HTTP 410
+{
+    "error": "deleted_workspace"
 }
 ```
 
