@@ -362,15 +362,32 @@ async def test_toggle_offline_availability(
     assert body == {"error": "bad_data", "fields": ["enable"]}
 
 
+@pytest.fixture
+async def remanence_monitor_prepared(
+    authenticated_client: TestClientProtocol,
+    workspace: WorkspaceInfo,
+    remanence_monitor_event: trio.Event,
+):
+    remanence_monitor_event.set()
+    with trio.fail_after(3.0):
+        while True:
+            response = await authenticated_client.get(
+                f"/workspaces/{workspace.id}/get_offline_availability_status"
+            )
+            body = await response.get_json()
+            assert response.status_code == 200
+            if body["is_prepared"]:
+                return
+            await trio.sleep(0)
+
+
 @pytest.mark.trio
 async def test_enable_offline_availability(
     authenticated_client: TestClientProtocol,
     workspace: WorkspaceInfo,
     monkeypatch,
-    remanence_monitor_event,
+    remanence_monitor_prepared,
 ):
-    remanence_monitor_event.set()
-
     # Non existing workspace
     fake_id = EntryID.new()
     response = await authenticated_client.post(
@@ -413,9 +430,8 @@ async def test_disable_offline_availability(
     authenticated_client: TestClientProtocol,
     workspace: WorkspaceInfo,
     monkeypatch,
-    remanence_monitor_event,
+    remanence_monitor_prepared,
 ):
-    remanence_monitor_event.set()
 
     # Non existing workspace
     fake_id = EntryID.new()
@@ -465,11 +481,8 @@ async def test_disable_offline_availability(
 async def test_get_offline_availability_status(
     authenticated_client: TestClientProtocol,
     workspace: WorkspaceInfo,
-    monkeypatch,
-    remanence_monitor_event,
+    remanence_monitor_prepared,
 ):
-    remanence_monitor_event.set()
-
     # Non existing workspace
     fake_id = EntryID.new()
     response = await authenticated_client.get(
@@ -485,9 +498,9 @@ async def test_get_offline_availability_status(
     )
     body = await response.get_json()
     assert response.status_code == 200
-    body == {
-        "is_running": False,
-        "is_prepared": False,
+    assert body == {
+        "is_running": True,
+        "is_prepared": True,
         "is_available_offline": False,
         "total_size": 0,
         "remote_only_size": 0,
@@ -507,9 +520,9 @@ async def test_get_offline_availability_status(
     )
     body = await response.get_json()
     assert response.status_code == 200
-    body == {
-        "is_running": False,
-        "is_prepared": False,
+    assert body == {
+        "is_running": True,
+        "is_prepared": True,
         "is_available_offline": True,
         "total_size": 0,
         "remote_only_size": 0,
@@ -529,9 +542,9 @@ async def test_get_offline_availability_status(
     )
     body = await response.get_json()
     assert response.status_code == 200
-    body == {
-        "is_running": False,
-        "is_prepared": False,
+    assert body == {
+        "is_running": True,
+        "is_prepared": True,
         "is_available_offline": False,
         "total_size": 0,
         "remote_only_size": 0,
