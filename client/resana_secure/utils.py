@@ -31,6 +31,8 @@ from parsec.core.fs.exceptions import (
     FSNoAccessError,
     FSReadOnlyError,
     FSSharingNotAllowedError,
+    FSWorkspaceArchivingNotAllowedError,
+    FSWorkspaceArchivingPeriodTooShort,
     FSWorkspaceNoAccess,
     FSWorkspaceNoReadAccess,
     FSWorkspaceNotFoundError,
@@ -317,6 +319,10 @@ def backend_errors_to_api_exceptions() -> Iterator[None]:
         raise APIException(403, {"error": "archived_workspace"})
     except FSWorkspaceRealmDeleted:
         raise APIException(410, {"error": "deleted_workspace"})
+    except FSWorkspaceArchivingPeriodTooShort:
+        raise APIException(400, {"error": "archiving_period_is_too_short"})
+    except FSWorkspaceArchivingNotAllowedError:
+        raise APIException(403, {"error": "archiving_not_allowed"})
     except FSWorkspaceNotFoundError:
         raise APIException(404, {"error": "unknown_workspace"})
     except (FSNoAccessError, FSWorkspaceNoAccess):

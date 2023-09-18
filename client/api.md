@@ -1271,7 +1271,7 @@ ou
 ```python
 HTTP 403
 {
-    "error": "no_owner_rights"
+    "error": "archiving_not_allowed"
 }
 ```
 

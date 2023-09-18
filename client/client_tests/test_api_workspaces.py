@@ -766,3 +766,54 @@ async def test_workspace_archiving_bad_fields(
     body = await response.get_json()
     assert response.status_code == 400, body
     assert body == {"error": "bad_data", "fields": ["deletion_date"]}
+
+
+@pytest.mark.trio
+async def test_workspace_archiving_period_too_short(
+    authenticated_client: TestClientProtocol,
+    workspace: WorkspaceInfo,
+):
+    deletion_date = DateTime.now().to_rfc3339()
+    response = await authenticated_client.post(
+        f"/workspaces/{workspace.id}/archiving",
+        json={"configuration": "DELETION_PLANNED", "deletion_date": deletion_date},
+    )
+    body = await response.get_json()
+    assert response.status_code == 400, body
+    assert body == {"error": "archiving_period_is_too_short"}
+
+
+@pytest.mark.trio
+async def test_workspace_archiving_not_allowed(
+    test_app,
+    authenticated_client: TestClientProtocol,
+    bob_user: LocalDeviceTestbed,
+    workspace: WorkspaceInfo,
+):
+    bob_client = await bob_user.authenticated_client(test_app)
+
+    response = await authenticated_client.patch(
+        f"/workspaces/{workspace.id}/share", json={"email": bob_user.email, "role": "MANAGER"}
+    )
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {}
+
+    await trio.sleep(1)
+
+    # Check bob's workspace list
+    response = await bob_client.get("/workspaces")
+    body = await response.get_json()
+    assert response.status_code == 200
+    assert body == {
+        "workspaces": [
+            {"archiving_configuration": "AVAILABLE", "id": ANY, "name": "wksp1", "role": "MANAGER"}
+        ]
+    }
+
+    response = await bob_client.post(
+        f"/workspaces/{workspace.id}/archiving", json={"configuration": "ARCHIVED"}
+    )
+    body = await response.get_json()
+    assert response.status_code == 403, body
+    assert body == {"error": "archiving_not_allowed"}
