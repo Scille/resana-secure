@@ -7,8 +7,6 @@ from quart import Blueprint
 
 from parsec.api.data import EntryID, EntryName
 from parsec.api.protocol import RealmRole
-from parsec.core.fs.exceptions import FSWorkspaceNotFoundError
-from parsec.core.fs.workspacefs import WorkspaceFS
 from parsec.core.logged_core import LoggedCore
 
 from ..utils import (
@@ -30,15 +28,15 @@ workspaces_bp = Blueprint("workspaces_api", __name__)
 @workspaces_bp.route("/workspaces", methods=["GET"])
 @authenticated
 async def list_workspaces(core: LoggedCore) -> tuple[dict[str, Any], int]:
-    # get_user_manifest() never raise exception
-    user_manifest = core.user_fs.get_user_manifest()
+    # `get_user_manifest()` never raise exception
+    available_entries = core.user_fs.get_available_workspace_entries()
     return (
         {
             "workspaces": sorted(
                 [
                     {"id": entry.id.hex, "name": entry.name.str, "role": entry.role.str}
-                    for entry in user_manifest.workspaces
-                    if entry.role is not None
+                    for entry in available_entries
+                    if entry.role is not None  # Always true, acts as an assert
                 ],
                 key=lambda elem: elem["name"],
             )
@@ -89,7 +87,6 @@ async def sync_workspaces(core: LoggedCore) -> tuple[dict[str, Any], int]:
     return {}, 200
 
 
-# TODO: provide an EntryID url converter
 @workspaces_bp.route("/workspaces/<WorkspaceID:workspace_id>", methods=["PATCH"])
 @authenticated
 async def rename_workspaces(core: LoggedCore, workspace_id: EntryID) -> tuple[dict[str, Any], int]:
@@ -101,13 +98,9 @@ async def rename_workspaces(core: LoggedCore, workspace_id: EntryID) -> tuple[di
     if bad_fields:
         raise APIException.from_bad_fields(bad_fields)
 
-    for entry in core.user_fs.get_user_manifest().workspaces:
-        if entry.id == workspace_id:
-            if entry.name != args["old_name"]:
-                raise APIException(409, {"error": "precondition_failed"})
-            break
-    else:
-        raise APIException(404, {"error": "unknown_workspace"})
+    workspace = get_workspace_type(core, workspace_id)
+    if workspace.get_workspace_name() != args["old_name"]:
+        raise APIException(409, {"error": "precondition_failed"})
 
     with backend_errors_to_api_exceptions():
         await core.user_fs.workspace_rename(workspace_id, args["new_name"])
@@ -196,12 +189,10 @@ async def list_mountpoints(core: LoggedCore) -> tuple[dict[str, Any], int]:
 @authenticated
 @requires_rie
 async def mount_workspace(core: LoggedCore, workspace_id: EntryID) -> tuple[dict[str, Any], int]:
-    try:
-        core.user_fs.get_workspace(workspace_id)
-    except FSWorkspaceNotFoundError:
-        raise APIException(404, {"error": "unknown_workspace"})
-
     timestamp = await check_if_timestamp()
+
+    # Check access using `get_workspace_type`
+    get_workspace_type(core, workspace_id, timestamp)
 
     with backend_errors_to_api_exceptions():
         await core.mountpoint_manager.mount_workspace(workspace_id, timestamp)
@@ -230,12 +221,6 @@ async def unmount_workspace(core: LoggedCore, workspace_id: EntryID) -> tuple[di
 async def toggle_offline_availability(
     core: LoggedCore, workspace_id: EntryID
 ) -> tuple[dict[str, Any], int]:
-    workspace_fs: WorkspaceFS | None = None
-    try:
-        workspace_fs = core.user_fs.get_workspace(workspace_id)
-    except FSWorkspaceNotFoundError:
-        raise APIException(404, {"error": "unknown_workspace"})
-
     data = await get_data()
     parser = Parser()
     parser.add_argument("enable", type=bool, required=True)
@@ -243,6 +228,7 @@ async def toggle_offline_availability(
     if bad_fields:
         raise APIException.from_bad_fields(bad_fields)
 
+    workspace_fs = get_workspace_type(core, workspace_id)
     info = workspace_fs.get_remanence_manager_info()
     if args["enable"] and info.is_block_remanent:
         raise APIException(400, {"error": "offline_availability_already_enabled"})
@@ -269,11 +255,7 @@ async def toggle_offline_availability(
 async def get_offline_availability_status(
     core: LoggedCore, workspace_id: EntryID
 ) -> tuple[dict[str, Any], int]:
-    workspace_fs: WorkspaceFS | None = None
-    try:
-        workspace_fs = core.user_fs.get_workspace(workspace_id)
-    except FSWorkspaceNotFoundError:
-        raise APIException(404, {"error": "unknown_workspace"})
+    workspace_fs = get_workspace_type(core, workspace_id)
     info = workspace_fs.get_remanence_manager_info()
 
     return {
