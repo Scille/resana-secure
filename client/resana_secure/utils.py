@@ -268,7 +268,7 @@ def get_workspace_type(
     if workspace.is_deleted():
         raise APIException(410, {"error": "deleted_workspace"})
     if workspace.get_workspace_entry().role is None:
-        raise APIException(403, {"error": "forbidded_workspace"})
+        raise APIException(403, {"error": "forbidden_workspace"})
     return workspace
 
 
@@ -326,7 +326,7 @@ def backend_errors_to_api_exceptions() -> Iterator[None]:
     except FSWorkspaceNotFoundError:
         raise APIException(404, {"error": "unknown_workspace"})
     except (FSNoAccessError, FSWorkspaceNoAccess):
-        raise APIException(403, {"error": "forbidded_workspace"})
+        raise APIException(403, {"error": "forbidden_workspace"})
     except (FSReadOnlyError, FSWorkspaceNoReadAccess):
         raise APIException(403, {"error": "read_only_workspace"})
     except FSSharingNotAllowedError:
