@@ -14,7 +14,7 @@ $ parsec backend run \
 $ python -m resana_secure --rie-server-addr localhost:6888
 
 # Running the test script
-$ python packagin/test_routes
+$ python packaging/test_routes.py
 ```
 
 TODO: integrate this in the CI
@@ -85,8 +85,10 @@ def make_request(method, url, auth_token=None, headers=None, data=None, files=No
         # Might as well see if it works with no auth while we're at it
         r = requests.request(method, url, headers=headers, data=data, files=files, json=json)
         # Should be 401 Auth required, else the route is not secure
-        if r.status_code != 401:
-            logger.error(f"{method} f{url} does not requires authentication.")
+        if r.status_code not in (401, 403):
+            logger.error(
+                f"{method} {url} does not requires authentication (returned {r.status_code})"
+            )
 
         # Now that we checked that auth token was required, we can perform the real request
         headers["Authorization"] = f"Bearer {auth_token}"
@@ -100,7 +102,7 @@ def make_request(method, url, auth_token=None, headers=None, data=None, files=No
 def test_workspaces(auth_token, resana_addr):
     VARIABLES = {}
 
-    MOUNTPOINT_DIR, _, _, _ = get_default_dirs()
+    MOUNTPOINT_DIR, *_ = get_default_dirs()
 
     # List workspaces
     with run_test("List workspaces") as context:
@@ -127,7 +129,16 @@ def test_workspaces(auth_token, resana_addr):
         r = make_request("GET", f"{resana_addr}/workspaces", auth_token=auth_token)
         context.request = r
         assert r.status_code == 200
-        assert r.json() == {"workspaces": [{"id": ANY, "name": DEFAULT_WORKSPACE, "role": "OWNER"}]}
+        assert r.json() == {
+            "workspaces": [
+                {
+                    "id": ANY,
+                    "name": DEFAULT_WORKSPACE,
+                    "role": "OWNER",
+                    "archiving_configuration": "AVAILABLE",
+                }
+            ]
+        }
         assert (MOUNTPOINT_DIR / DEFAULT_WORKSPACE).is_dir()
 
     # Checking offline availability
@@ -169,7 +180,14 @@ def test_workspaces(auth_token, resana_addr):
         context.request = r
         assert r.status_code == 200
         assert r.json() == {
-            "workspaces": [{"id": ANY, "name": f"{DEFAULT_WORKSPACE}_RENAMED", "role": "OWNER"}]
+            "workspaces": [
+                {
+                    "id": ANY,
+                    "name": f"{DEFAULT_WORKSPACE}_RENAMED",
+                    "role": "OWNER",
+                    "archiving_configuration": "AVAILABLE",
+                }
+            ]
         }
 
     # Checking the share info
@@ -286,7 +304,7 @@ def test_files(auth_token, resana_addr):
     SMALL_FILE_SIZE = 1024
     LARGE_FILE_SIZE = 2**20 * 20  # 20mB
 
-    MOUNTPOINT_DIR, _, _, _ = get_default_dirs()
+    MOUNTPOINT_DIR, *_ = get_default_dirs()
 
     # Get a workspace id
     with run_test("Get workspace id") as context:
@@ -423,9 +441,10 @@ def test_files(auth_token, resana_addr):
             MOUNTPOINT_DIR / DEFAULT_WORKSPACE / "Folder" / "test2.txt"
         ).read_bytes() == file_content
 
-    time.sleep(
-        2.0
-    )  # Wait for file sync to get timestamp, 2 seconds is long enough to be consistent
+    # Wait for file sync to get timestamp, 5 seconds is long enough to be consistent
+    sleep_time = 5
+    logger.info(f"Sleeping for {sleep_time} seconds, waiting for synchronization...")
+    time.sleep(sleep_time)
     timestamp = DateTime.now().to_rfc3339()
 
     # Post a large file with JSON
@@ -786,7 +805,7 @@ def test_files(auth_token, resana_addr):
         )
         context.request = r
 
-        assert r.status_code == 200
+        assert r.status_code == 200, r.json()
         assert r.json() == {
             "files": [
                 {
@@ -810,7 +829,7 @@ def test_files(auth_token, resana_addr):
                     "updated_by": "gordon.freeman@blackmesa.nm",
                 },
             ]
-        }
+        }, r.json()
 
     # Unmount workspace
     with run_test("Unmount timestamped workspace"):
@@ -833,6 +852,212 @@ def test_files(auth_token, resana_addr):
             "snapshots": [],
             "workspaces": [{"id": ANY, "name": f"{DEFAULT_WORKSPACE}_RENAMED", "role": "OWNER"}],
         }
+
+
+def test_workspace_archiving(auth_token, resana_addr, bootstrap_addr, org_id, administration_token):
+    MOUNTPOINT_DIR, *_ = get_default_dirs()
+
+    # Get a workspace id
+    with run_test("Get workspace id") as context:
+        r = make_request("GET", f"{resana_addr}/workspaces", auth_token=auth_token)
+        context.request = r
+        assert r.status_code == 200
+        workspace_id = r.json()["workspaces"][0]["id"]
+
+    with run_test("Get default archiving configuration") as context:
+        r = make_request(
+            "GET", f"{resana_addr}/workspaces/{workspace_id}/archiving", auth_token=auth_token
+        )
+        context.request = r
+        assert r.status_code == 200
+        assert r.json() == {
+            "configuration": "AVAILABLE",
+            "configured_by": None,
+            "configured_on": None,
+            "deletion_date": None,
+            "minimum_archiving_period": 2592000,
+        }, r.json()
+
+    with run_test("Check workspace mounted before archiving"):
+        assert (MOUNTPOINT_DIR / DEFAULT_WORKSPACE).exists()
+
+    with run_test("Archive workspace") as context:
+        r = make_request(
+            "POST",
+            f"{resana_addr}/workspaces/{workspace_id}/archiving",
+            json={"configuration": "ARCHIVED"},
+            auth_token=auth_token,
+        )
+        context.request = r
+        assert r.status_code == 200
+        assert r.json() == {}
+
+    with run_test("Get archived workspace configuration") as context:
+        r = make_request(
+            "GET", f"{resana_addr}/workspaces/{workspace_id}/archiving", auth_token=auth_token
+        )
+        context.request = r
+        assert r.status_code == 200
+        assert r.json() == {
+            "configuration": "ARCHIVED",
+            "configured_by": "gordon.freeman@blackmesa.nm",
+            "configured_on": ANY,
+            "deletion_date": None,
+            "minimum_archiving_period": 2592000,
+        }, r.json()
+
+    with run_test("Check workspace list with archived workspace") as context:
+        r = make_request("GET", f"{resana_addr}/workspaces", auth_token=auth_token)
+        context.request = r
+        assert r.status_code == 200
+        assert r.json() == {
+            "workspaces": [
+                {
+                    "archiving_configuration": "ARCHIVED",
+                    "id": workspace_id,
+                    "name": ANY,
+                    "role": "OWNER",
+                }
+            ]
+        }, r.json()
+
+    with run_test("Check workspace unmounted after archiving"):
+        assert not (MOUNTPOINT_DIR / DEFAULT_WORKSPACE).exists()
+
+    with run_test("Mount archived workspace") as context:
+        r = make_request(
+            "POST",
+            f"{resana_addr}/workspaces/{workspace_id}/mount",
+            auth_token=auth_token,
+        )
+        context.context = r
+        assert r.status_code == 200
+        assert r.json() == {"id": f"{workspace_id}"}
+        assert (MOUNTPOINT_DIR / f"{DEFAULT_WORKSPACE}_RENAMED").exists()
+
+    with run_test("Check archived workspace is read-only") as context:
+        try:
+            (MOUNTPOINT_DIR / f"{DEFAULT_WORKSPACE}_RENAMED" / "new-dir").mkdir()
+        except OSError:
+            pass
+        else:
+            assert False, "not read-only"
+
+    with run_test("Plan workspace deletion") as context:
+        deletion_date = DateTime.now().add(days=31).to_rfc3339()
+        r = make_request(
+            "POST",
+            f"{resana_addr}/workspaces/{workspace_id}/archiving",
+            json={"configuration": "DELETION_PLANNED", "deletion_date": deletion_date},
+            auth_token=auth_token,
+        )
+        context.request = r
+        assert r.status_code == 200
+        assert r.json() == {}
+
+    with run_test("Get deletion-planned workspace configuration") as context:
+        r = make_request(
+            "GET", f"{resana_addr}/workspaces/{workspace_id}/archiving", auth_token=auth_token
+        )
+        context.request = r
+        assert r.status_code == 200
+        assert r.json() == {
+            "configuration": "DELETION_PLANNED",
+            "configured_by": "gordon.freeman@blackmesa.nm",
+            "configured_on": ANY,
+            "deletion_date": deletion_date,
+            "minimum_archiving_period": 2592000,
+        }, r.json()
+
+    with run_test("Check workspace list with deletion-planned workspace") as context:
+        r = make_request("GET", f"{resana_addr}/workspaces", auth_token=auth_token)
+        context.request = r
+        assert r.status_code == 200
+        assert r.json() == {
+            "workspaces": [
+                {
+                    "archiving_configuration": "DELETION_PLANNED",
+                    "id": workspace_id,
+                    "name": ANY,
+                    "role": "OWNER",
+                }
+            ]
+        }, r.json()
+
+    with run_test("Check workspace unmounted after planning deletion"):
+        assert not (MOUNTPOINT_DIR / DEFAULT_WORKSPACE).exists()
+
+    with run_test("Mount deletion-planned workspace") as context:
+        r = make_request(
+            "POST",
+            f"{resana_addr}/workspaces/{workspace_id}/mount",
+            auth_token=auth_token,
+        )
+        context.context = r
+        assert r.status_code == 200
+        assert r.json() == {"id": f"{workspace_id}"}
+        assert (MOUNTPOINT_DIR / f"{DEFAULT_WORKSPACE}_RENAMED").exists()
+
+    with run_test("Check deletion-planned workspace is read-only") as context:
+        try:
+            (MOUNTPOINT_DIR / f"{DEFAULT_WORKSPACE}_RENAMED" / "new-dir").mkdir()
+        except OSError:
+            pass
+        else:
+            assert False, "not read-only"
+
+    with run_test("Allow for instant deletion") as context:
+        parsed = urllib.parse.urlparse(bootstrap_addr)
+        backend_addr = f"http://{parsed.netloc}"
+        r = make_request(
+            "PATCH",
+            f"{backend_addr}/administration/organizations/{org_id}",
+            auth_token=administration_token,
+            json={"minimum_archiving_period": 0},
+        )
+        context.request = r
+        assert r.status_code == 200, r.json()
+        assert r.json() == {}, r.json()
+
+    with run_test("Delete workspace") as context:
+        deletion_date = DateTime.now().to_rfc3339()
+        r = make_request(
+            "POST",
+            f"{resana_addr}/workspaces/{workspace_id}/archiving",
+            json={"configuration": "DELETION_PLANNED", "deletion_date": deletion_date},
+            auth_token=auth_token,
+        )
+        context.request = r
+        assert r.status_code == 200
+        assert r.json() == {}
+
+    with run_test("Archiving configuration is not available for deleted workspace") as context:
+        r = make_request(
+            "GET", f"{resana_addr}/workspaces/{workspace_id}/archiving", auth_token=auth_token
+        )
+        context.request = r
+        assert r.status_code == 410
+        assert r.json() == {"error": "deleted_workspace"}, r.json()
+
+    with run_test("Workspace list exclude deleted workspaces") as context:
+        r = make_request("GET", f"{resana_addr}/workspaces", auth_token=auth_token)
+        context.request = r
+        assert r.status_code == 200
+        assert r.json() == {"workspaces": []}, r.json()
+
+    with run_test("Check workspace unmounted after deleting"):
+        assert not (MOUNTPOINT_DIR / DEFAULT_WORKSPACE).exists()
+
+    with run_test("Cannot mount deleted workspace") as context:
+        r = make_request(
+            "POST",
+            f"{resana_addr}/workspaces/{workspace_id}/mount",
+            auth_token=auth_token,
+        )
+        context.context = r
+        assert r.status_code == 410, (r.status_code, r.json())
+        assert r.json() == {"error": "deleted_workspace"}
+        assert not (MOUNTPOINT_DIR / f"{DEFAULT_WORKSPACE}_RENAMED").exists()
 
 
 def test_user_invitations(auth_token, resana_addr, org_id, second_invitee=False, sleep_time=0.1):
@@ -1745,6 +1970,7 @@ def main(
     resana_addr,
     bootstrap_addr,
     org_id,
+    administration_token,
     skip_bootstrap=False,
     skip_humans=False,
     skip_workspaces=False,
@@ -1753,6 +1979,7 @@ def main(
     skip_device_invite=False,
     skip_recovery=False,
     skip_shamir_recovery=False,
+    skip_workspace_archiving=False,
 ):
     """Test all Resana routes.
 
@@ -1801,6 +2028,11 @@ def main(
     # Upload, rename, delete files
     if not skip_files:
         test_files(auth_token, resana_addr)
+    # Workspace archiving
+    if not skip_workspaces and not skip_workspace_archiving:
+        test_workspace_archiving(
+            auth_token, resana_addr, bootstrap_addr, org_id, administration_token
+        )
     # Device recovery
     if not skip_recovery:
         test_recovery(auth_token, resana_addr, org_id)
@@ -1882,6 +2114,18 @@ if __name__ == "__main__":
         help="Skip shamir recovery invite API (this may have an impact on other APIs)",
     )
     parser.add_argument("--skip-recovery", action="store_true", help="Skip the recovery API")
+    parser.add_argument(
+        "--skip-workspace-archiving",
+        action="store_true",
+        help="Skip workspace archiving API (this may have an impact on other APIs)",
+    )
+    parser.add_argument(
+        "--administration-token",
+        "-t",
+        type=str,
+        default="test",
+        help="Administration token to allow for instant deletion",
+    )
 
     args = parser.parse_args()
     if args.org is None:
@@ -1904,6 +2148,7 @@ if __name__ == "__main__":
         args.resana,
         bootstrap_addr,
         args.org,
+        args.administration_token,
         skip_bootstrap=args.skip_bootstrap,
         skip_humans=args.skip_humans,
         skip_workspaces=args.skip_workspaces,
@@ -1912,6 +2157,7 @@ if __name__ == "__main__":
         skip_device_invite=args.skip_device_invite,
         skip_recovery=args.skip_recovery,
         skip_shamir_recovery=args.skip_shamir_recovery,
+        skip_workspace_archiving=args.skip_workspace_archiving,
     )
 
     ret_code = 0
@@ -1926,4 +2172,5 @@ if __name__ == "__main__":
         print(" - Parsec backend is running")
         print(" - Resana is running")
         print(" - Resana has the --rie-server-addr option correctly set")
+        print(" - This script is provided with the right administration token (`test` by default)")
     raise SystemExit(ret_code)
