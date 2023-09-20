@@ -10,7 +10,7 @@ correspondent à une réponse du type:
 ```python
 HTTP <CODE>
 {
-    "erreur": "<error-name>"
+    "error": "<error-name>"
 }
 ```
 
@@ -1178,19 +1178,21 @@ HTTP 200
 - HTTP 401: `not_connected_to_rie`
 
 
-## `GET /workspaces/<id>/archiving`
+## Archivage et suppression des workspaces
 
-Récupère des informations sur l'état de l'archivage/suppression pour ce workspace.
-
-Note: la configuration d'archivage peut-être dans 3 états:
+La configuration d'archivage/suppression peut-être dans 3 états:
 - Disponible (`AVAILABLE`): l'état par défaut, le workspace est disponible en lecture/écriture (si le role de l'utilisateur le permet).e
 - Archivé (`ARCHIVED`): le workspace est en lecture-seul jusqu'au prochain changement de configuration.
 - Suppression planifié (`DELETION_PlANNED`): le workspace est en lecture-seul et une suppression de l'espace est planifié a une date donné.
 
+### `GET /workspaces/<id>/archiving`
+
+Récupère les informations sur l'état de l'archivage/suppression pour ce workspace.
+
 En plus de l'état de la configuration courante, 4 informations sont fournis:
-- La date de la configuration courante (`configured_on`). Elle peut etre `null` si le workspace n'a jamais été configuré.
-- L'email de l'utilisateur responsable de la configuration courante (`configured_by`). Elle peut etre `null` si le workspace n'a jamais été configuré.
-- La date de suppression planifiée (`deletion_date`). Elle n'est fourni que dans l'état de suppression planifié. Elle peut être déja passée.
+- La date de la configuration courante (`configured_on`). Elle peut être `null` si le workspace n'a jamais été configuré.
+- L'email de l'utilisateur responsable de la configuration courante (`configured_by`). Elle peut être `null` si le workspace n'a jamais été configuré.
+- La date de suppression planifiée (`deletion_date`). Elle n'est fourni que dans l'état de suppression planifié. Elle peut être déjà passée.
 - Un booléen indiquant que le workspace est effectivement supprimé. Cela signifie que la date courante a dépassé la date de suppression planifié.
 - La période d'archivage minimale en secondes (`minimum_archiving_period`). C'est la période minimale à respecter lors d'une suppression planifiée.
 
@@ -1221,20 +1223,15 @@ HTTP 200
 - HTTP 410: `deleted_workspace`
 - HTTP 403: `forbidden_workspace`
 
-## `POST /workspaces/<id>/archiving`
+### `POST /workspaces/<id>/archiving`
 
 Configure l'archivage ou planifie une suppression pour ce workspace.
-
-La configuration d'archivage peut-etre dans 3 états:
-- Disponible (`AVAILABLE`): l'état par défaut, le workspace est disponible en lecture/écriture (si le role de l'utilisateur le permet).e
-- Archivé (`ARCHIVED`): le worspace est en lecture-seul jusqu'au prochain changement de configuration.
-- Suppression planifié (`DELETION_PlANNED`): le workspace est en lecture-seul et une suppression de l'espace est planifié a une date donné.
 
 **Notes:**
 
 - La date de suppression (`deletion_date`) n'est fourni que dans le cas d'une suppression planifiée.
-- Cette date de suppression doit respecté le délai d'archivage minimum, . configuré au niveau de l'organization.
-- Les droits de propriétaire (`OWNER`) sont nécéssaires pour réaliser cette opération.
+- Cette date de suppression doit respecter le délai d'archivage minimum, configuré au niveau de l'organization.
+- Les droits de propriétaire (`OWNER`) sont nécessaires pour réaliser cette opération.
 
 **Request:**
 
@@ -1256,7 +1253,7 @@ HTTP 200
 
 **Erreurs:**
 
-- HTTP 404: `unkown_workspace`
+- HTTP 404: `unknown_workspace`
 - HTTP 403: `archiving_not_allowed`
 - HTTP 410: `deleted_workspace`
 - HTTP 403: `forbidden_workspace`
@@ -1304,7 +1301,7 @@ HTTP 200
 
 **Erreurs:**
 
-- HTTP 404: `unkown_workspace`
+- HTTP 404: `unknown_workspace`
 - HTTP 410: `deleted_workspace`
 - HTTP 403: `forbidden_workspace`
 - HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
@@ -1337,7 +1334,7 @@ HTTP 201
 
 **Erreurs:**
 
-- HTTP 404: `unkown_workspace`
+- HTTP 404: `unknown_workspace`
 - HTTP 410: `deleted_workspace`
 - HTTP 403: `forbidden_workspace`
 - HTTP 403: `archived_workspace`
@@ -1371,7 +1368,7 @@ HTTP 200
 
 **Erreurs:**
 
-- HTTP 404: `unkown_workspace`
+- HTTP 404: `unknown_workspace`
 - HTTP 410: `deleted_workspace`
 - HTTP 403: `archived_workspace`
 - HTTP 403: `forbidden_workspace`

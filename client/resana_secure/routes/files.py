@@ -33,8 +33,8 @@ from ..utils import (
     authenticated,
     backend_errors_to_api_exceptions,
     check_if_timestamp,
+    check_workspace_available,
     get_data,
-    get_workspace_type,
 )
 
 files_bp = Blueprint("files_api", __name__)
@@ -83,7 +83,7 @@ async def get_workspace_folders_tree(
     timestamp = await check_if_timestamp()
 
     with backend_errors_to_api_exceptions():
-        workspace = get_workspace_type(core, workspace_id, timestamp)
+        workspace = check_workspace_available(core, workspace_id, timestamp)
 
         async def _recursive_build_tree(path: str, name: EntryName | None) -> dict[str, Any] | None:
             entry_info = cast(EntryInfo, await workspace.path_info(path=path))
@@ -266,7 +266,7 @@ async def get_workspace_folder_content(
         raise APIException(404, {"error": "unknown_folder"})
 
     with backend_errors_to_api_exceptions():
-        workspace = get_workspace_type(core, workspace_id, timestamp)
+        workspace = check_workspace_available(core, workspace_id, timestamp)
 
         async def _build_cooked_files() -> list[dict[str, int | str]]:
             result = await entry_id_to_path(workspace, folder_id_parsed)
@@ -442,7 +442,7 @@ async def open_workspace_item(
         raise APIException(404, {"error": "unknown_file"})
 
     with backend_errors_to_api_exceptions():
-        workspace = get_workspace_type(core, workspace_id, timestamp)
+        workspace = check_workspace_available(core, workspace_id, timestamp)
 
         result = await entry_id_to_path(workspace, entry_id_parsed)
         if not result:
@@ -486,7 +486,7 @@ async def search_workspace_item(
         raise APIException.from_bad_fields(bad_fields)
 
     with backend_errors_to_api_exceptions():
-        workspace = get_workspace_type(core, workspace_id, args["timestamp"])
+        workspace = check_workspace_available(core, workspace_id, args["timestamp"])
 
         def _matches(file_name: EntryName) -> bool:
             return (args["case_sensitive"] and args["search_string"] in file_name.str) or (

@@ -256,7 +256,7 @@ def apitoken_to_addr(apitoken: str) -> BackendInvitationAddr:
     return BackendInvitationAddr.from_url(invitation_url)
 
 
-def get_workspace_type(
+def check_workspace_available(
     core: LoggedCore, workspace_id: EntryID, timestamp: DateTime | None = None
 ) -> WorkspaceFS | WorkspaceFSTimestamped:
     try:
