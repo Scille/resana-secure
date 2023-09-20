@@ -79,7 +79,7 @@ jobs:
       - name: Restore cache from `windows-build`
         uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8  # pin v3.3.1
         with:
-          key: windows-packaging-${{ hashFiles('client/poetry.lock') }}
+          key: windows-packaging-${{ hashFiles('client/poetry.lock', 'client/submodules/parsec-cloud/**') }}
           restore-keys: windows-packaging-
           path: |
             packaging/windows/build/tools_venv
