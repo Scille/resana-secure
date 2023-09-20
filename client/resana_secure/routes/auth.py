@@ -51,7 +51,7 @@ async def do_auth() -> tuple[dict[str, Any], int]:
         and args["encrypted_key"] is not None
         and args["user_password"] is not None
     ):
-        raise APIException(400, {"error": "cannot use both authentication modes at the same time"})
+        raise APIException(400, {"error": "cannot_use_both_authentication_modes"})
     if args["key"] is None:
         if not (args["encrypted_key"] and args["user_password"]):
             raise APIException.from_bad_fields(
