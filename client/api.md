@@ -14,26 +14,65 @@ HTTP <CODE>
 }
 ```
 
-En voici la liste:
-- HTTP 400: `invitation_not_found`
-- HTTP 400: `invitation_already_used`
-- HTTP 502: `connection_refused_by_server`
-- HTTP 404: `not_found`
-- HTTP 400: `claimer_already_member`
-- HTTP 400: `no_shamir_recovery_setup`
-- HTTP 403: `archived_workspace`
-- HTTP 410: `deleted_workspace`
-- HTTP 400: `archiving_period_is_too_short`
-- HTTP 403: `archiving_not_allowed`
-- HTTP 404: `unknown_workspace`
-- HTTP 403: `forbidden_workspace`
-- HTTP 403: `read_only_workspace`
-- HTTP 403: `sharing_not_allowed`
-- HTTP 404: `unknown_token`
-- HTTP 409: `invalid_state`
-- HTTP 400: `mountpoint_already_mounted`
-- HTTP 404: `mountpoint_not_mounted`
-- HTTP 503: `offline`
+Voici la liste des erreurs par ordre alphabétique:
+- `archived_workspace` (HTTP 403)
+- `archiving_not_allowed` (HTTP 403)
+- `archiving_period_is_too_short` (HTTP 400)
+- `authentication_requested` (HTTP 401)
+- `bad_claimer_sas` (HTTP 400)
+- `bad_data` (HTTP 400)
+- `bad_greeter_sas` (HTTP 400)
+- `bad_key` (HTTP 400)
+- `cannot_delete_root_folder` (HTTP 400)
+- `cannot_move_root_folder` (HTTP 400)
+- `cannot_use_both_authentication_modes` (HTTP 400)
+- `claimer_already_member` (HTTP 400)
+- `claimer_not_a_member` (HTTP 400)
+- `connection_refused_by_server` (HTTP 502)
+- `deleted_workspace` (HTTP 410)
+- `destination_parent_not_a_folder` (HTTP 400)
+- `device_not_found` (HTTP 404)
+- `email_not_in_recipients` (HTTP 400)
+- `failed_to_disable_offline_availability` (HTTP 400)
+- `failed_to_enable_offline_availability` (HTTP 400)
+- `forbidden_workspace` (HTTP 403)
+- `invalid_configuration` (HTTP 400)
+- `invalid_passphrase` (HTTP 400)
+- `invalid_state` (HTTP 409)
+- `invitation_already_used` (HTTP 400)
+- `invitation_not_found` (HTTP 400)
+- `json_body_expected` (HTTP 400)
+- `mountpoint_already_mounted` (HTTP 400)
+- `mountpoint_not_mounted` (HTTP 404)
+- `no_shamir_recovery_setup` (HTTP 400)
+- `not_enough_shares` (HTTP 400)
+- `not_a_file` (HTTP 404)
+- `not_a_folder` (HTTP 404)
+- `not_connected_to_rie` (HTTP 401)
+- `not_found` (HTTP 404)
+- `not_setup` (HTTP 404)
+- `offline` (HTTP 503)
+- `offline_availability_already_disabled` (HTTP 400)
+- `offline_availability_already_enabled` (HTTP 400)
+- `organization_already_bootstrapped` (HTTP 400)
+- `precondition_failed` (HTTP 409)
+- `read_only_workspace` (HTTP 403)
+- `recipient_already_recovered` (HTTP 400)
+- `sharing_not_allowed` (HTTP 403)
+- `source_not_a_folder` (HTTP 404)
+- `unexpected_error` (HTTP 400)
+- `unknown_destination_parent` (HTTP 404)
+- `unknown_email` (HTTP 404)
+- `unknown_entry` (HTTP 404)
+- `unknown_file` (HTTP 404)
+- `unknown_folder` (HTTP 404)
+- `unknown_organization` (HTTP 404)
+- `unknown_parent` (HTTP 404)
+- `unknown_source` (HTTP 404)
+- `unknown_token` (HTTP 404)
+- `unknown_workspace` (HTTP 404)
+- `users_not_found` (HTTP 400)
+
 
 Une erreur dans le formatage de la requête est retournée sous la forme suivante:
 
@@ -157,8 +196,9 @@ Set-Cookie: session=<token>; HttpOnly; Path=/; SameSite=Strict
 
 **Erreurs:**
 
-- HTTP 404: le poste n'a pas été enrôlé pour cet utilisateur (i.e. il ne contient pas de fichier de clés de Device à déchiffrer)
-- HTTP 400: la clé de déchiffrement est invalide
+- HTTP 404: `device_not_found`, le poste n'a pas été enrôlé pour cet utilisateur (i.e. il ne contient pas de fichier de clés de Device à déchiffrer)
+- HTTP 400: `bad_key`, la clé de déchiffrement est invalide
+- HTTP 400: `cannot_use_both_authentication_modes`, si les deux modes d'authentification sont utilisés simultanément
 
 Une fois obtenu, le token d'authentification est
 
@@ -232,10 +272,10 @@ HTTP 200
 
 **Erreurs:**
 
-- HTTP 400: `organization_already_boostrapped`
-- HTTP 404: L'organisation n'existe pas sur le serveur Parsec ou l'URL de bootstrap n'est pas valide
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'organisation n'existe pas sure le serveur)
+- HTTP 400: `organization_already_bootstrapped`
+- HTTP 404: `unknown_organization`, l'organisation n'existe pas sur le serveur Parsec ou l'URL de bootstrap n'est pas valide
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+
 
 ## Utilisateurs & invitations
 
@@ -269,8 +309,8 @@ HTTP 200
 
 **Erreurs:**
 
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 `profile` peut être: `ADMIN` ou `STANDARD`
 
@@ -297,8 +337,8 @@ HTTP 200
 
 - HTTP 404: si email inconnu
 - HTTP 403: si l'utilisateur actuel n'a pas le profil administrateur sur l'organisation Parsec
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 ### `GET /invitations`
 
@@ -338,8 +378,8 @@ HTTP 200
 
 **Erreurs:**
 
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 `status` peut être: `IDLE` ou `READY`
 
@@ -395,8 +435,8 @@ HTTP 200
 - HTTP 400: `claimer_not_a_member` (seulement pour les récupérations partagées)
 - HTTP 400: `no_shamir_recovery_setup` (seulement pour les récupérations partagées)
 - HTTP 403: si l'utilisateur actuel n'a pas le profil administrateur sur l'organisation Parsec et tente d'inviter un autre utilisateur.
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 La création d'invitation est idempotent (si une invitation existe déjà, elle ne sera pas recréée et le token existant sera retourné).
 
@@ -424,9 +464,9 @@ HTTP 204
 **Erreurs:**
 
 - HTTP 400: `invitation_already_used`
-- HTTP 404: si le token n'existe pas
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 404: `unknown_token`, si le token n'existe pas
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 ## Enrôlement (greeter)
 
@@ -457,9 +497,10 @@ HTTP 200
 
 - HTTP 400: `invitation_already_used`
 - HTTP 403 si l'utilisateur n'a pas le profil `ADMIN` et tente d'inviter un nouvel utilisateur
-- HTTP 404 si le token est inconnu
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 404: `unknown_token`, si le token n'existe pas
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 409: `invalid_state`, le processus d'invitation n'est pas dans l'état attendu pour exécuter cette commande
 
 **Notes:**
 
@@ -491,10 +532,10 @@ HTTP 200
 **Erreurs:**
 
 - HTTP 403: si l'utilisateur n'a pas le profil `ADMIN` et tente d'inviter un nouvel utilisateur
-- HTTP 404: si le token est inconnu
-- HTTP 409: si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 404: `unknown_token`, si le token n'existe pas
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 409: `invalid_state`, si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 
 `candidate_claimer_sas` est une liste de quatre codes dont un seul correspond
 au code SAS du pair. L'utilisateur est donc obligé de se concerter avec le pair
@@ -525,11 +566,11 @@ HTTP 200
 **Erreurs:**
 
 - HTTP 403: si l'utilisateur n'a pas le profil `ADMIN` et tente d'inviter un nouvel utilisateur
-- HTTP 404: si le token est inconnu
-- HTTP 400: si claimer_sas n'est pas le bon
-- HTTP 409: si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 404: `unknown_token`, si le token n'existe pas
+- HTTP 400: `bad_claimer_sas` si le code SAS n'est pas bon
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 409: `invalid_state`, si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 
 ### `POST /invitations/<token>/greeter/4-finalize`
 
@@ -568,10 +609,10 @@ HTTP 200
 **Erreurs:**
 
 - HTTP 403: si l'utilisateur n'a pas le profil `ADMIN` et tente d'inviter un nouvel utilisateur
-- HTTP 404: si le token est inconnu
-- HTTP 409: si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 404: `unknown_token`, si le token n'existe pas
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 409: `invalid_state`, si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 
 ## Enrôlement (claimer)
 
@@ -634,9 +675,10 @@ Si `enough_share` est vrai, le client doit passer directement à l'étape 4.
 
 **Erreurs:**
 
-- HTTP 404: si le token est inconnu
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 404: `unknown_token`, si le token n'existe pas
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 409: `invalid_state`, le processus d'invitation n'est pas dans l'état attendu pour exécuter cette commande
 
 `type` est `device`, `user` or `shamir_recovery`
 `candidate_greeter_sas` est une liste de quatre codes dont un seul correspond
@@ -647,14 +689,16 @@ pour déterminer lequel est le bon.
 
 Attend que le pair qui enrôle ait rejoint le serveur Parsec.
 
-Request pour une invitation de type user ou device:
+**Request:**
+
+Pour une invitation de type user ou device:
 
 ```python
 {
 }
 ```
 
-Request pour une invitation de type shamir
+Pour une invitation de type shamir
 
 ```python
 {
@@ -676,9 +720,10 @@ HTTP 200
 
 - HTTP 400: `email_not_in_recipients`, dans le cas d'une invitation shamir, quand l'email fournit ne correspond à aucun des destinataires
 - HTTP 400: `recipient_already_recovered`, dans le cas d'une invitation shamir, quand l'email fournit correspond à un destinataire déjà contacté
-- HTTP 404: si le token est inconnu
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 404: `unknown_token`, si le token n'existe pas
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 409: `invalid_state`, le processus d'invitation n'est pas dans l'état attendu pour exécuter cette commande
 
 **Notes:**
 
@@ -711,11 +756,11 @@ HTTP 200
 
 **Erreurs:**
 
-- HTTP 404: si le token est inconnu
-- HTTP 400: si greeter_sas n'est pas le bon
-- HTTP 409: si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 404: `unknown_token`, si le token n'existe pas
+- HTTP 400: `bad_greeter_sas` si le code SAS n'est pas le bon
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 409: `invalid_state`, si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 
 `greeter_sas` est le code de 4 caractère à transmettre par un canal tiers au pair.
 
@@ -756,10 +801,11 @@ Si `enough_shares` est vrai, le client peut continuer à l'étape 4 pour finaliz
 
 **Erreurs:**
 
-- HTTP 404: si le token est inconnu
-- HTTP 409: si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 404: `unknown_token`, si le token n'existe pas
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 409: `invalid_state`, si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
+
 
 ### `POST /invitations/<token>/claimer/4-finalize`
 
@@ -785,11 +831,11 @@ HTTP 200
 
 **Erreurs:**
 
-- HTTP 400: `not-enough-shares`, dans le cas d'une invitation shamir, avec un nombre de parts insuffisant
-- HTTP 404: si le token est inconnu
-- HTTP 409: si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 400: `not_enough_shares`, dans le cas d'une invitation shamir, avec un nombre de parts insuffisant
+- HTTP 404: `unknown_token`, si le token n'existe pas
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 409: `invalid_state`, si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 
 Note: `key` est utilisé pour chiffrer le fichier de clé de Device résultant de l'opération d'enrôlement.
 
@@ -882,9 +928,10 @@ HTTP 200
 
 **Erreurs:**
 
-- HTTP 409: le workspace a déjà eu son nom changé
-- HTTP 404: le workspace n'existe pas
-- HTTP 410: le workspace a été supprimé
+- HTTP 409: `precondition_failed`, le workspace a déjà eu son nom changé
+- HTTP 404: `unknown_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
 
 **Notes:**
 
@@ -917,10 +964,11 @@ HTTP 200
 
 **Erreurs:**
 
-- HTTP 404: le workspace n'existe pas
-- HTTP 410: le workspace a été supprimé
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 404: `unknown_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 ### `PATCH /workspaces/<id>/share`
 
@@ -951,8 +999,11 @@ HTTP 200
 
 - HTTP 404: `unknown_workspace`
 - HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 403: `sharing_not_allowed`
 - HTTP 404: `unknown_email`
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 **Notes:**
 
@@ -1025,6 +1076,8 @@ HTTP 200
 - HTTP 400: `mountpoint_already_mounted`
 - HTTP 404: `unknown_workspace`
 - HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 401: `not_connected_to_rie`
 
 
 ### `POST /workspaces/<id>/unmount`
@@ -1054,6 +1107,8 @@ HTTP 200
 - HTTP 404: `mountpoint_not_mounted`
 - HTTP 404: `unknown_workspace`
 - HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 401: `not_connected_to_rie`
 
 
 ### `POST /workspaces/<id>/toggle_offline_availability`
@@ -1081,8 +1136,12 @@ HTTP 200
 
 - HTTP 404: `unknown_workspace`
 - HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
 - HTTP 400: `offline_availability_already_disabled`
 - HTTP 400: `offline_availability_already_enabled`
+- HTTP 400: `failed_to_enable_offline_availability`
+- HTTP 400: `failed_to_disable_offline_availability`
+- HTTP 401: `not_connected_to_rie`
 
 
 ### `GET /workspaces/<id>/get_offline_availability_status`
@@ -1115,15 +1174,17 @@ HTTP 200
 
 - HTTP 404: `unknown_workspace`
 - HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 401: `not_connected_to_rie`
 
 
 ## `GET /workspaces/<id>/archiving`
 
 Récupère des informations sur l'état de l'archivage/suppression pour ce workspace.
 
-Note: la configuration d'archivage peut-etre dans 3 états:
+Note: la configuration d'archivage peut-être dans 3 états:
 - Disponible (`AVAILABLE`): l'état par défaut, le workspace est disponible en lecture/écriture (si le role de l'utilisateur le permet).e
-- Archivé (`ARCHIVED`): le worspace est en lecture-seul jusqu'au prochain changement de configuration.
+- Archivé (`ARCHIVED`): le workspace est en lecture-seul jusqu'au prochain changement de configuration.
 - Suppression planifié (`DELETION_PlANNED`): le workspace est en lecture-seul et une suppression de l'espace est planifié a une date donné.
 
 En plus de l'état de la configuration courante, 4 informations sont fournis:
@@ -1158,6 +1219,7 @@ HTTP 200
 
 - HTTP 404: `unknown_workspace`
 - HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
 
 ## `POST /workspaces/<id>/archiving`
 
@@ -1197,7 +1259,9 @@ HTTP 200
 - HTTP 404: `unkown_workspace`
 - HTTP 403: `archiving_not_allowed`
 - HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
 - HTTP 400: `archiving_period_is_too_short`
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 
 ## Dossiers
@@ -1241,7 +1305,9 @@ HTTP 200
 **Erreurs:**
 
 - HTTP 404: `unkown_workspace`
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 ### `POST /workspaces/<id>/folders`
 
@@ -1272,8 +1338,11 @@ HTTP 201
 **Erreurs:**
 
 - HTTP 404: `unkown_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 403: `archived_workspace`
 - HTTP 404: `unknown_parent`
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 ### `POST /workspaces/<id>/folders/rename`
 
@@ -1303,15 +1372,16 @@ HTTP 200
 **Erreurs:**
 
 - HTTP 404: `unkown_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `archived_workspace`
+- HTTP 403: `forbidden_workspace`
 - HTTP 400: `destination_parent_not_a_folder`
 - HTTP 400: `source_not_a_folder`
 - HTTP 400: `cannot_move_root_folder`
-- HTTP 404: `unknown_workspace`
-- HTTP 410: `deleted_workspace`
 - HTTP 404: `unknown_source_folder`
 - HTTP 404: `unknown_destination_parent_folder`
 - HTTP 403: si l'utilisateur n'a pas le profil `OWNER`/`MANAGER`/`CONTRIBUTER` sur le workspace
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 ### `DELETE /workspaces/<id>/folders/<id>`
 
@@ -1336,14 +1406,15 @@ HTTP 204
 
 ou
 
+- HTTP 404: `unknown_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
 - HTTP 400: `cannot_delete_root_folder`
 - HTTP 403: `read_only_workspace`
 - HTTP 403: `archived_workspace`
 - HTTP 404: `not_a_folder`
-- HTTP 404: `unknown_workspace`
-- HTTP 410: `deleted_workspace`
 - HTTP 404: `unknown_folder`
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 ## Fichiers
 
@@ -1385,8 +1456,9 @@ HTTP 200
 
 - HTTP 404: `unknown_workspace`
 - HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
 - HTTP 404: `unknown_path`
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 
 ### `POST /workspaces/<id>/files`
@@ -1428,9 +1500,11 @@ HTTP 201
 **Erreurs:**
 
 - HTTP 404: `unknown_workspace`
+- HTTP 403: `archived_workspace`
 - HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
 - HTTP 404: `unknown_path`
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 
 ### `POST /workspaces/<id>/files/rename`
@@ -1459,11 +1533,13 @@ HTTP 200
 
 **Erreurs:**
 
-- HTTP 400: `invalid_destination`
 - HTTP 404: `unknown_workspace`
+- HTTP 403: `archived_workspace`
 - HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 400: `invalid_destination`
 - HTTP 404: `unknown_path`
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 
 ### `DELETE /workspaces/<id>/files/<id>`
@@ -1491,8 +1567,10 @@ HTTP 204
 
 - HTTP 404: `unknown_workspace`
 - HTTP 410: `deleted_workspace`
-- HTTP 404: `unknown_file`
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
+- HTTP 403: `forbidden_workspace`
+- HTTP 404: `unknown_entry`
+- HTTP 404: `not_a_file`
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 ### `POST /workspaces/<id>/open/<id>`
 
@@ -1520,8 +1598,9 @@ HTTP 200
 
 - HTTP 404: `unknown_workspace`
 - HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
 - HTTP 404: `unknown_file`
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
 
 
 ### `POST /workspaces/<id>/search`
@@ -1563,6 +1642,7 @@ HTTP 200
 
 - HTTP 404: `unknown_workspace`
 - HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
 
 
 ### [NOT IMPLEMENTED] `GET /workspaces/<id>/reencryption`
@@ -1586,8 +1666,9 @@ HTTP 200
 
 - HTTP 404: `unknown_workspace`
 - HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
 - HTTP 404: `unknown_path`
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
 
 **Notes:**
 
@@ -1621,8 +1702,9 @@ HTTP 200
 
 - HTTP 404: `unknown_workspace`
 - HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
 - HTTP 403 si l'utilisateur n'a pas le profil `OWNER` sur le workspace
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
 
 
 ## Récupération d'appareil
