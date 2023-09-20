@@ -273,7 +273,6 @@ async def get_offline_availability_status(
 
 @workspaces_bp.route("/workspaces/<WorkspaceID:workspace_id>/archiving", methods=["GET"])
 @authenticated
-@requires_rie
 async def get_archiving_configuration(
     core: LoggedCore, workspace_id: EntryID
 ) -> tuple[dict[str, Any], int]:
@@ -302,7 +301,6 @@ async def get_archiving_configuration(
 
 @workspaces_bp.route("/workspaces/<WorkspaceID:workspace_id>/archiving", methods=["POST"])
 @authenticated
-@requires_rie
 async def set_archiving_configuration(
     core: LoggedCore, workspace_id: EntryID
 ) -> tuple[dict[str, Any], int]:
