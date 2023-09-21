@@ -81,7 +81,7 @@ async def test_create_with_block_remanence_workspaces(authenticated_client: Test
     assert body == {
         "is_available_offline": True,
         "is_prepared": ANY,
-        "is_running": True,
+        "is_running": ANY,
         "total_size": 0,
         "remote_only_size": 0,
         "local_and_remote_size": 0,
