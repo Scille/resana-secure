@@ -93,15 +93,15 @@ class AsgiIpFilteringMiddleware:
             authorized_proxies=self.authorized_proxies,
         )
 
-    def is_network_authorized(self, host: str) -> bool:
+    def is_network_authorized(self, client_ip: str) -> bool:
         """
         Return `True` if the provided host is authorized, `False` otherwise.
         """
         try:
-            host_ip = ip_address(host)
+            client_address = ip_address(client_ip)
         except ValueError:
             return False
-        return any(host_ip in network for network in self.authorized_networks)
+        return any(client_address in network for network in self.authorized_networks)
 
     def is_proxy_authorized(self, proxy: str) -> bool:
         """
@@ -140,29 +140,19 @@ class AsgiIpFilteringMiddleware:
         if not self.path_requires_ip_filtering(scope["path"]):
             return await self.asgi_app(scope, receive, send)
 
-        # Check that client info is provided
-        client = scope.get("client")
-        if client is None:
-            logger.info("No client information is provided", **scope)
-            return await self.http_reject(scope, send)
-
         # Check that the proxy is authorized
-        ip_proxy, _ = client
-        if not self.is_proxy_authorized(ip_proxy):
+        client = scope.get("client")
+        local_ip = client[0] if client is not None else "127.0.0.1"
+        if not self.is_proxy_authorized(local_ip):
             logger.info("A connection has been rejected", **scope)
-            return await self.http_reject(scope, send, ip_proxy)
-
-        # Check that the `x-real-ip` header is provided
-        x_real_ip = dict(scope["headers"]).get(b"x-real-ip")
-        if x_real_ip is None:
-            logger.info("No x-real-ip information is provided", **scope)
-            return await self.http_reject(scope, send)
+            return await self.http_reject(scope, send, local_ip)
 
         # Check that the network is authorized
-        ip_host = x_real_ip.decode()
-        if not self.is_network_authorized(ip_host):
+        x_real_ip = dict(scope["headers"]).get(b"x-real-ip")
+        client_ip = x_real_ip.decode() if x_real_ip is not None else local_ip
+        if not self.is_network_authorized(client_ip):
             logger.info("A connection has been rejected", **scope)
-            return await self.http_reject(scope, send, ip_host)
+            return await self.http_reject(scope, send, client_ip)
 
         return await self.asgi_app(scope, receive, send)
 
@@ -170,7 +160,7 @@ class AsgiIpFilteringMiddleware:
         self,
         scope: Scope,
         send: ASGISendCallable,
-        client_host: str = "<not provided>",
+        client_ip: str = "<not provided>",
     ) -> None:
         """
         Reject the request with an `403` HTTP error code.
@@ -185,7 +175,7 @@ class AsgiIpFilteringMiddleware:
             return
 
         assert scope["type"] == "http"
-        content = self.MESSAGE_REJECTED.format(client_host).encode()
+        content = self.MESSAGE_REJECTED.format(client_ip).encode()
         content_length = f"{len(content)}".encode()
         start_event: HTTPResponseStartEvent = {
             "type": "http.response.start",

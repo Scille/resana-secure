@@ -35,7 +35,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from functools import partial, wraps
-from ipaddress import IPv4Address, IPv6Address, ip_address, ip_network
+from ipaddress import ip_address, ip_network
 from typing import cast
 
 import hypercorn
@@ -137,9 +137,7 @@ class AsgiIpFilteringByOrganizationMiddleware:
             authorized_networks_by_organization=self.authorized_networks_by_organization,
         )
 
-    def is_network_authorized(
-        self, organization_string: str, host: IPv4Address | IPv6Address
-    ) -> bool:
+    def is_network_authorized(self, organization_string: str, client_ip: str) -> bool:
         """
         Return `True` if the provided host is authorized, `False` otherwise.
         """
@@ -148,11 +146,15 @@ class AsgiIpFilteringByOrganizationMiddleware:
         except ValueError:
             return False
         try:
+            client_address = ip_address(client_ip)
+        except ValueError:
+            return False
+        try:
             authorized_networks = self.authorized_networks_by_organization[organization]
         except KeyError:
             # Organization without configuration are allowed by default
             return True
-        return any(host in network for network in authorized_networks)
+        return any(client_address in network for network in authorized_networks)
 
     def path_requires_ip_filtering(self, path: str) -> bool:
         """
@@ -169,7 +171,7 @@ class AsgiIpFilteringByOrganizationMiddleware:
     def is_http_path_authorized(
         self,
         path: str,
-        host_ip: IPv4Address | IPv6Address,
+        client_ip: str,
     ) -> bool:
         """
         Return `True` if the provided route is authorized, `False` otherwise.
@@ -183,7 +185,7 @@ class AsgiIpFilteringByOrganizationMiddleware:
             # Path stops before providing the organization (e.g. `/authenticated`)
             # Let's allow it
             return True
-        return self.is_network_authorized(organization_string, host_ip)
+        return self.is_network_authorized(organization_string, client_ip)
 
     async def __call__(
         self, scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable
@@ -200,25 +202,18 @@ class AsgiIpFilteringByOrganizationMiddleware:
         if not self.path_requires_ip_filtering(scope["path"]):
             return await self.asgi_app(scope, receive, send)
 
-        # Check that `x-real-ip` is provided
+        # Check that the `x-real-ip` header is provided
+        client = scope.get("client")
+        local_ip = client[0] if client is not None else "127.0.0.1"
         x_real_ip = dict(scope["headers"]).get(b"x-real-ip")
-        if x_real_ip is None:
-            logger.info("No x-real-ip information is provided", **scope)
-            return await self.http_reject(scope, send)
-
-        # Check that `x-real-ip` has a valid ip address
-        try:
-            host_ip = ip_address(x_real_ip.decode())
-        except ValueError:
-            logger.info("Header x-real-ip does not contain a valid IP address", **scope)
-            return await self.http_reject(scope, send)
+        client_ip = x_real_ip.decode() if x_real_ip is not None else local_ip
 
         # With HTTP requests, check the path
         if scope["type"] == "http":
             scope = cast(HTTPScope, scope)
-            if not self.is_http_path_authorized(scope["path"], host_ip):
+            if not self.is_http_path_authorized(scope["path"], client_ip):
                 logger.info("An HTTP connection has been rejected", **scope)
-                return await self.http_reject(scope, send, str(host_ip))
+                return await self.http_reject(scope, send, client_ip)
             return await self.asgi_app(scope, receive, send)
 
         # With websockets, wrap the receiver
@@ -226,7 +221,7 @@ class AsgiIpFilteringByOrganizationMiddleware:
         scope = cast(WebsocketScope, scope)
         state = WrappedReceiveState()
         wrapped_receive = partial(
-            self.websocket_wrapped_receive, scope, receive, send, host_ip, state
+            self.websocket_wrapped_receive, scope, receive, send, client_ip, state
         )
         return await self.asgi_app(scope, wrapped_receive, send)
 
@@ -235,7 +230,7 @@ class AsgiIpFilteringByOrganizationMiddleware:
         scope: WebsocketScope,
         receive: ASGIReceiveCallable,
         send: ASGISendCallable,
-        host_ip: IPv4Address | IPv6Address,
+        client_ip: str,
         state: WrappedReceiveState,
     ) -> ASGIReceiveEvent:
         event = await receive()
@@ -269,14 +264,14 @@ class AsgiIpFilteringByOrganizationMiddleware:
             return event
 
         # Websocket connection denied
-        if not self.is_network_authorized(organization_string, host_ip):
+        if not self.is_network_authorized(organization_string, client_ip):
             state.denied = True
             logger.info(
                 "A websocket connection has been rejected",
                 organization=organization_string,
                 **scope,
             )
-            await self.http_reject(scope, send, str(host_ip))
+            await self.http_reject(scope, send, client_ip)
             return self.websocket_disconnect_event
 
         # Webosocket connection authorized
@@ -287,7 +282,7 @@ class AsgiIpFilteringByOrganizationMiddleware:
         self,
         scope: Scope,
         send: ASGISendCallable,
-        client_host: str = "<not provided>",
+        client_ip: str = "<not provided>",
     ) -> None:
         """
         Reject the request with an `403` HTTP error code.
@@ -302,7 +297,7 @@ class AsgiIpFilteringByOrganizationMiddleware:
             return
 
         assert scope["type"] == "http"
-        content = self.MESSAGE_REJECTED.format(client_host).encode()
+        content = self.MESSAGE_REJECTED.format(client_ip).encode()
         content_length = f"{len(content)}".encode()
         start_event: HTTPResponseStartEvent = {
             "type": "http.response.start",
