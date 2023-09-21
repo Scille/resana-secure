@@ -5,10 +5,9 @@ from typing import Any
 
 from quart import Blueprint
 
+from parsec._parsec import DateTime, RealmArchivingConfiguration
 from parsec.api.data import EntryID, EntryName
 from parsec.api.protocol import RealmRole
-from parsec.core.fs.exceptions import FSWorkspaceNotFoundError
-from parsec.core.fs.workspacefs import WorkspaceFS
 from parsec.core.logged_core import LoggedCore
 
 from ..utils import (
@@ -17,10 +16,10 @@ from ..utils import (
     authenticated,
     backend_errors_to_api_exceptions,
     check_if_timestamp,
+    check_workspace_available,
     email_validator,
     get_data,
     get_user_id_from_email,
-    get_workspace_type,
     requires_rie,
 )
 
@@ -30,19 +29,21 @@ workspaces_bp = Blueprint("workspaces_api", __name__)
 @workspaces_bp.route("/workspaces", methods=["GET"])
 @authenticated
 async def list_workspaces(core: LoggedCore) -> tuple[dict[str, Any], int]:
-    # get_user_manifest() never raise exception
-    user_manifest = core.user_fs.get_user_manifest()
+    workspace_items = []
+    for workspace in core.user_fs.get_available_workspaces():
+        workspace_entry = workspace.get_workspace_entry()
+        archiving_configuration, _, _ = workspace.get_archiving_configuration()
+        assert workspace_entry.role is not None
+        workspace_item = {
+            "id": workspace_entry.id.hex,
+            "name": workspace_entry.name.str,
+            "role": workspace_entry.role.str,
+            "archiving_configuration": archiving_configuration.str,
+        }
+        workspace_items.append(workspace_item)
+    workspace_items.sort(key=lambda elem: elem["name"])
     return (
-        {
-            "workspaces": sorted(
-                [
-                    {"id": entry.id.hex, "name": entry.name.str, "role": entry.role.str}
-                    for entry in user_manifest.workspaces
-                    if entry.role is not None
-                ],
-                key=lambda elem: elem["name"],
-            )
-        },
+        {"workspaces": workspace_items},
         200,
     )
 
@@ -89,7 +90,6 @@ async def sync_workspaces(core: LoggedCore) -> tuple[dict[str, Any], int]:
     return {}, 200
 
 
-# TODO: provide an EntryID url converter
 @workspaces_bp.route("/workspaces/<WorkspaceID:workspace_id>", methods=["PATCH"])
 @authenticated
 async def rename_workspaces(core: LoggedCore, workspace_id: EntryID) -> tuple[dict[str, Any], int]:
@@ -101,13 +101,9 @@ async def rename_workspaces(core: LoggedCore, workspace_id: EntryID) -> tuple[di
     if bad_fields:
         raise APIException.from_bad_fields(bad_fields)
 
-    for entry in core.user_fs.get_user_manifest().workspaces:
-        if entry.id == workspace_id:
-            if entry.name != args["old_name"]:
-                raise APIException(409, {"error": "precondition_failed"})
-            break
-    else:
-        raise APIException(404, {"error": "unknown_workspace"})
+    workspace = check_workspace_available(core, workspace_id)
+    if workspace.get_workspace_name() != args["old_name"]:
+        raise APIException(409, {"error": "precondition_failed"})
 
     with backend_errors_to_api_exceptions():
         await core.user_fs.workspace_rename(workspace_id, args["new_name"])
@@ -125,7 +121,7 @@ async def get_workspace_share_info(
     timestamp = await check_if_timestamp()
 
     with backend_errors_to_api_exceptions():
-        workspace = get_workspace_type(core, workspace_id, timestamp)
+        workspace = check_workspace_available(core, workspace_id, timestamp)
 
         cooked_roles = {}
         roles = await workspace.get_user_roles()
@@ -196,12 +192,9 @@ async def list_mountpoints(core: LoggedCore) -> tuple[dict[str, Any], int]:
 @authenticated
 @requires_rie
 async def mount_workspace(core: LoggedCore, workspace_id: EntryID) -> tuple[dict[str, Any], int]:
-    try:
-        core.user_fs.get_workspace(workspace_id)
-    except FSWorkspaceNotFoundError:
-        raise APIException(404, {"error": "unknown_workspace"})
-
     timestamp = await check_if_timestamp()
+
+    check_workspace_available(core, workspace_id, timestamp)
 
     with backend_errors_to_api_exceptions():
         await core.mountpoint_manager.mount_workspace(workspace_id, timestamp)
@@ -230,12 +223,6 @@ async def unmount_workspace(core: LoggedCore, workspace_id: EntryID) -> tuple[di
 async def toggle_offline_availability(
     core: LoggedCore, workspace_id: EntryID
 ) -> tuple[dict[str, Any], int]:
-    workspace_fs: WorkspaceFS | None = None
-    try:
-        workspace_fs = core.user_fs.get_workspace(workspace_id)
-    except FSWorkspaceNotFoundError:
-        raise APIException(404, {"error": "unknown_workspace"})
-
     data = await get_data()
     parser = Parser()
     parser.add_argument("enable", type=bool, required=True)
@@ -243,16 +230,17 @@ async def toggle_offline_availability(
     if bad_fields:
         raise APIException.from_bad_fields(bad_fields)
 
-    info = workspace_fs.get_remanence_manager_info()
+    workspace = check_workspace_available(core, workspace_id)
+    info = workspace.get_remanence_manager_info()
     if args["enable"] and info.is_block_remanent:
         raise APIException(400, {"error": "offline_availability_already_enabled"})
     if not args["enable"] and not info.is_block_remanent:
         raise APIException(400, {"error": "offline_availability_already_disabled"})
     try:
         if args["enable"]:
-            await workspace_fs.enable_block_remanence()
+            await workspace.enable_block_remanence()
         else:
-            await workspace_fs.disable_block_remanence()
+            await workspace.disable_block_remanence()
         return {}, 200
     except Exception:
         if args["enable"]:
@@ -269,12 +257,8 @@ async def toggle_offline_availability(
 async def get_offline_availability_status(
     core: LoggedCore, workspace_id: EntryID
 ) -> tuple[dict[str, Any], int]:
-    workspace_fs: WorkspaceFS | None = None
-    try:
-        workspace_fs = core.user_fs.get_workspace(workspace_id)
-    except FSWorkspaceNotFoundError:
-        raise APIException(404, {"error": "unknown_workspace"})
-    info = workspace_fs.get_remanence_manager_info()
+    workspace = check_workspace_available(core, workspace_id)
+    info = workspace.get_remanence_manager_info()
 
     return {
         "is_running": info.is_running,
@@ -284,3 +268,89 @@ async def get_offline_availability_status(
         "remote_only_size": info.remote_only_size,
         "local_and_remote_size": info.local_and_remote_size,
     }, 200
+
+
+@workspaces_bp.route("/workspaces/<WorkspaceID:workspace_id>/archiving", methods=["GET"])
+@authenticated
+async def get_archiving_configuration(
+    core: LoggedCore, workspace_id: EntryID
+) -> tuple[dict[str, Any], int]:
+    workspace = check_workspace_available(core, workspace_id)
+    configuration, configured_on, configured_by = workspace.get_archiving_configuration()
+    configured_on_str = None if configured_on is None else configured_on.to_rfc3339()
+    deletion_date_str = (
+        configuration.deletion_date.to_rfc3339() if configuration.is_deletion_planned() else None
+    )
+    organization_config = core.get_organization_config()
+
+    configured_by_email = None
+    if configured_by is not None:
+        user_info = await core.get_user_info(configured_by.user_id)
+        if user_info.human_handle is not None:
+            configured_by_email = user_info.human_handle.email
+
+    return {
+        "configuration": configuration.str,
+        "configured_on": configured_on_str,
+        "configured_by": configured_by_email,
+        "deletion_date": deletion_date_str,
+        "minimum_archiving_period": organization_config.minimum_archiving_period,
+    }, 200
+
+
+@workspaces_bp.route("/workspaces/<WorkspaceID:workspace_id>/archiving", methods=["POST"])
+@authenticated
+async def set_archiving_configuration(
+    core: LoggedCore, workspace_id: EntryID
+) -> tuple[dict[str, Any], int]:
+    def archiving_configuration_validator(value: str) -> None:
+        try:
+            RealmArchivingConfiguration.from_str(value, None)
+        except ValueError:
+            RealmArchivingConfiguration.from_str(value, DateTime.now())
+
+    data = await get_data()
+    parser = Parser()
+    parser.add_argument(
+        "configuration", type=str, validator=archiving_configuration_validator, required=True
+    )
+    parser.add_argument("deletion_date", converter=DateTime.from_rfc3339, required=False)
+    args, bad_fields = parser.parse_args(data)
+    if bad_fields:
+        raise APIException.from_bad_fields(bad_fields)
+
+    # The `configuration` and `deletion_date` fields have been validated independently
+    # They also have to be validated together
+    configuration: str = args["configuration"]
+    deletion_date: DateTime | None = args["deletion_date"]
+    try:
+        archiving_configuration = RealmArchivingConfiguration.from_str(
+            configuration,
+            deletion_date,
+        )
+    except ValueError:
+        raise APIException.from_bad_fields(["configuration", "deletion_date"])
+
+    # Adapt the deletion date if necessary.
+    # This is useful when a user tries to remove a workspace instantely (if allowed).
+    # In that case, there's a good chance the planned date for deletion falls slightly
+    # before `now`. In this case, it's ok to shift it and make it equal to `now`.
+    # However we don't want this shift if the deletion date is way off, since it
+    # means a user mistake is likely involved. A 5 minutes window seems like a
+    # suitable trade-off.
+    # Another solution would be to adapt the API for instant deletion but it's
+    # probably not going to be used since a minimum archiving period is typically
+    # configured. At the moment, this is mainly useful when testing.
+    now = core.device.time_provider.now()
+    if (
+        archiving_configuration.is_deletion_planned()
+        and deletion_date is not None
+        and now.subtract(minutes=5) < deletion_date < now
+    ):
+        archiving_configuration = RealmArchivingConfiguration.deletion_planned(now)
+
+    workspace = check_workspace_available(core, workspace_id)
+    with backend_errors_to_api_exceptions():
+        await workspace.configure_archiving(archiving_configuration, now=now)
+
+    return {}, 200

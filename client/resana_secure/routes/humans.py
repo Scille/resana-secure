@@ -32,7 +32,7 @@ async def search_humans(core: LoggedCore) -> tuple[dict[str, Any], int]:
     else:
         bad_fields.append("omit_revoked")
     if bad_fields:
-        raise APIException(400, {"error": "bad_arguments", "fields": list(bad_fields)})
+        raise APIException.from_bad_fields(bad_fields)
 
     with backend_errors_to_api_exceptions():
         results, total = await core.find_humans(

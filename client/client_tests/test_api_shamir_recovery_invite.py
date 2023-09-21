@@ -241,7 +241,7 @@ async def test_shamir_recovery_claim(
         )
         body = await response.get_json()
         assert response.status_code == 400, body
-        assert body == {"error": "not-enough-shares"}
+        assert body == {"error": "not_enough_shares"}
 
         # Diana is done, Alice might or might not get back to step 0
         if alice_retrieves_before_next_recipient:

@@ -31,7 +31,13 @@ from parsec.core.fs.exceptions import (
     FSNoAccessError,
     FSReadOnlyError,
     FSSharingNotAllowedError,
+    FSWorkspaceArchivingNotAllowedError,
+    FSWorkspaceArchivingPeriodTooShort,
+    FSWorkspaceNoAccess,
+    FSWorkspaceNoReadAccess,
     FSWorkspaceNotFoundError,
+    FSWorkspaceRealmArchived,
+    FSWorkspaceRealmDeleted,
 )
 from parsec.core.fs.workspacefs import WorkspaceFS, WorkspaceFSTimestamped
 from parsec.core.invite import (
@@ -250,12 +256,19 @@ def apitoken_to_addr(apitoken: str) -> BackendInvitationAddr:
     return BackendInvitationAddr.from_url(invitation_url)
 
 
-def get_workspace_type(
+def check_workspace_available(
     core: LoggedCore, workspace_id: EntryID, timestamp: DateTime | None = None
 ) -> WorkspaceFS | WorkspaceFSTimestamped:
-    workspace = core.user_fs.get_workspace(workspace_id)
+    try:
+        workspace = core.user_fs.get_workspace(workspace_id)
+    except FSWorkspaceNotFoundError:
+        raise APIException(404, {"error": "unknown_workspace"})
     if timestamp:
         workspace = WorkspaceFSTimestamped(workspace, timestamp)
+    if workspace.is_deleted():
+        raise APIException(410, {"error": "deleted_workspace"})
+    if workspace.get_workspace_entry().role is None:
+        raise APIException(403, {"error": "forbidden_workspace"})
     return workspace
 
 
@@ -299,9 +312,22 @@ def backend_errors_to_api_exceptions() -> Iterator[None]:
         # Should mainly catch `BackendProtocolError`
         raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
 
-    except (FSWorkspaceNotFoundError, FSNoAccessError):
+    # The order is important here since:
+    # - `FSWorkspaceArchivedError` inherits from `FSWorkspaceNoAccess`
+    # - `FSWorkspaceDeletedError` inherits from `FSWorkspaceNoReadAccess`
+    except FSWorkspaceRealmArchived:
+        raise APIException(403, {"error": "archived_workspace"})
+    except FSWorkspaceRealmDeleted:
+        raise APIException(410, {"error": "deleted_workspace"})
+    except FSWorkspaceArchivingPeriodTooShort:
+        raise APIException(400, {"error": "archiving_period_is_too_short"})
+    except FSWorkspaceArchivingNotAllowedError:
+        raise APIException(403, {"error": "archiving_not_allowed"})
+    except FSWorkspaceNotFoundError:
         raise APIException(404, {"error": "unknown_workspace"})
-    except FSReadOnlyError:
+    except (FSNoAccessError, FSWorkspaceNoAccess):
+        raise APIException(403, {"error": "forbidden_workspace"})
+    except (FSReadOnlyError, FSWorkspaceNoReadAccess):
         raise APIException(403, {"error": "read_only_workspace"})
     except FSSharingNotAllowedError:
         raise APIException(403, {"error": "sharing_not_allowed"})

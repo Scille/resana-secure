@@ -280,7 +280,7 @@ async def test_bad_find_humans(authenticated_client: TestClientProtocol, bad_par
     response = await authenticated_client.get(f"/humans?{bad_param}")
     body = await response.get_json()
     assert response.status_code == 400
-    assert body == {"error": "bad_arguments", "fields": ANY}
+    assert body == {"error": "bad_data", "fields": ANY}
 
 
 @pytest.mark.trio

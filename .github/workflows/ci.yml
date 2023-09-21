@@ -112,8 +112,7 @@ jobs:
       - name: Generate cache key
         id: cache-key
         run: |
-          echo "key=linux-client-2-${{ hashFiles('client/poetry.lock') }}" >> $GITHUB_OUTPUT
-          echo "restore-keys=linux-client-2-" >> $GITHUB_OUTPUT
+          echo "key=linux-client-2-${{ hashFiles('client/poetry.lock', 'client/submodules/parsec-cloud/**') }}" >> $GITHUB_OUTPUT
 
       # Using this workaround to cache `poetry` dependencies until
       # https://github.com/actions/setup-python/issues/476 is resolved
@@ -122,7 +121,6 @@ jobs:
         id: restore
         with:
           key: ${{ steps.cache-key.outputs.key }}
-          restore-keys: ${{ steps.cache-key.outputs.restore-keys }}
           path: /home/runner/.cache/pypoetry/virtualenvs/resana-secure-ZeXD18oj-py3.9
 
       - name: Cache rust artifact
@@ -232,7 +230,6 @@ jobs:
         uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8  # pin v3.3.1
         with:
           key: linux-server-2-${{ hashFiles('server/poetry.lock') }}
-          restore-keys: linux-server-2-
           path: /home/runner/.cache/pypoetry/virtualenvs/resana-server-OVnVNowq-py3.9
 
       - name: Install Project
@@ -295,8 +292,7 @@ jobs:
       - name: Cache python dependencies
         uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8  # pin v3.3.1
         with:
-          key: windows-build-${{ hashFiles('client/poetry.lock') }}
-          restore-keys: windows-build-
+          key: windows-build-${{ hashFiles('client/poetry.lock', 'client/submodules/parsec-cloud/**') }}
           path: C:\Users\runneradmin\AppData\Local\pypoetry\Cache\virtualenvs\resana-secure-*
 
       - name: Cache rust artifact

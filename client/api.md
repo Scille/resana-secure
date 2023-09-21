@@ -1,12 +1,107 @@
 # Resana-Secure client (localhost server) API
 
+## Liste des erreurs
+
+Pour la suite de ce documents, les erreurs listées sous la forme:
+
+> - HTTP \<CODE\>: `<error-name>`
+
+correspondent à une réponse du type:
+```python
+HTTP <CODE>
+{
+    "error": "<error-name>"
+}
+```
+
+Voici la liste des erreurs par ordre alphabétique:
+- `archived_workspace` (HTTP 403)
+- `archiving_not_allowed` (HTTP 403)
+- `archiving_period_is_too_short` (HTTP 400)
+- `authentication_requested` (HTTP 401)
+- `bad_claimer_sas` (HTTP 400)
+- `bad_data` (HTTP 400)
+- `bad_greeter_sas` (HTTP 400)
+- `bad_key` (HTTP 400)
+- `cannot_delete_root_folder` (HTTP 400)
+- `cannot_move_root_folder` (HTTP 400)
+- `cannot_use_both_authentication_modes` (HTTP 400)
+- `claimer_already_member` (HTTP 400)
+- `claimer_not_a_member` (HTTP 400)
+- `connection_refused_by_server` (HTTP 502)
+- `deleted_workspace` (HTTP 410)
+- `destination_parent_not_a_folder` (HTTP 400)
+- `device_not_found` (HTTP 404)
+- `email_not_in_recipients` (HTTP 400)
+- `failed_to_disable_offline_availability` (HTTP 400)
+- `failed_to_enable_offline_availability` (HTTP 400)
+- `forbidden_workspace` (HTTP 403)
+- `invalid_configuration` (HTTP 400)
+- `invalid_passphrase` (HTTP 400)
+- `invalid_state` (HTTP 409)
+- `invitation_already_used` (HTTP 400)
+- `invitation_not_found` (HTTP 400)
+- `json_body_expected` (HTTP 400)
+- `mountpoint_already_mounted` (HTTP 400)
+- `mountpoint_not_mounted` (HTTP 404)
+- `no_shamir_recovery_setup` (HTTP 400)
+- `not_enough_shares` (HTTP 400)
+- `not_a_file` (HTTP 404)
+- `not_a_folder` (HTTP 404)
+- `not_connected_to_rie` (HTTP 401)
+- `not_found` (HTTP 404)
+- `not_setup` (HTTP 404)
+- `offline` (HTTP 503)
+- `offline_availability_already_disabled` (HTTP 400)
+- `offline_availability_already_enabled` (HTTP 400)
+- `organization_already_bootstrapped` (HTTP 400)
+- `precondition_failed` (HTTP 409)
+- `read_only_workspace` (HTTP 403)
+- `recipient_already_recovered` (HTTP 400)
+- `sharing_not_allowed` (HTTP 403)
+- `source_not_a_folder` (HTTP 404)
+- `unexpected_error` (HTTP 400)
+- `unknown_destination_parent` (HTTP 404)
+- `unknown_email` (HTTP 404)
+- `unknown_entry` (HTTP 404)
+- `unknown_file` (HTTP 404)
+- `unknown_folder` (HTTP 404)
+- `unknown_organization` (HTTP 404)
+- `unknown_parent` (HTTP 404)
+- `unknown_source` (HTTP 404)
+- `unknown_token` (HTTP 404)
+- `unknown_workspace` (HTTP 404)
+- `users_not_found` (HTTP 400)
+
+
+Une erreur dans le formatage de la requête est retournée sous la forme suivante:
+
+```python
+HTTP 400
+{
+    "erreur": "bad_data",
+    "fields": ["<field_name>", ...]
+}
+```
+
+Une erreur non-attendue peut aussi être retournée sous la forme suivante:
+
+```python
+HTTP 400
+{
+    "erreur": "unexpected_error",
+    "detail": "<some details about the error>"
+}
+```
+
 ## Pre-Authentification
 
 ### `GET <server-resana>/resana-secure/master-key`
 
 Récupère la "encrypted master key RESANA Secure" depuis le serveur RESANA.
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -15,7 +110,7 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
 - HTTP 404: l'utilisateur ne possède pas de master-key
 
@@ -27,7 +122,8 @@ le client RESANA s'occupe de la déchiffrer via le mdp utilisateur RESANA Secure
 
 Changement du mot de passe RESANA ainsi que de la master key RESANA Secure.
 
-Request:
+**Request:**
+
 
 ```python
 {
@@ -37,7 +133,8 @@ Request:
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -45,7 +142,7 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
 - HTTP 409: le mot de passe a déjà été changé (i.e. `old_password` n'est pas le mot de passe actuel)
 
@@ -56,6 +153,8 @@ ou
 Procède à l'authentification auprès du client Parsec.
 Cette requête doit être réalisée en tout premier, elle fournit un cookie
 de session permettant d'authentifier les autres requêtes.
+
+**Request:**
 
 Deux différentes options sont disponibles pour l'authentification :
 
@@ -84,7 +183,8 @@ Deux différentes options sont disponibles pour l'authentification :
 
 `user_password` doit être une chaîne de caractère échappé pour répondre aux normes json
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -94,10 +194,11 @@ Set-Cookie: session=<token>; HttpOnly; Path=/; SameSite=Strict
 }
 ```
 
-ou
+**Erreurs:**
 
-- HTTP 404: le poste n'a pas été enrôlé pour cet utilisateur (i.e. il ne contient pas de fichier de clés de Device à déchiffrer)
-- HTTP 400: la clé de déchiffrement est invalide
+- HTTP 404: `device_not_found`, le poste n'a pas été enrôlé pour cet utilisateur (i.e. il ne contient pas de fichier de clés de Device à déchiffrer)
+- HTTP 400: `bad_key`, la clé de déchiffrement est invalide
+- HTTP 400: `cannot_use_both_authentication_modes`, si les deux modes d'authentification sont utilisés simultanément
 
 Une fois obtenu, le token d'authentification est
 
@@ -112,7 +213,8 @@ authentification retournant un token différent.
 
 Met fin à l'authentification auprès du client Parsec et invalide le token d'authentification.
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -125,7 +227,8 @@ Set-Cookie: session=; Expires=Thu, 01-Jan-1970 00:00:00 GMT; Max-Age=0; Path=/
 
 Met fin à toutes les authentifications auprès du client Parsec et invalide tous les tokens d'authentification.
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -138,7 +241,8 @@ HTTP 200
 Le boostrap est la phase d'enregistrement du premier utilisateur d'une organisation
 nouvellement créée.
 
-Request:
+**Request:**
+
 
 ```python
 {
@@ -157,7 +261,8 @@ Le champ `organization_url` contient une URL du type `parsec://parsec.example.co
 Il contient la partie publique de la clé RSA (au format PEM, c'est à dire base64 avec `-----BEGIN PUBLIC KEY-----` header/footer) de l'autorité
 de séquestre.
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -165,18 +270,12 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-```python
-HTTP 400
-{
-    "error": "organization_already_boostrapped"
-}
-```
+- HTTP 400: `organization_already_bootstrapped`
+- HTTP 404: `unknown_organization`, l'organisation n'existe pas sur le serveur Parsec ou l'URL de bootstrap n'est pas valide
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
 
-- HTTP 404: L'organisation n'existe pas sur le serveur Parsec ou l'URL de bootstrap n'est pas valide
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'organisation n'existe pas sure le serveur)
 
 ## Utilisateurs & invitations
 
@@ -185,7 +284,8 @@ HTTP 400
 `query` est recherchée contre les champs human_handle.email et human_handle.label, les matchs partiels sont acceptés.
 (par exemple, `query=john` va matcher contre `email:john.doe@example.com` et contre `Bob Johnson`)
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -207,23 +307,25 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 `profile` peut être: `ADMIN` ou `STANDARD`
 
 ### `POST /humans/<email>/revoke`
 
-Request:
+**Request:**
+
 
 ```python
 {
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -231,18 +333,19 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-- HTTP 404 si email inconnu
-- HTTP 403 si l'utilisateur actuel n'a pas le profil administrateur sur l'organisation Parsec
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 404: si email inconnu
+- HTTP 403: si l'utilisateur actuel n'a pas le profil administrateur sur l'organisation Parsec
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 ### `GET /invitations`
 
 Récupère la liste des invitations en cours.
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -273,10 +376,10 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 `status` peut être: `IDLE` ou `READY`
 
@@ -290,7 +393,8 @@ avec pour intention de procéder à l'enrôlement.
 
 Créé une nouvelle invitation.
 
-Request:
+**Request:**
+
 
 ```python
 {
@@ -315,7 +419,8 @@ ou pour une récupération partagée
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -324,38 +429,14 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-```python
-HTTP 400
-{
-    "error":  "claimer_already_member"
-}
-```
-
-ou (seulement pour les récupérations partagées)
-
-```python
-HTTP 400
-{
-    "error":  "claimer_not_a_member"
-}
-```
-
-ou (seulement pour les récupérations partagées)
-
-```python
-HTTP 400
-{
-    "error":  "no_shamir_recovery_setup"
-}
-```
-
-ou
-
-- HTTP 403 si l'utilisateur actuel n'a pas le profil administrateur sur l'organisation Parsec et tente d'inviter un autre utilisateur.
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 400: `claimer_already_member`
+- HTTP 400: `claimer_not_a_member` (seulement pour les récupérations partagées)
+- HTTP 400: `no_shamir_recovery_setup` (seulement pour les récupérations partagées)
+- HTTP 403: si l'utilisateur actuel n'a pas le profil administrateur sur l'organisation Parsec et tente d'inviter un autre utilisateur.
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 La création d'invitation est idempotent (si une invitation existe déjà, elle ne sera pas recréée et le token existant sera retourné).
 
@@ -363,14 +444,16 @@ La création d'invitation est idempotent (si une invitation existe déjà, elle 
 
 Supprime une invitation.
 
-Request:
+**Request:**
+
 
 ```python
 {
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 204
@@ -378,20 +461,12 @@ HTTP 204
 }
 ```
 
-ou
+**Erreurs:**
 
-```python
-HTTP 400
-{
-    "error": "invitation_already_used"
-}
-```
-
-ou
-
-- HTTP 404 si le token n'existe pas
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 400: `invitation_already_used`
+- HTTP 404: `unknown_token`, si le token n'existe pas
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 ## Enrôlement (greeter)
 
@@ -399,14 +474,16 @@ ou
 
 Démarre la phase d'enrôlement et attend que le pair à enrôler ait rejoint le serveur Parsec.
 
-Request:
+**Request:**
+
 
 ```python
 {
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -416,37 +493,34 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-```python
-HTTP 400
-{
-    "error": "invitation_already_used"
-}
-```
-
-ou
-
+- HTTP 400: `invitation_already_used`
 - HTTP 403 si l'utilisateur n'a pas le profil `ADMIN` et tente d'inviter un nouvel utilisateur
-- HTTP 404 si le token est inconnu
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 404: `unknown_token`, si le token n'existe pas
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 409: `invalid_state`, le processus d'invitation n'est pas dans l'état attendu pour exécuter cette commande
 
-`type` est `DEVICE` ou `USER`
-`greeter_sas` est le code de 4 caractère à transmettre par un canal tiers au pair.
+**Notes:**
+
+- `type` est `DEVICE` ou `USER`
+- `greeter_sas` est le code de 4 caractère à transmettre par un canal tiers au pair.
 
 ### `POST /invitations/<token>/greeter/2-wait-peer-trust`
 
 Attend que le pair ait validé le code SAS qui lui a été fourni.
 
-Request:
+**Request:**
+
 
 ```python
 {
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -455,13 +529,13 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-- HTTP 403 si l'utilisateur n'a pas le profil `ADMIN` et tente d'inviter un nouvel utilisateur
-- HTTP 404 si le token est inconnu
-- HTTP 409 si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 403: si l'utilisateur n'a pas le profil `ADMIN` et tente d'inviter un nouvel utilisateur
+- HTTP 404: `unknown_token`, si le token n'existe pas
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 409: `invalid_state`, si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 
 `candidate_claimer_sas` est une liste de quatre codes dont un seul correspond
 au code SAS du pair. L'utilisateur est donc obligé de se concerter avec le pair
@@ -471,7 +545,8 @@ pour déterminer lequel est le bon.
 
 Vérifie le code SAS fourni par le pair.
 
-Request:
+**Request:**
+
 
 ```python
 {
@@ -479,7 +554,8 @@ Request:
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -487,20 +563,21 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-- HTTP 403 si l'utilisateur n'a pas le profil `ADMIN` et tente d'inviter un nouvel utilisateur
-- HTTP 404 si le token est inconnu
-- HTTP 400 si claimer_sas n'est pas le bon
-- HTTP 409 si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 403: si l'utilisateur n'a pas le profil `ADMIN` et tente d'inviter un nouvel utilisateur
+- HTTP 404: `unknown_token`, si le token n'existe pas
+- HTTP 400: `bad_claimer_sas` si le code SAS n'est pas bon
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 409: `invalid_state`, si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 
 ### `POST /invitations/<token>/greeter/4-finalize`
 
 Ajoute le pair dans Parsec
 
-Request:
+**Request:**
+
 pour un enrôlement de device:
 
 ```python
@@ -520,7 +597,8 @@ ou pour un enrôlement de user:
 `granted_profile` peut être: `ADMIN` ou `STANDARD`
 (seuls les profiles `ADMIN` peuvent à leur tour inviter de nouveaux utilisateurs)
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -528,13 +606,13 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-- HTTP 403 si l'utilisateur n'a pas le profil `ADMIN` et tente d'inviter un nouvel utilisateur
-- HTTP 404 si le token est inconnu
-- HTTP 409 si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 403: si l'utilisateur n'a pas le profil `ADMIN` et tente d'inviter un nouvel utilisateur
+- HTTP 404: `unknown_token`, si le token n'existe pas
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 409: `invalid_state`, si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 
 ## Enrôlement (claimer)
 
@@ -544,7 +622,8 @@ Démarre la phase d'enrôlement et récupère des informations de base sur l'inv
 
 Note: this route is also exposed as `POST /invitations/<token>/claimer/0-retreive-info` due to a legacy typo (`0-retrieve-info` vs `0-retreive-info``)
 
-Request:
+**Request:**
+
 
 ```python
 {
@@ -594,9 +673,12 @@ HTTP 200
 
 Si `enough_share` est vrai, le client doit passer directement à l'étape 4.
 
-- HTTP 404 si le token est inconnu
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+**Erreurs:**
+
+- HTTP 404: `unknown_token`, si le token n'existe pas
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 409: `invalid_state`, le processus d'invitation n'est pas dans l'état attendu pour exécuter cette commande
 
 `type` est `device`, `user` or `shamir_recovery`
 `candidate_greeter_sas` est une liste de quatre codes dont un seul correspond
@@ -607,14 +689,16 @@ pour déterminer lequel est le bon.
 
 Attend que le pair qui enrôle ait rejoint le serveur Parsec.
 
-Request pour une invitation de type user ou device:
+**Request:**
+
+Pour une invitation de type user ou device:
 
 ```python
 {
 }
 ```
 
-Request pour une invitation de type shamir
+Pour une invitation de type shamir
 
 ```python
 {
@@ -622,7 +706,8 @@ Request pour une invitation de type shamir
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -631,38 +716,27 @@ HTTP 200
 }
 ```
 
-ou, dans le cas d'une invitation shamir quand l'email fournit ne correspond à aucun des destinataires:
+**Erreurs:**
 
-```python
-HTTP 400
-{
-    "error": "email_not_in_recipients"
-}
-```
+- HTTP 400: `email_not_in_recipients`, dans le cas d'une invitation shamir, quand l'email fournit ne correspond à aucun des destinataires
+- HTTP 400: `recipient_already_recovered`, dans le cas d'une invitation shamir, quand l'email fournit correspond à un destinataire déjà contacté
+- HTTP 404: `unknown_token`, si le token n'existe pas
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 409: `invalid_state`, le processus d'invitation n'est pas dans l'état attendu pour exécuter cette commande
 
-ou, dans le cas d'une invitation shamir quand l'email fournit correspond à un destinataire déjà contacté:
+**Notes:**
 
-```python
-HTTP 400
-{
-    "error": "recipient_already_recovered"
-}
-```
-
-- HTTP 404 si le token est inconnu
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
-
-`type` est `DEVICE` ou `USER`
-`candidate_greeter_sas` est une liste de quatre codes dont un seul correspond
-au code SAS du pair. L'utilisateur est donc obligé de se concerter avec le pair
-pour déterminer lequel est le bon.
+- `type` est `DEVICE` ou `USER`
+- `candidate_greeter_sas` est une liste de quatre codes dont un seul correspond au code SAS du pair.
+  L'utilisateur est donc obligé de se concerter avec le pair pour déterminer lequel est le bon.
 
 ### `POST /invitations/<token>/claimer/2-check-trust`
 
 Vérifie le code SAS fourni par le pair.
 
-Request:
+**Request:**
+
 
 ```python
 {
@@ -670,7 +744,8 @@ Request:
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -679,13 +754,13 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-- HTTP 404 si le token est inconnu
-- HTTP 400 si greeter_sas n'est pas le bon
-- HTTP 409 si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 404: `unknown_token`, si le token n'existe pas
+- HTTP 400: `bad_greeter_sas` si le code SAS n'est pas le bon
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 409: `invalid_state`, si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 
 `greeter_sas` est le code de 4 caractère à transmettre par un canal tiers au pair.
 
@@ -693,14 +768,16 @@ ou
 
 Attend que le pair ait validé le code SAS qui lui a été fourni.
 
-Request:
+**Request:**
+
 
 ```python
 {
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -721,18 +798,21 @@ Si `enough_shares` est faux, le client doit recommencer à l'étape 0 (ou direct
 
 Si `enough_shares` est vrai, le client peut continuer à l'étape 4 pour finalizer la création de l'appareil.
 
-ou
 
-- HTTP 404 si le token est inconnu
-- HTTP 409 si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+**Erreurs:**
+
+- HTTP 404: `unknown_token`, si le token n'existe pas
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 409: `invalid_state`, si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
+
 
 ### `POST /invitations/<token>/claimer/4-finalize`
 
 Ajoute le pair dans Parsec
 
-Request:
+**Request:**
+
 
 ```python
 {
@@ -740,7 +820,8 @@ Request:
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -748,23 +829,15 @@ HTTP 200
 }
 ```
 
-ou dans le cas d'une invitation shamir avec un nombre de parts insuffisant:
+**Erreurs:**
 
-```python
-HTTP 400
-{
-    "error": "not-enough-shares"
-}
-```
+- HTTP 400: `not_enough_shares`, dans le cas d'une invitation shamir, avec un nombre de parts insuffisant
+- HTTP 404: `unknown_token`, si le token n'existe pas
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 409: `invalid_state`, si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
 
-ou
-
-- HTTP 404 si le token est inconnu
-- HTTP 409 si le pair a reset le processus (il faut repartir de la route `1-wait-peer-ready`)
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
-
-`key` est utilisé pour chiffrer le fichier de clé de Device résultant de l'opération d'enrôlement.
+Note: `key` est utilisé pour chiffrer le fichier de clé de Device résultant de l'opération d'enrôlement.
 
 ## Workspace
 
@@ -772,7 +845,8 @@ ou
 
 Récupère la liste des workspaces.
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -781,21 +855,32 @@ HTTP 200
         {
             "id": <uuid>,
             "name": <string>,
-            "role": <string>
+            "role": <string> = "OWNER", "MANAGER", "CONTRIBUTOR", "READER",
+            "archiving_configuration": <string> = "AVAILABLE" | "ARCHIVED" | "DELETION_PLANNED"
         }
     ]
     …
 }
 ```
+​
+Note: la configuration d'archivage peut-etre dans 3 états:
 
-`role` peut être: `OWNER`, `MANAGER`, `CONTRIBUTOR`, `READER`.
+- Disponible (`AVAILABLE`): l'état par défaut, le workspace est disponible en lecture/écriture (si le role de l'utilisateur le permet).
+- Archivé (`ARCHIVED`): le worspace est en lecture-seul jusqu'au prochain changement de configuration.
+- Suppression planifié (`DELETION_PLANNED`): le workspace est en lecture-seul et une suppression de l'espace est planifié a une date donné.
+
+Les workspaces en état archivé ou suppression planifié sont typiquement caché de la liste des workspaces à l'affichage.
+Ils sont néamoins rendu disponible ici car leur accès peut etre nécéssaire dans des usages avancés:
+- Changement de la configuration de l'archivage via `POST /workspaces/<id>/archiving`
+- Accès aux données en lecture-seul lorsque l'utilisateur souhaite accédé au contenu du workspace malgré son archivage.
 
 ### `POST /workspaces`
 
-Créé un nouveau workspace.
+Crée un nouveau workspace.
 name : les caractères `\ / : * ? " > < |` sont interdits sur Windows https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file ainsi que certains mots https://github.com/Scille/parsec-cloud/blob/77cc7ba287d442cc5b98366bf52cd1b51690db87/parsec/core/mountpoint/winify.py#L22-L43.
 
-Request:
+**Request:**
+
 
 ```python
 {
@@ -803,7 +888,8 @@ Request:
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 201
@@ -814,14 +900,15 @@ HTTP 201
 
 **Notes:**
 
-- le nom d'un workspace n'a pas à être unique.
-- la création d'un workspace peut se faire hors-ligne.
+- Le nom d'un workspace n'a pas à être unique.
+- La création d'un workspace peut se faire hors-ligne.
 
 ### `PATCH /workspaces/<id>`
 
 Renomme un workspace.
 
-Request:
+**Request:**
+
 
 ```python
 {
@@ -830,7 +917,8 @@ Request:
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -838,27 +926,32 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-- HTTP 409: le workspace a déjà eu son nom changé
-- HTTP 404: le workspace n'existe pas
+- HTTP 409: `precondition_failed`, le workspace a déjà eu son nom changé
+- HTTP 404: `unknown_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
 
 **Notes:**
 
-- le renommage d'un workspace n'impacte que l'utilisateur réalisant ce renommage (si le workspace est partagé avec d'autres utilisateurs, ceux-ci ne verront pas le changement de nom)
+- Le renommage d'un workspace n'impacte que l'utilisateur réalisant ce renommage (si le workspace est partagé avec d'autres utilisateurs, ceux-ci ne verront pas le changement de nom)
 
 ### `GET /workspaces/<id>/share`
 
 Récupère les informations de partage d'un workspace. Un timestamp au format rfc3339 peut être fourni pour avoir les données à la date précisée.
 
-Request:
+**Request:**
+
+
 ```python
 {
     "timestamp": Optional<string>
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -869,17 +962,20 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-- HTTP 404: le workspace n'existe pas
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-- HTTP 502: le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+- HTTP 404: `unknown_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 ### `PATCH /workspaces/<id>/share`
 
 Partage un workspace.
 
-Request:
+**Request:**
+
 
 ```python
 {
@@ -890,7 +986,8 @@ Request:
 
 `role` peut être soit `null` (pour retirer le partage) soit une des strings: `OWNER`, `MANAGER`, `CONTRIBUTOR`, `READER`
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -898,37 +995,27 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-```python
-HTTP 404
-{
-    "error": "unknown_workspace"
-}
-```
-
-ou
-
-```python
-HTTP 404
-{
-    "error": "unknown_email"
-}
-```
-
-ou
-
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 404: `unknown_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 403: `sharing_not_allowed`
+- HTTP 404: `unknown_email`
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
 
 **Notes:**
 
 - le renommage d'un workspace n'impacte que l'utilisateur réalisant ce renommage (si le workspace est partagé avec d'autres utilisateurs, ceux-ci ne verront pas le changement de nom)
 
+
 ### `GET /workspaces/mountpoints`
 
 Liste les workspaces montés
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -951,7 +1038,10 @@ HTTP 200
 }
 ```
 
-`role` peut être: `OWNER`, `MANAGER`, `CONTRIBUTOR`, `READER`. Dans le cas des snapshot, le rôle sera toujours `READER`.
+**Notes:**
+
+- `role` peut être: `OWNER`, `MANAGER`, `CONTRIBUTOR`, `READER`. Dans le cas des snapshot, le rôle sera toujours `READER`.
+
 
 ### `POST /workspaces/<id>/mount`
 
@@ -961,7 +1051,8 @@ Deux options sont disponibles, la première sans argument pour un montage standa
 
 Dans ce deuxième cas :
 
-Request:
+**Request:**
+
 
 ```python
 {
@@ -969,7 +1060,8 @@ Request:
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -979,30 +1071,21 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-```python
-HTTP 400
-{
-    "error": "mountpoint_already_mounted"
-}
-```
-
-ou
-
-```python
-HTTP 404
-{
-    "error": "unknown_workspace"
-}
-```
+- HTTP 400: `mountpoint_already_mounted`
+- HTTP 404: `unknown_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 401: `not_connected_to_rie`
 
 
 ### `POST /workspaces/<id>/unmount`
 
 Démonte un workspace. S'il s'agit d'un workspace monté à une date donnée via un timestamp, ce même timestamp doit être fourni pour le démonter.
 
-Request:
+**Request:**
+
 
 ```python
 {
@@ -1010,7 +1093,8 @@ Request:
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -1018,36 +1102,29 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-```python
-HTTP 404
-{
-    "error": "mountpoint_not_mounted"
-}
-```
+- HTTP 404: `mountpoint_not_mounted`
+- HTTP 404: `unknown_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 401: `not_connected_to_rie`
 
-ou
-
-```python
-HTTP 404
-{
-    "error": "unknown_workspace"
-}
-```
 
 ### `POST /workspaces/<id>/toggle_offline_availability`
 
 Active ou désactive la rémanence des données d'un workspace. Si désactivé, les fichiers seront téléchargés de manière paresseuse, uniquement lorsqu'une demande de consultation est faite. Si activé, tout est mis en oeuvre pour télécharger tous les fichiers présents dans le workspace afin qu'ils soient autant que possible disponibles même en étant hors-ligne.
 
-Request:
+**Request:**
+
 ```python
 {
     "enable": <bool>
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -1055,45 +1132,31 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-```python
-HTTP 404
-{
-    "error": "unknown_workspace"
-}
-```
-
-ou
-
-```python
-HTTP 400
-{
-    "error": "offline_availability_already_disabled"
-}
-```
-
-ou
-
-```python
-HTTP 400
-{
-    "error": "offline_availability_already_enabled"
-}
-```
+- HTTP 404: `unknown_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 400: `offline_availability_already_disabled`
+- HTTP 400: `offline_availability_already_enabled`
+- HTTP 400: `failed_to_enable_offline_availability`
+- HTTP 400: `failed_to_disable_offline_availability`
+- HTTP 401: `not_connected_to_rie`
 
 
 ### `GET /workspaces/<id>/get_offline_availability_status`
 
 Récupère des informations sur l'état de la disponibilité hors-ligne de ce workspace.
 
-Request:
+**Request:**
+
 ```python
 {
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -1107,14 +1170,96 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
+
+- HTTP 404: `unknown_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 401: `not_connected_to_rie`
+
+
+## Archivage et suppression des workspaces
+
+La configuration d'archivage/suppression peut-être dans 3 états:
+- Disponible (`AVAILABLE`): l'état par défaut, le workspace est disponible en lecture/écriture (si le role de l'utilisateur le permet).e
+- Archivé (`ARCHIVED`): le workspace est en lecture-seul jusqu'au prochain changement de configuration.
+- Suppression planifié (`DELETION_PlANNED`): le workspace est en lecture-seul et une suppression de l'espace est planifié a une date donné.
+
+### `GET /workspaces/<id>/archiving`
+
+Récupère les informations sur l'état de l'archivage/suppression pour ce workspace.
+
+En plus de l'état de la configuration courante, 4 informations sont fournis:
+- La date de la configuration courante (`configured_on`). Elle peut être `null` si le workspace n'a jamais été configuré.
+- L'email de l'utilisateur responsable de la configuration courante (`configured_by`). Elle peut être `null` si le workspace n'a jamais été configuré.
+- La date de suppression planifiée (`deletion_date`). Elle n'est fourni que dans l'état de suppression planifié. Elle peut être déjà passée.
+- Un booléen indiquant que le workspace est effectivement supprimé. Cela signifie que la date courante a dépassé la date de suppression planifié.
+- La période d'archivage minimale en secondes (`minimum_archiving_period`). C'est la période minimale à respecter lors d'une suppression planifiée.
+
+**Request:**
 
 ```python
-HTTP 404
 {
-    "error": "unknown_workspace"
 }
 ```
+
+**Response:**
+
+
+```python
+HTTP 200
+{
+    "configuration": <str> = "AVAILABLE" | "ARCHIVED" | "DELETION_PlANNED",
+    "configured_on": <datetime or null>,
+    "configured_by": <str or null>,
+    "deletion_date": <datetime or null>,
+    "minimum_archiving_period": <int> # in seconds
+}
+```
+
+**Erreurs:**
+
+- HTTP 404: `unknown_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+
+### `POST /workspaces/<id>/archiving`
+
+Configure l'archivage ou planifie une suppression pour ce workspace.
+
+**Notes:**
+
+- La date de suppression (`deletion_date`) n'est fourni que dans le cas d'une suppression planifiée.
+- Cette date de suppression doit respecter le délai d'archivage minimum, configuré au niveau de l'organization.
+- Les droits de propriétaire (`OWNER`) sont nécessaires pour réaliser cette opération.
+
+**Request:**
+
+```python
+{
+    "configuration": <str> = "AVAILABLE" | "ARCHIVED" | "DELETION_PlANNED",
+    "deletion_date": <datetime or null>,
+}
+```
+
+**Response:**
+
+
+```python
+HTTP 200
+{
+}
+```
+
+**Erreurs:**
+
+- HTTP 404: `unknown_workspace`
+- HTTP 403: `archiving_not_allowed`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 400: `archiving_period_is_too_short`
+- HTTP 502: `connection_refused_by_server`, le client Parsec s'est vu refuser sa requête par le serveur Parsec (e.g. l'utilisateur Parsec a été révoqué)
+
 
 ## Dossiers
 
@@ -1122,14 +1267,16 @@ HTTP 404
 
 Consulter l'arborescence d'un workspace. Un timestamp au format rfc3339 peut être fourni pour avoir les données à la date précisée.
 
-Request:
+**Request:**
+
 ```python
 {
     "timestamp": Optional<string>
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -1152,25 +1299,20 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-```python
-HTTP 404
-{
-    "error": "unknown_workspace"
-}
-```
-
-ou
-
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
+- HTTP 404: `unknown_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 ### `POST /workspaces/<id>/folders`
 
 Créé un nouveau répertoire.
 name : les caractères `\ / : * ? " > < |` sont interdits sur Windows https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file ainsi que certains mots https://github.com/Scille/parsec-cloud/blob/77cc7ba287d442cc5b98366bf52cd1b51690db87/parsec/core/mountpoint/winify.py#L22-L43.
 
-Request:
+**Request:**
+
 
 ```python
 {
@@ -1179,7 +1321,8 @@ Request:
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 201
@@ -1188,33 +1331,22 @@ HTTP 201
 }
 ```
 
-ou
 
-```python
-HTTP 404
-{
-    "error": "unknown_workspace"
-}
-```
+**Erreurs:**
 
-ou
-
-```python
-HTTP 404
-{
-    "error": "unknown_parent"
-}
-```
-
-ou
-
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
+- HTTP 404: `unknown_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 403: `archived_workspace`
+- HTTP 404: `unknown_parent`
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 ### `POST /workspaces/<id>/folders/rename`
 
 Déplace/renomme un repertoire.
 
-Request:
+**Request:**
+
 
 ```python
 {
@@ -1224,7 +1356,8 @@ Request:
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -1232,77 +1365,35 @@ HTTP 200
 }
 ```
 
-ou
 
-```python
-HTTP 400
-{
-    "error": "destination_parent_not_a_folder"
-}
-```
+**Erreurs:**
 
-ou
-
-```python
-HTTP 400
-{
-    "error": "source_not_a_folder"
-}
-```
-
-ou
-
-```python
-HTTP 400
-{
-    "error": "cannot_move_root_folder"
-}
-```
-
-ou
-
-```python
-HTTP 404
-{
-    "error": "unknown_workspace"
-}
-```
-
-ou
-
-```python
-HTTP 404
-{
-    "error": "unknown_source_folder"
-}
-```
-
-ou
-
-```python
-HTTP 404
-{
-    "error": "unknown_destination_parent_folder"
-}
-```
-
-ou
-
-- HTTP 403 si l'utilisateur n'a pas le profil `OWNER`/`MANAGER`/`CONTRIBUTER` sur le workspace
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
+- HTTP 404: `unknown_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `archived_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 400: `destination_parent_not_a_folder`
+- HTTP 400: `source_not_a_folder`
+- HTTP 400: `cannot_move_root_folder`
+- HTTP 404: `unknown_source_folder`
+- HTTP 404: `unknown_destination_parent_folder`
+- HTTP 403: si l'utilisateur n'a pas le profil `OWNER`/`MANAGER`/`CONTRIBUTER` sur le workspace
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 ### `DELETE /workspaces/<id>/folders/<id>`
 
 Supprime un répertoire.
 
-Request:
+**Request:**
+
 
 ```python
 {
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 204
@@ -1312,52 +1403,15 @@ HTTP 204
 
 ou
 
-```python
-HTTP 400
-{
-    "error": "cannot_delete_root_folder"
-}
-```
-
-ou
-
-```python
-HTTP 403
-{
-    "error": "read_only_workspace"
-}
-```
-
-ou
-
-```python
-HTTP 404
-{
-    "error": "not_a_folder"
-}
-```
-
-ou
-
-```python
-HTTP 404
-{
-    "error": "unknown_workspace"
-}
-```
-
-ou
-
-```python
-HTTP 404
-{
-    "error": "unknown_folder"
-}
-```
-
-ou
-
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
+- HTTP 404: `unknown_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 400: `cannot_delete_root_folder`
+- HTTP 403: `read_only_workspace`
+- HTTP 403: `archived_workspace`
+- HTTP 404: `not_a_folder`
+- HTTP 404: `unknown_folder`
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 ## Fichiers
 
@@ -1365,14 +1419,16 @@ ou
 
 Consulte l'arborescence des fichiers d'un workspace. Un timestamp au format rfc3339 peut être fourni pour avoir les données à la date précisée.
 
-Request:
+**Request:**
+
 ```python
 {
     "timestamp": Optional<string>
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -1393,34 +1449,22 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-```python
-HTTP 404
-{
-    "error": "unknown_workspace"
-}
-```
+- HTTP 404: `unknown_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 404: `unknown_path`
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
-ou
-
-```python
-HTTP 404
-{
-    "error": "unknown_path"
-}
-```
-
-ou
-
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 ### `POST /workspaces/<id>/files`
 
 Créé un nouveau fichier.
 name/filename : les caractères `\ / : * ? " > < |` sont interdits sur Windows https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file ainsi que certains mots https://github.com/Scille/parsec-cloud/blob/77cc7ba287d442cc5b98366bf52cd1b51690db87/parsec/core/mountpoint/winify.py#L22-L43.
 
-Request:
+**Request:**
+
 
 En multipart (recommandé)
 
@@ -1440,7 +1484,8 @@ ou en base64 en JSON (déprécié)
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 201
@@ -1449,33 +1494,22 @@ HTTP 201
 }
 ```
 
-ou
+**Erreurs:**
 
-```python
-HTTP 404
-{
-    "error": "unknown_workspace"
-}
-```
+- HTTP 404: `unknown_workspace`
+- HTTP 403: `archived_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 404: `unknown_path`
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
-ou
-
-```python
-HTTP 404
-{
-    "error": "unknown_path"
-}
-```
-
-ou
-
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 ### `POST /workspaces/<id>/files/rename`
 
 Déplace/renomme un fichier
 
-Request:
+**Request:**
+
 
 ```python
 {
@@ -1485,7 +1519,8 @@ Request:
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -1493,49 +1528,31 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-```python
-HTTP 400
-{
-    "error": "invalid_destination"
-}
-```
+- HTTP 404: `unknown_workspace`
+- HTTP 403: `archived_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 400: `invalid_destination`
+- HTTP 404: `unknown_path`
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
-ou
-
-```python
-HTTP 404
-{
-    "error": "unknown_workspace"
-}
-```
-
-ou
-
-```python
-HTTP 404
-{
-    "error": "unknown_path"
-}
-```
-
-ou
-
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 ### `DELETE /workspaces/<id>/files/<id>`
 
 Supprime un fichier.
 
-Request:
+**Request:**
+
 
 ```python
 {
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 204
@@ -1543,33 +1560,21 @@ HTTP 204
 }
 ```
 
-ou
+**Erreurs:**
 
-```python
-HTTP 404
-{
-    "error": "unknown_workspace"
-}
-```
-
-ou
-
-```python
-HTTP 404
-{
-    "error": "unknown_file"
-}
-```
-
-ou
-
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
+- HTTP 404: `unknown_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 404: `unknown_entry`
+- HTTP 404: `not_a_file`
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 ### `POST /workspaces/<id>/open/<id>`
 
 Ouvre un fichier/répertoire. Un timestamp au format rfc3339 peut être fourni pour ouvrir le fichier dans l'état dans lequel il se trouvait à la date précisée.
 
-Request:
+**Request:**
+
 
 ```python
 {
@@ -1577,7 +1582,8 @@ Request:
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -1585,33 +1591,21 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-```python
-HTTP 404
-{
-    "error": "unknown_workspace"
-}
-```
+- HTTP 404: `unknown_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 404: `unknown_file`
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
 
-ou
-
-```python
-HTTP 404
-{
-    "error": "unknown_file"
-}
-```
-
-ou
-
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
 
 ### `POST /workspaces/<id>/search`
 
 Un timestamp au format rfc3339 peut être fourni pour avoir les données à la date précisée.
 
-Request:
+**Request:**
+
 ```python
 {
     "string": <string>,
@@ -1641,20 +1635,19 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-```python
-HTTP 404
-{
-    "error": "unknown_workspace"
-}
-```
+- HTTP 404: `unknown_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+
 
 ### [NOT IMPLEMENTED] `GET /workspaces/<id>/reencryption`
 
 Récupère les information de rechiffrement du workspace.
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -1666,44 +1659,35 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-```python
-HTTP 404
-{
-    "error": "unknown_workspace"
-}
-```
+- HTTP 404: `unknown_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
+- HTTP 404: `unknown_path`
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
 
-ou
+**Notes:**
 
-```python
-HTTP 404
-{
-    "error": "unknown_path"
-}
-```
+- `user_revoked` liste des email des HumanHandle dont le user a été révoqué
+- `role_revoked` liste des email des HumanHandle dont le user a perdu l'accès au workspace
+- `reencryption_already_in_progress` le rechiffrement est déjà en cours
 
-ou
-
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
-
-`user_revoked` liste des email des HumanHandle dont le user a été révoqué
-`role_revoked` liste des email des HumanHandle dont le user a perdu l'accès au workspace
-`reencryption_already_in_progress` le rechiffrement est déjà en cours
 
 ### [NOT IMPLEMENTED] `POST /workspaces/<id>/reencryption`
 
 Lance le rechiffrement du workspace.
 
-Request:
+**Request:**
+
 
 ```python
 {
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -1711,21 +1695,14 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-```python
-HTTP 404
-{
-    "error": "unknown_workspace"
-}
-```
-
-ou
-
+- HTTP 404: `unknown_workspace`
+- HTTP 410: `deleted_workspace`
+- HTTP 403: `forbidden_workspace`
 - HTTP 403 si l'utilisateur n'a pas le profil `OWNER` sur le workspace
-ou
+- HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
 
-- HTTP 503: le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne)
 
 ## Récupération d'appareil
 
@@ -1736,14 +1713,16 @@ Ce fichier de récupération sert à créer de nouveaux devices pour l'utilisate
 notamment de récupérer son compte en cas de perte de son ordinateur ou bien d'oubli
 de mot de passe.
 
-Request:
+**Request:**
+
 
 ```python
 {
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -1763,7 +1742,8 @@ la passphrase dans un endroit sûr et non accessible par un tiers.
 
 Créé un nouveau device à partir du fichier de récupération généré préalablement.
 
-Request:
+**Request:**
+
 
 ```python
 {
@@ -1773,7 +1753,8 @@ Request:
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -1781,20 +1762,17 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs:**
 
-```python
-HTTP 400
-{
-    "error": "invalid_passphrase"
-}
-```
+- HTTP 400: `invalid_passphrase`
+
 
 ### `POST /recovery/shamir/setup`
 
 Configure un nouvel appareil de récupération partagé.
 
-Request:
+**Request:**
+
 
 ```python
 {
@@ -1809,7 +1787,8 @@ Request:
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -1817,7 +1796,7 @@ HTTP 200
 }
 ```
 
-ou
+**Erreurs spécifiques:**
 
 ```python
 HTTP 400
@@ -1827,28 +1806,26 @@ HTTP 400
 }
 ```
 
-ou
 
-```python
-HTTP 400
-{
-    "error": "invalid_configuration"
-}
-```
+**Erreurs:**
+
+- HTTP 400: `invalid_configuration`
 
 
 ### `DELETE /recovery/shamir/setup`
 
 Supprime l'appareil de récupération partagé courant.
 
-Request:
+**Request:**
+
 
 ```python
 {
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -1865,7 +1842,8 @@ Retourne l'appareil de récupération partagé courant
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
@@ -1881,13 +1859,10 @@ HTTP 200
     ]
 }
 ```
-or
-```python
-HTTP 404
-{
-    "error": "not_setup"
-}
-```
+
+**Erreurs:**
+
+- HTTP 404: `not_setup`
 
 
 ### `GET /recovery/shamir/setup/others`
@@ -1899,7 +1874,8 @@ Retourne l'appareil de récupération partagé courant
 }
 ```
 
-Response:
+**Response:**
+
 
 ```python
 HTTP 200
