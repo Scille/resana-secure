@@ -30,14 +30,14 @@ workspaces_bp = Blueprint("workspaces_api", __name__)
 @authenticated
 async def list_workspaces(core: LoggedCore) -> tuple[dict[str, Any], int]:
     workspace_items = []
-    for entry in core.user_fs.get_available_workspace_entries():
-        assert entry.role is not None
-        workspace = core.user_fs.get_workspace(entry.id)
+    for workspace in core.user_fs.get_available_workspaces():
+        workspace_entry = workspace.get_workspace_entry()
         archiving_configuration, _, _ = workspace.get_archiving_configuration()
+        assert workspace_entry.role is not None
         workspace_item = {
-            "id": entry.id.hex,
-            "name": entry.name.str,
-            "role": entry.role.str,
+            "id": workspace_entry.id.hex,
+            "name": workspace_entry.name.str,
+            "role": workspace_entry.role.str,
             "archiving_configuration": archiving_configuration.str,
         }
         workspace_items.append(workspace_item)
