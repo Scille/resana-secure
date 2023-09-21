@@ -31,12 +31,14 @@ const sections = [
   "mount",
   "folder",
   "file",
+  "search",
   "invitation",
   "invitation-greeter",
   "invitation-claimer",
   "human",
   "share",
   "recovery",
+  "shamir",
   "sequester",
   "logout",
   "result"
@@ -50,31 +52,13 @@ function navTo(className) {
   openNav();
 }
 
-// COMMON
-function getHttpResult(http) {
-  try {
-    return `${http.status}<br>` + JSON.stringify(JSON.parse(http.responseText), null, 4);
-  } catch (error) {
-    return `${http.status} ${http.responseURL}<br>` + http.responseText.replace(/</gi, "&lt;").replace(/>/gi, "&gt;");
-  }
-}
 
-// RELEASE
-let releaseVersion = "vX.Y.Z";
-
-function releaseVersionChange(event) {
-  releaseVersion = document.getElementById("release-version").value;
-  const elements = document.getElementsByClassName("release-version");
-  for (const element of elements) {
-    element.innerHTML = releaseVersion;
-  }
-}
+// BOOTSTRAP
 
 const defaultEmail = "gordon.freeman@blackmesa.nm";
 const inviteeEmail = "eli.vance@blackmesa.nm";
 const defaultPassword = "P@ssw0rd";
 
-// BOOTSTRAP
 function boostrap() {
   const organizationUrl = document.getElementById("bootstrap-url").value;
   const sequesterVerifyKey = document.getElementById("sequester-verify-key").value;
@@ -924,6 +908,59 @@ function importRecovery() {
     document.getElementById("import-result").innerHTML = getHttpResult(http);
   }
 }
+
+
+// SHAMIR
+function shamirSetup() {
+  const http = new XMLHttpRequest();
+  http.open("POST", `http://localhost:5775/recovery/shamir/setup`);
+  http.setRequestHeader("Content-type", "application/json");
+  http.setRequestHeader("Authorization", `bearer ${tokenSession}`);
+  http.send(JSON.stringify({
+    threshold: 0,
+    recipients: [{
+      email: "",
+      weight: 1
+    }]
+  }));
+  http.onreadystatechange = (e) => {
+    document.getElementById("shamir-setup-result").innerHTML = getHttpResult(http);
+  }
+}
+
+function shamirDelete() {
+  const http = new XMLHttpRequest();
+  http.open("DELETE", `http://localhost:5775/recovery/shamir/setup`);
+  http.setRequestHeader("Content-type", "application/json");
+  http.setRequestHeader("Authorization", `bearer ${tokenSession}`);
+  http.send(JSON.stringify({}));
+  http.onreadystatechange = (e) => {
+    document.getElementById("shamir-delete-result").innerHTML = getHttpResult(http);
+  }
+}
+
+function shamirGetCurrent() {
+  const http = new XMLHttpRequest();
+  http.open("GET", `http://localhost:5775/recovery/shamir/setup`);
+  http.setRequestHeader("Content-type", "application/json");
+  http.setRequestHeader("Authorization", `bearer ${tokenSession}`);
+  http.send(JSON.stringify({}));
+  http.onreadystatechange = (e) => {
+    document.getElementById("shamir-get-current-result").innerHTML = getHttpResult(http);
+  }
+}
+
+function shamirGetOthers() {
+  const http = new XMLHttpRequest();
+  http.open("GET", `http://localhost:5775/recovery/shamir/setup/others`);
+  http.setRequestHeader("Content-type", "application/json");
+  http.setRequestHeader("Authorization", `bearer ${tokenSession}`);
+  http.send(JSON.stringify({}));
+  http.onreadystatechange = (e) => {
+    document.getElementById("shamir-get-others-result").innerHTML = getHttpResult(http);
+  }
+}
+
 
 // LOGOUT
 function deconnect(force = false) {

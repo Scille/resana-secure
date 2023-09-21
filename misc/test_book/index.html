@@ -60,6 +60,10 @@
           <span class="mdc-list-item__ripple"></span>
           <span class="mdc-list-item__text">Files</span>
         </li>
+        <li class="mdc-list-item" role="menuitem" onclick="navTo('search')">
+          <span class="mdc-list-item__ripple"></span>
+          <span class="mdc-list-item__text">Recherche</span>
+        </li>
         <li class="mdc-list-item" role="menuitem" onclick="navTo('invitation')">
           <span class="mdc-list-item__ripple"></span>
           <span class="mdc-list-item__text">Invitations</span>
@@ -83,6 +87,10 @@
         <li class="mdc-list-item" role="menuitem" onclick="navTo('recovery')">
           <span class="mdc-list-item__ripple"></span>
           <span class="mdc-list-item__text">Recovery</span>
+        </li>
+        <li class="mdc-list-item" role="menuitem" onclick="navTo('shamir')">
+          <span class="mdc-list-item__ripple"></span>
+          <span class="mdc-list-item__text">Shamir</span>
         </li>
         <li class="mdc-list-item" role="menuitem" onclick="navTo('sequester')">
           <span class="mdc-list-item__ripple"></span>
@@ -404,6 +412,11 @@ parsec backend sequester generate_service_certificate --service-label="Service a
         </div>
       </section>
 
+      <section id="search">
+        <h2>Recherche</h2>
+
+      </section>
+
       <section id="invitation">
         <h2>Invitation</h2>
         <p><b>Tests à réaliser</b></p>
@@ -582,6 +595,32 @@ parsec backend sequester generate_service_certificate --service-label="Service a
           <br>
           <button onclick="importRecovery()">Import</button>
           <pre id="import-result"></pre>
+        </p>
+      </section>
+
+      <section id="shamir">
+        <h2>Shamir</h2>
+
+        <h3>Get</h3>
+        <p>
+          <button onclick="shamirGetCurrent()">Current</button>
+          <pre id="shamir-get-current-result"></pre>
+        </p>
+        <p>
+          <button onclick="shamirGetOthers()">Others</button>
+          <pre id="shamir-get-others-result"></pre>
+        </p>
+
+        <h3>Setup</h3>
+        <p>
+          <button onclick="shamirSetup()">Setup</button>
+          <pre id="shamir-setup-result"></pre>
+        </p>
+
+        <h3>Delete</h3>
+        <p>
+          <button onclick="shamirDelete()">Supprimer</button>
+          <pre id="shamir-delete-result"></pre>
         </p>
       </section>
 
@@ -946,6 +985,19 @@ parsec backend sequester export_realm --organization test_20230419 --service 99e
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
     <script type="text/javascript" src="test_book.js"></script>
+    <script type="text/javascript" src="common.js"></script>
+    <script type="text/javascript" src="auth.js"></script>
+    <script type="text/javascript" src="bootstrap.js"></script>
+    <script type="text/javascript" src="file.js"></script>
+    <script type="text/javascript" src="folder.js"></script>
+    <script type="text/javascript" src="invitation.js"></script>
+    <script type="text/javascript" src="mount.js"></script>
+    <script type="text/javascript" src="offline.js"></script>
+    <script type="text/javascript" src="recovery.js"></script>
+    <script type="text/javascript" src="release.js"></script>
+    <script type="text/javascript" src="search.js"></script>
+    <script type="text/javascript" src="shamir.js"></script>
+    <script type="text/javascript" src="workspace.js"></script>
   </body>
 </html>
 

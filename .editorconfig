@@ -22,3 +22,6 @@ indent_size = 2
 
 [*.nsi]
 indent_size = 2
+
+[*.{css,js,html}]
+indent_size = 2
