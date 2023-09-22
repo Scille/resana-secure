@@ -16,7 +16,7 @@ NOTIFICATION_BASE_MSG = f"Application `{os.environ.get('APP', '<unknown app>')}`
 
 # Do not notify on this error messages
 IGNORE_MESSAGES = [
-    "Database connection lost (PostgreSQL notification query has been lost), retrying in 1.0 seconds",
+    b"Database connection lost (PostgreSQL notification query has been lost), retrying in 1.0 seconds",
 ]
 
 
@@ -42,11 +42,11 @@ def run_cmd_with_log_scan(args: argparse.Namespace, cmd: List[str]) -> subproces
     def _listen_log_stream(stream_in, stream_out):
         while True:
             line = stream_in.readline()
-            print(line)
             if not line:
                 # Command has finished
                 return
 
+            print(line)
             # Filter unwanted error messages
             if any((msg in line for msg in IGNORE_MESSAGES)):
                 continue
