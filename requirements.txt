@@ -1,1 +1,1 @@
-git+ssh://git@github.com/Scille/resana-secure.git@v0.14.1#subdirectory=server
+git+ssh://git@github.com/Scille/resana-secure.git@fix-server-ignore-message#subdirectory=server
