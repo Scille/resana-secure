@@ -42,6 +42,7 @@ def run_cmd_with_log_scan(args: argparse.Namespace, cmd: List[str]) -> subproces
     def _listen_log_stream(stream_in, stream_out):
         while True:
             line = stream_in.readline()
+            print(line)
             if not line:
                 # Command has finished
                 return
