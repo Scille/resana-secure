@@ -323,3 +323,44 @@ async def test_websocket_org2_without_org2_ip(
             await ws.send(packb({"organization_id": "Org-2"}))
             assert await ws.receive() == "WS event 2"
     assert ctx.value.args == (403,)
+
+
+@pytest.mark.trio
+async def test_organization_specific_configuration_outside_of_generic_configuration(
+    test_app: QuartTrio,
+) -> None:
+    """
+    This kind of configuration is technically allowed at the moment, although we don't plan to use it.
+
+    The test is here to make sure we don't break this behavior unintentionnaly.
+
+    However, we might want to explicitely check against this kind of configuration in the future.
+    """
+    middleware = AsgiIpFilteringMiddleware(
+        test_app.asgi_app,
+        authorized_proxies="0.0.0.0/0",
+        authorized_networks="130.0.0.0/16 131.0.0.0/16",
+        authorized_networks_by_organization="""
+Org-1 130.0.20.0/24 130.0.21.0/24;
+Org-2 131.0.20.0/24 131.0.21.0/24;
+Org-3 155.0.20.0/24 155.0.21.0/24;
+""",
+    )
+    middleware.TEST_LOCAL_IP = "127.0.0.1"
+    test_app.asgi_app = middleware  # type: ignore[assignment]
+    test_client = test_app.test_client()
+    org3_client_ip = "155.0.20.1"
+
+    org3_route = "/authenticated/Org-3/test"
+    response = await test_client.get(
+        org3_route,
+        headers={"x-real-ip": org3_client_ip},
+    )
+    assert (await response.data).decode() == "Hello World"
+    assert response.status_code == 200
+
+    ws_route = "/ws"
+    async with test_client.websocket(ws_route, headers={"x-real-ip": org3_client_ip}) as ws:
+        assert await ws.receive() == "WS event"
+        await ws.send(packb({"organization_id": "Org-3"}))
+        assert await ws.receive() == "WS event 2"
