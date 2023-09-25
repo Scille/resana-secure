@@ -2,13 +2,13 @@
 import pytest
 from asgi_ip_filtering import AsgiIpFilteringMiddleware
 from quart import websocket
-from quart.testing.connections import WebsocketDisconnectError
+from quart.testing.connections import WebsocketDisconnectError, WebsocketResponseError
 from quart.typing import TestClientProtocol
 from quart_trio import QuartTrio
 
 
 @pytest.fixture
-def test_client() -> TestClientProtocol:
+def test_app() -> QuartTrio:
     app = QuartTrio(__name__)
 
     @app.route("/")
@@ -24,84 +24,127 @@ def test_client() -> TestClientProtocol:
         return "Hello World"
 
     @app.route("/anonymous")
-    async def anonymous_route() -> str:
+    async def empty_anonymous_route() -> str:
         return "Hello World"
 
-    @app.route("/anonymous/<arg>")
-    async def anonymous_route_with_arg(arg: str) -> str:
+    @app.route("/anonymous/<org>")
+    async def anonymous_route(org: str) -> str:
+        return "Hello World"
+
+    @app.route("/anonymous/<org>/<arg>")
+    async def anonymous_route_with_arg(org: str, arg: str) -> str:
         return "Hello World"
 
     @app.route("/invited")
-    async def invited_route() -> str:
+    async def empty_invited_route() -> str:
         return "Hello World"
 
-    @app.route("/invited/<arg>")
-    async def invited_route_with_arg(arg: str) -> str:
+    @app.route("/invited/<org>")
+    async def invited_route(org: str) -> str:
+        return "Hello World"
+
+    @app.route("/invited/<org>/<arg>")
+    async def invited_route_with_arg(org: str, arg: str) -> str:
         return "Hello World"
 
     @app.route("/authenticated")
-    async def authenticated_route() -> str:
+    async def empty_authenticated_route() -> str:
         return "Hello World"
 
-    @app.route("/authenticated/<arg>")
-    async def authenticated_route_with_arg(arg: str) -> str:
+    @app.route("/authenticated/<org>")
+    async def authenticated_route(org: str) -> str:
+        return "Hello World"
+
+    @app.route("/authenticated/<org>/<arg>")
+    async def authenticated_route_with_arg(org: str, arg: str) -> str:
         return "Hello World"
 
     @app.websocket("/ws")
     async def ws_route() -> None:
         await websocket.accept()
         await websocket.send("WS event")
+        await websocket.receive()
+        await websocket.send("WS event 2")
 
     @app.websocket("/ws/<arg>")
     async def ws_route_with_arg(arg: str) -> None:
         await websocket.accept()
         await websocket.send("WS event")
+        await websocket.receive()
+        await websocket.send("WS event 2")
 
-    app.asgi_app = AsgiIpFilteringMiddleware(app.asgi_app, "130.0.0.0/24 131.0.0.0/24", "127.0.0.0/24 128.0.0.0/24")  # type: ignore[assignment]
-    return app.test_client()
+    return app
 
 
-TEST_FILTERED_HTTP_ROUTES = (
-    "/anonymous",
-    "/invited",
-    "/authenticated",
-    "/anonymous/test",
-    "/invited/test",
-    "/authenticated/test",
+@pytest.fixture
+def test_client(test_app: QuartTrio) -> TestClientProtocol:
+    middleware = AsgiIpFilteringMiddleware(
+        test_app.asgi_app,
+        authorized_proxies="10.0.0.0/24 11.0.0.0/24",
+        authorized_networks="130.0.0.0/24 131.0.0.0/24",
+        authorized_networks_by_organization="",
+    )
+    test_app.asgi_app = middleware  # type: ignore[assignment]
+    return test_app.test_client()
+
+
+@pytest.fixture(
+    params=[
+        "/anonymous",
+        "/invited",
+        "/authenticated",
+        "/anonymous/test",
+        "/invited/test",
+        "/authenticated/test",
+    ]
 )
+def filtered_http_routes(request) -> str:
+    return request.param
 
-TEST_UNFILTERED_HTTP_ROUTES = (
-    "/",
-    "/administration",
-    "/administration/test",
-)
 
-TEST_WS_ROUTES = (
-    "/ws",
-    "/ws/test",
+@pytest.fixture(
+    params=[
+        "/",
+        "/administration",
+        "/administration/test",
+    ]
 )
+def unfiltered_http_routes(request) -> str:
+    return request.param
+
+
+@pytest.fixture(params=["10.0.0.1", "11.0.0.1"], ids=["proxy1", "proxy2"])
+def insider_local_ip(request):
+    return request.param
+
+
+@pytest.fixture
+def outsider_local_ip():
+    return "12.0.0.1"
+
+
+@pytest.fixture(params=["130.0.0.1", "131.0.0.1"], ids=["network1", "network2"])
+def insider_client_ip(request):
+    return request.param
+
+
+@pytest.fixture
+def outsider_client_ip():
+    return "132.0.0.1"
 
 
 @pytest.mark.trio
-@pytest.mark.parametrize("route", TEST_FILTERED_HTTP_ROUTES + TEST_UNFILTERED_HTTP_ROUTES)
-async def test_asgi_ip_filtering_http_with_insider_ip(
-    test_client: TestClientProtocol, route: str
+async def test_unfiltered_http_with_insider_ip(
+    test_client: TestClientProtocol,
+    unfiltered_http_routes: str,
+    insider_client_ip: str,
+    insider_local_ip: str,
 ) -> None:
     response = await test_client.get(
-        route,
+        unfiltered_http_routes,
         scope_base={
-            "client": ("127.0.0.1", 1234),
-            "headers": [(b"x-real-ip", b"130.0.0.1")],
-        },
-    )
-    assert response.status_code == 200
-    assert (await response.data).decode() == "Hello World"
-
-    response = await test_client.get(
-        route,
-        scope_base={
-            "client": ("128.0.0.1", 1234),
-            "headers": [(b"x-real-ip", b"131.0.0.1")],
+            "client": (insider_local_ip, 1234),
+            "headers": [(b"x-real-ip", insider_client_ip.encode())],
         },
     )
     assert response.status_code == 200
@@ -109,25 +152,29 @@ async def test_asgi_ip_filtering_http_with_insider_ip(
 
 
 @pytest.mark.trio
-@pytest.mark.parametrize("route", TEST_UNFILTERED_HTTP_ROUTES)
-async def test_asgi_ip_filtering_unfiltered_http_with_outsider_ip(
-    test_client: TestClientProtocol, route: str
+async def test_unfiltered_http_with_outsider_ip(
+    test_client: TestClientProtocol,
+    unfiltered_http_routes: str,
+    insider_local_ip: str,
+    insider_client_ip: str,
+    outsider_local_ip: str,
+    outsider_client_ip: str,
 ) -> None:
     response = await test_client.get(
-        route,
+        unfiltered_http_routes,
         scope_base={
-            "client": ("129.0.0.1", 1234),
-            "headers": [(b"x-real-ip", b"130.0.0.1")],
+            "client": (outsider_local_ip, 1234),
+            "headers": [(b"x-real-ip", insider_client_ip.encode())],
         },
     )
     assert response.status_code == 200
     assert (await response.data).decode() == "Hello World"
 
     response = await test_client.get(
-        route,
+        unfiltered_http_routes,
         scope_base={
-            "client": ("128.0.0.1", 1234),
-            "headers": [(b"x-real-ip", b"132.0.0.1")],
+            "client": (insider_local_ip, 1234),
+            "headers": [(b"x-real-ip", outsider_client_ip.encode())],
         },
     )
     assert response.status_code == 200
@@ -135,90 +182,202 @@ async def test_asgi_ip_filtering_unfiltered_http_with_outsider_ip(
 
 
 @pytest.mark.trio
-@pytest.mark.parametrize("route", TEST_FILTERED_HTTP_ROUTES)
-async def test_asgi_ip_filtering_filtered_http_with_outsider_ip(
-    test_client: TestClientProtocol, route: str
+async def test_filtered_http_with_insider_ip(
+    test_client: TestClientProtocol,
+    filtered_http_routes: str,
+    insider_client_ip: str,
+    insider_local_ip: str,
 ) -> None:
     response = await test_client.get(
-        route,
+        filtered_http_routes,
         scope_base={
-            "client": ("129.0.0.1", 1234),
-            "headers": [(b"x-real-ip", b"130.0.0.1")],
+            "client": (insider_local_ip, 1234),
+            "headers": [(b"x-real-ip", insider_client_ip.encode())],
+        },
+    )
+    assert response.status_code == 200
+    assert (await response.data).decode() == "Hello World"
+
+
+@pytest.mark.trio
+async def test_filtered_http_with_outsider_ip(
+    test_client: TestClientProtocol,
+    filtered_http_routes: str,
+    insider_local_ip: str,
+    insider_client_ip: str,
+    outsider_local_ip: str,
+    outsider_client_ip: str,
+) -> None:
+    response = await test_client.get(
+        filtered_http_routes,
+        scope_base={
+            "client": (outsider_local_ip, 1234),
+            "headers": [(b"x-real-ip", insider_client_ip.encode())],
         },
     )
     assert response.status_code == 403
     assert response.content_type == "text/html; charset=UTF-8"
-    expected = AsgiIpFilteringMiddleware.MESSAGE_REJECTED.format("129.0.0.1")
+    expected = AsgiIpFilteringMiddleware.PROXY_REJECTED_MESSAGE.format(outsider_local_ip)
+    assert (await response.data).decode() == expected
+
+    response = await test_client.get(
+        filtered_http_routes,
+        scope_base={
+            "client": (insider_local_ip, 1234),
+            "headers": [(b"x-real-ip", outsider_client_ip.encode())],
+        },
+    )
+    assert response.status_code == 403
+    assert response.content_type == "text/html; charset=UTF-8"
+    expected = AsgiIpFilteringMiddleware.NETWORK_REJECTED_MESSAGE.format(outsider_client_ip)
+    assert (await response.data).decode() == expected
+
+
+@pytest.mark.trio
+async def test_unknown_route_with_insider_ip(
+    test_client: TestClientProtocol,
+    insider_local_ip: str,
+    insider_client_ip: str,
+) -> None:
+    route = "/unknown"
+
+    response = await test_client.get(
+        route,
+        scope_base={
+            "client": (insider_local_ip, 1234),
+            "headers": [(b"x-real-ip", insider_client_ip.encode())],
+        },
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.trio
+async def test_unknown_route_with_outsider_ip(
+    test_client: TestClientProtocol,
+    insider_local_ip: str,
+    insider_client_ip: str,
+    outsider_local_ip: str,
+    outsider_client_ip: str,
+) -> None:
+    route = "/unknown"
+
+    response = await test_client.get(
+        route,
+        scope_base={
+            "client": (outsider_local_ip, 1234),
+            "headers": [(b"x-real-ip", insider_client_ip.encode())],
+        },
+    )
+    assert response.status_code == 403
+    assert response.content_type == "text/html; charset=UTF-8"
+    expected = AsgiIpFilteringMiddleware.PROXY_REJECTED_MESSAGE.format(outsider_local_ip)
     assert (await response.data).decode() == expected
 
     response = await test_client.get(
         route,
         scope_base={
-            "client": ("127.0.0.1", 1234),
-            "headers": [(b"x-real-ip", b"132.0.0.1")],
+            "client": (insider_local_ip, 1234),
+            "headers": [(b"x-real-ip", outsider_client_ip.encode())],
         },
     )
     assert response.status_code == 403
     assert response.content_type == "text/html; charset=UTF-8"
-    expected = AsgiIpFilteringMiddleware.MESSAGE_REJECTED.format("132.0.0.1")
+    expected = AsgiIpFilteringMiddleware.NETWORK_REJECTED_MESSAGE.format(outsider_client_ip)
     assert (await response.data).decode() == expected
 
 
 @pytest.mark.trio
-async def test_asgi_ip_filtering_unknown_route(test_client: TestClientProtocol) -> None:
-    response = await test_client.get(
-        "/unknown",
-        scope_base={
-            "client": ("127.0.0.1", 1234),
-            "headers": [(b"x-real-ip", b"130.0.0.1")],
-        },
-    )
-    assert response.status_code == 404
+async def test_unknown_ws_route_with_insider_ip(
+    test_client: TestClientProtocol,
+    insider_local_ip: str,
+    insider_client_ip: str,
+) -> None:
+    route = "/unknown"
 
-    response = await test_client.get(
-        "/unknown",
-        scope_base={
-            "client": ("128.0.0.1", 1234),
-            "headers": [(b"x-real-ip", b"131.0.0.1")],
-        },
-    )
-    assert response.status_code == 404
-
-    response = await test_client.get(
-        "/unknown",
-        scope_base={
-            "client": ("129.0.0.1", 1234),
-            "headers": [(b"x-real-ip", b"130.0.0.1")],
-        },
-    )
-    assert response.status_code == 404
-
-    response = await test_client.get(
-        "/unknown",
-        scope_base={
-            "client": ("128.0.0.1", 1234),
-            "headers": [(b"x-real-ip", b"132.0.0.1")],
-        },
-    )
-    assert response.status_code == 404
+    with pytest.raises(WebsocketResponseError) as ctx_response:
+        scope_base = {
+            "client": (insider_local_ip, 1234),
+            "headers": [(b"x-real-ip", insider_client_ip.encode())],
+        }
+        async with test_client.websocket(route, scope_base=scope_base) as ws:  # type: ignore[call-arg]
+            await ws.receive()
+    assert ctx_response.value.response.status_code == 404
 
 
 @pytest.mark.trio
-@pytest.mark.parametrize("route", TEST_WS_ROUTES)
-async def test_asgi_ip_filtering_websocket(test_client: TestClientProtocol, route: str) -> None:
-    # Websocket route
-    async with test_client.websocket(route, scope_base={"client": ("127.0.0.1", 1234), "headers": [(b"x-real-ip", b"130.0.0.1")]}) as ws:  # type: ignore[call-arg]
-        assert await ws.receive() == "WS event"
+async def test_unknown_ws_route_with_outsider_ip(
+    test_client: TestClientProtocol,
+    insider_local_ip: str,
+    insider_client_ip: str,
+    outsider_local_ip: str,
+    outsider_client_ip: str,
+) -> None:
+    route = "/unknown"
 
-    async with test_client.websocket(route, scope_base={"client": ("128.0.0.1", 1234), "headers": [(b"x-real-ip", b"131.0.0.1")]}) as ws:  # type: ignore[call-arg]
-        assert await ws.receive() == "WS event"
+    with pytest.raises(WebsocketDisconnectError) as ctx_disconnect:
+        scope_base = {
+            "client": (outsider_local_ip, 1234),
+            "headers": [(b"x-real-ip", insider_client_ip.encode())],
+        }
+        async with test_client.websocket(route, scope_base=scope_base) as ws:  # type: ignore[call-arg]
+            await ws.receive()
+    assert ctx_disconnect.value.args == (403,)
 
+    with pytest.raises(WebsocketDisconnectError) as ctx_disconnect:
+        scope_base = {
+            "client": (insider_local_ip, 1234),
+            "headers": [(b"x-real-ip", outsider_client_ip.encode())],
+        }
+        async with test_client.websocket(route, scope_base=scope_base) as ws:  # type: ignore[call-arg]
+            await ws.receive()
+    assert ctx_disconnect.value.args == (403,)
+
+
+@pytest.mark.trio
+async def test_websocket_with_insider_ip(
+    test_client: TestClientProtocol,
+    insider_local_ip: str,
+    insider_client_ip: str,
+) -> None:
+    route = "/ws"
+
+    scope_base = {
+        "client": (insider_local_ip, 1234),
+        "headers": [(b"x-real-ip", insider_client_ip.encode())],
+    }
+    async with test_client.websocket(route, scope_base=scope_base) as ws:  # type: ignore[call-arg]
+        assert await ws.receive() == "WS event"
+        await ws.send("something")
+        assert await ws.receive() == "WS event 2"
+
+
+@pytest.mark.trio
+async def test_websocket_with_outsider_ip(
+    test_client: TestClientProtocol,
+    insider_local_ip: str,
+    insider_client_ip: str,
+    outsider_local_ip: str,
+    outsider_client_ip: str,
+) -> None:
+    route = "/ws"
     with pytest.raises(WebsocketDisconnectError) as ctx:
-        async with test_client.websocket(route, scope_base={"client": ("129.0.0.1", 1234), "headers": [(b"x-real-ip", b"130.0.0.1")]}) as ws:  # type: ignore[call-arg]
+        scope_base = {
+            "client": (outsider_local_ip, 1234),
+            "headers": [(b"x-real-ip", insider_client_ip.encode())],
+        }
+        async with test_client.websocket(route, scope_base=scope_base) as ws:  # type: ignore[call-arg]
+            await ws.receive()
+            await ws.send("something")
             await ws.receive()
     assert ctx.value.args == (403,)
 
     with pytest.raises(WebsocketDisconnectError) as ctx:
-        async with test_client.websocket(route, scope_base={"client": ("127.0.0.1", 1234), "headers": [(b"x-real-ip", b"132.0.0.1")]}) as ws:  # type: ignore[call-arg]
+        scope_base = {
+            "client": (insider_local_ip, 1234),
+            "headers": [(b"x-real-ip", outsider_client_ip.encode())],
+        }
+        async with test_client.websocket(route, scope_base=scope_base) as ws:  # type: ignore[call-arg]
+            await ws.receive()
+            await ws.send("something")
             await ws.receive()
     assert ctx.value.args == (403,)
