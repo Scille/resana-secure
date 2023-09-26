@@ -310,7 +310,7 @@ def backend_errors_to_api_exceptions() -> Iterator[None]:
         raise APIException(400, {"error": "no_shamir_recovery_setup"})
     except BackendConnectionError as exc:
         # Should mainly catch `BackendProtocolError`
-        raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
+        raise APIException(400, {"error": "unexpected_error", "detail": repr(exc)})
 
     # The order is important here since:
     # - `FSWorkspaceArchivedError` inherits from `FSWorkspaceNoAccess`
@@ -334,7 +334,7 @@ def backend_errors_to_api_exceptions() -> Iterator[None]:
     except FSBackendOfflineError:
         raise APIException(503, {"error": "offline"})
     except FSError as exc:
-        raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
+        raise APIException(400, {"error": "unexpected_error", "detail": repr(exc)})
 
     except InviteNotFoundError:
         raise APIException(404, {"error": "unknown_token"})
@@ -343,7 +343,7 @@ def backend_errors_to_api_exceptions() -> Iterator[None]:
     except InviteAlreadyUsedError:
         raise APIException(400, {"error": "invitation_already_used"})
     except InviteError as exc:
-        raise APIException(400, {"error": "unexpected_error", "detail": str(exc)})
+        raise APIException(400, {"error": "unexpected_error", "detail": repr(exc)})
 
     except LongTermCtxNotStarted:
         raise APIException(409, {"error": "invalid_state"})
