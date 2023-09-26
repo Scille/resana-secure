@@ -1,4 +1,5 @@
 from collections import namedtuple
+from typing import Awaitable, Callable
 from unittest.mock import ANY, Mock
 
 import pytest
@@ -11,6 +12,49 @@ from parsec.api.data import EntryID
 from .conftest import LocalDeviceTestbed, RemoteDeviceTestbed
 
 WorkspaceInfo = namedtuple("WorkspaceInfo", "id,name")
+
+
+async def wait_for(condition: Callable[[], Awaitable[None]], timeout=5.0):
+    with trio.fail_after(timeout):
+        while True:
+            try:
+                await condition()
+            except AssertionError:
+                pass
+            else:
+                return
+            await trio.sleep(0)
+
+
+@pytest.fixture
+async def workspace_mounted(authenticated_client: TestClientProtocol, workspace: WorkspaceInfo):
+    async def condition():
+        response = await authenticated_client.get("/workspaces/mountpoints")
+        body = await response.get_json()
+        assert response.status_code == 200, body
+        assert len(body["workspaces"]) == 1
+
+    await wait_for(condition)
+
+
+@pytest.fixture
+async def remanence_monitor_prepared(
+    authenticated_client: TestClientProtocol,
+    workspace: WorkspaceInfo,
+    remanence_monitor_event: trio.Event,
+):
+    remanence_monitor_event.set()
+
+    async def condition():
+        response = await authenticated_client.get(
+            f"/workspaces/{workspace.id}/get_offline_availability_status"
+        )
+        body = await response.get_json()
+        assert response.status_code == 200, body
+        assert body["is_running"]
+        assert body["is_prepared"]
+
+    await wait_for(condition)
 
 
 @pytest.fixture
@@ -26,8 +70,9 @@ async def workspace(authenticated_client: TestClientProtocol):
 async def test_create_and_list_workspaces(authenticated_client: TestClientProtocol):
     # No workspaces
     response = await authenticated_client.get("/workspaces")
-    assert response.status_code == 200
-    assert await response.get_json() == {"workspaces": []}
+    body = await response.get_json()
+    assert response.status_code == 200, body
+    assert body == {"workspaces": []}
 
     # Create some workspaces
     response = await authenticated_client.post("/workspaces", json={"name": "foo"})
@@ -43,7 +88,7 @@ async def test_create_and_list_workspaces(authenticated_client: TestClientProtoc
 
     # Get the updated workspaces list
     response = await authenticated_client.get("/workspaces")
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert await response.get_json() == {
         "workspaces": [
             {"id": bar_id, "name": "bar", "role": "OWNER", "archiving_configuration": "AVAILABLE"},
@@ -54,7 +99,7 @@ async def test_create_and_list_workspaces(authenticated_client: TestClientProtoc
     # Enforce the sync
     response = await authenticated_client.post("/workspaces/sync", json={})
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {}
 
 
@@ -62,13 +107,14 @@ async def test_create_and_list_workspaces(authenticated_client: TestClientProtoc
 async def test_create_with_block_remanence_workspaces(authenticated_client: TestClientProtocol):
     # No workspaces
     response = await authenticated_client.get("/workspaces")
-    assert response.status_code == 200
-    assert await response.get_json() == {"workspaces": []}
+    body = await response.get_json()
+    assert response.status_code == 200, body
+    assert body == {"workspaces": []}
 
     # Create workspace
     response = await authenticated_client.post("/workspaces", json={"name": "Block_Reman"})
-    assert response.status_code == 201
     body = await response.get_json()
+    assert response.status_code == 201, body
     assert body == {"id": ANY}
     foo_id = body["id"]
 
@@ -76,7 +122,7 @@ async def test_create_with_block_remanence_workspaces(authenticated_client: Test
     response = await authenticated_client.get(
         f"/workspaces/{foo_id}/get_offline_availability_status"
     )
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     body = await response.get_json()
     assert body == {
         "is_available_offline": True,
@@ -89,7 +135,7 @@ async def test_create_with_block_remanence_workspaces(authenticated_client: Test
 
     # Get the updated workspaces list
     response = await authenticated_client.get("/workspaces")
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert await response.get_json() == {
         "workspaces": [
             {
@@ -104,7 +150,7 @@ async def test_create_with_block_remanence_workspaces(authenticated_client: Test
     # Enforce the sync
     response = await authenticated_client.post("/workspaces/sync", json={})
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {}
 
 
@@ -116,7 +162,7 @@ async def test_rename_workspace(authenticated_client: TestClientProtocol, worksp
         )
         if i == 0:
             body = await response.get_json()
-            assert response.status_code == 200
+            assert response.status_code == 200, body
             assert body == {}
         else:
             # Renaming while having an out of date old_name should do nothing
@@ -126,7 +172,7 @@ async def test_rename_workspace(authenticated_client: TestClientProtocol, worksp
 
         response = await authenticated_client.get("/workspaces")
         body = await response.get_json()
-        assert response.status_code == 200
+        assert response.status_code == 200, body
         assert body == {
             "workspaces": [
                 {
@@ -153,7 +199,7 @@ async def test_rename_unknown_workspace(authenticated_client: TestClientProtocol
 async def test_get_share_info(authenticated_client: TestClientProtocol, workspace: WorkspaceInfo):
     response = await authenticated_client.get(f"/workspaces/{workspace.id}/share")
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {"roles": {"alice@example.com": "OWNER"}}
 
 
@@ -214,7 +260,7 @@ async def test_self_share_not_allowed(
     )
     body = await response.get_json()
     assert response.status_code == 400
-    assert body == {"error": "unexpected_error", "detail": "Cannot share to oneself"}
+    assert body == {"error": "unexpected_error", "detail": "FSError('Cannot share to oneself')"}
 
 
 @pytest.mark.trio
@@ -227,13 +273,13 @@ async def test_share_ok(
         f"/workspaces/{workspace.id}/share", json={"email": other_user.email, "role": "MANAGER"}
     )
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {}
 
     # Share info should have been updated
     response = await authenticated_client.get(f"/workspaces/{workspace.id}/share")
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {"roles": {"alice@example.com": "OWNER", "bob@example.com": "MANAGER"}}
 
 
@@ -241,13 +287,12 @@ async def test_share_ok(
 async def test_mount_unmount_workspace(
     authenticated_client: TestClientProtocol,
     workspace: WorkspaceInfo,
+    workspace_mounted: None,
 ):
-    await trio.sleep(2)  # 2 seconds to ensure the default mountpoint is present
-
     # Unmount workspace mounted by default
     response = await authenticated_client.post(f"/workspaces/{workspace.id}/unmount")
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {}
 
     # Unmount not mounted workspace
@@ -259,7 +304,7 @@ async def test_mount_unmount_workspace(
     # Mount workspace
     response = await authenticated_client.post(f"/workspaces/{workspace.id}/mount")
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {"id": workspace.id}
 
     # Mount already mounted workspace
@@ -277,7 +322,7 @@ async def test_mount_unmount_workspace(
     # Unmount workspace
     response = await authenticated_client.post(f"/workspaces/{workspace.id}/unmount")
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {}
 
 
@@ -285,14 +330,23 @@ async def test_mount_unmount_workspace(
 async def test_mount_unmount_workspace_timestamped(
     authenticated_client: TestClientProtocol,
     workspace: WorkspaceInfo,
+    workspace_mounted: None,
 ):
-    await trio.sleep(2)  # 2 seconds to ensure the default mountpoint is present
+    # Force sync so the workspace exists before taking the time reference
+    # Otherwise we might get an `FSRemoteManifestNotFound`
+    response = await authenticated_client.post("/workspaces/sync", json={})
+    body = await response.get_json()
+    assert response.status_code == 200, body
+    assert body == {}
+
+    # Take a time reference
     now = DateTime.now().to_rfc3339()
 
     # List mountpoints
     response = await authenticated_client.get("/workspaces/mountpoints")
-    assert response.status_code == 200
-    assert await response.get_json() == {
+    body = await response.get_json()
+    assert response.status_code == 200, body
+    assert body == {
         "snapshots": [],
         "workspaces": [
             {"id": workspace.id, "name": workspace.name, "role": "OWNER"},
@@ -304,12 +358,12 @@ async def test_mount_unmount_workspace_timestamped(
         f"/workspaces/{workspace.id}/mount", json={"timestamp": now}
     )
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {"id": workspace.id, "timestamp": now}
 
     # List mountpoints with timestamped
     response = await authenticated_client.get("/workspaces/mountpoints")
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert await response.get_json() == {
         "snapshots": [
             {"id": workspace.id, "name": workspace.name, "role": "READER", "timestamp": now},
@@ -324,7 +378,7 @@ async def test_mount_unmount_workspace_timestamped(
         f"/workspaces/{workspace.id}/unmount", json={"timestamp": now}
     )
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {}
 
     # Mount with invalid timestamp
@@ -376,25 +430,6 @@ async def test_toggle_offline_availability(
     assert body == {"error": "bad_data", "fields": ["enable"]}
 
 
-@pytest.fixture
-async def remanence_monitor_prepared(
-    authenticated_client: TestClientProtocol,
-    workspace: WorkspaceInfo,
-    remanence_monitor_event: trio.Event,
-):
-    remanence_monitor_event.set()
-    with trio.fail_after(3.0):
-        while True:
-            response = await authenticated_client.get(
-                f"/workspaces/{workspace.id}/get_offline_availability_status"
-            )
-            body = await response.get_json()
-            assert response.status_code == 200
-            if body["is_prepared"]:
-                return
-            await trio.sleep(0)
-
-
 @pytest.mark.trio
 async def test_enable_offline_availability(
     authenticated_client: TestClientProtocol,
@@ -427,7 +462,7 @@ async def test_enable_offline_availability(
         f"/workspaces/{workspace.id}/toggle_offline_availability", json={"enable": True}
     )
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {}
 
     # Try to enable it a second time
@@ -469,7 +504,7 @@ async def test_disable_offline_availability(
         f"/workspaces/{workspace.id}/toggle_offline_availability", json={"enable": True}
     )
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {}
 
     # Fake an error when disabling
@@ -487,7 +522,7 @@ async def test_disable_offline_availability(
         f"/workspaces/{workspace.id}/toggle_offline_availability", json={"enable": False}
     )
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {}
 
 
@@ -511,7 +546,7 @@ async def test_get_offline_availability_status(
         f"/workspaces/{workspace.id}/get_offline_availability_status"
     )
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {
         "is_running": True,
         "is_prepared": True,
@@ -526,14 +561,14 @@ async def test_get_offline_availability_status(
         f"/workspaces/{workspace.id}/toggle_offline_availability", json={"enable": True}
     )
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {}
 
     response = await authenticated_client.get(
         f"/workspaces/{workspace.id}/get_offline_availability_status"
     )
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {
         "is_running": True,
         "is_prepared": True,
@@ -548,14 +583,14 @@ async def test_get_offline_availability_status(
         f"/workspaces/{workspace.id}/toggle_offline_availability", json={"enable": False}
     )
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {}
 
     response = await authenticated_client.get(
         f"/workspaces/{workspace.id}/get_offline_availability_status"
     )
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {
         "is_running": True,
         "is_prepared": True,
@@ -574,7 +609,7 @@ async def test_workspace_archiving(
     # Default archiving configuration
     response = await authenticated_client.get(f"/workspaces/{workspace.id}/archiving")
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {
         "configuration": "AVAILABLE",
         "configured_by": None,
@@ -593,7 +628,7 @@ async def test_workspace_archiving(
     # Check the archiving status
     response = await authenticated_client.get(f"/workspaces/{workspace.id}/archiving")
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {
         "configuration": "ARCHIVED",
         "configured_by": "alice@example.com",
@@ -606,7 +641,7 @@ async def test_workspace_archiving(
     # Check the workspace list
     response = await authenticated_client.get("/workspaces")
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {
         "workspaces": [
             {"id": ANY, "name": "wksp1", "role": "OWNER", "archiving_configuration": "ARCHIVED"}
@@ -624,7 +659,7 @@ async def test_workspace_archiving(
     # Check the archiving status
     response = await authenticated_client.get(f"/workspaces/{workspace.id}/archiving")
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {
         "configuration": "AVAILABLE",
         "configured_by": "alice@example.com",
@@ -637,7 +672,7 @@ async def test_workspace_archiving(
     # Check the workspace list
     response = await authenticated_client.get("/workspaces")
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {
         "workspaces": [
             {"id": ANY, "name": "wksp1", "role": "OWNER", "archiving_configuration": "AVAILABLE"}
@@ -656,7 +691,7 @@ async def test_workspace_archiving(
     # Check the archiving status
     response = await authenticated_client.get(f"/workspaces/{workspace.id}/archiving")
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {
         "configuration": "DELETION_PLANNED",
         "configured_by": "alice@example.com",
@@ -669,7 +704,7 @@ async def test_workspace_archiving(
     # Check the workspace list
     response = await authenticated_client.get("/workspaces")
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {
         "workspaces": [
             {
@@ -710,7 +745,7 @@ async def test_delete_workspace(
     # Check the workspace list
     response = await authenticated_client.get("/workspaces")
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {"workspaces": []}
 
 
@@ -796,15 +831,21 @@ async def test_workspace_archiving_not_allowed(
         f"/workspaces/{workspace.id}/share", json={"email": bob_user.email, "role": "MANAGER"}
     )
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {}
 
-    await trio.sleep(1)
+    async def condition():
+        response = await bob_client.get("/workspaces")
+        body = await response.get_json()
+        assert response.status_code == 200, body
+        assert len(body["workspaces"]) == 1
+
+    await wait_for(condition)
 
     # Check bob's workspace list
     response = await bob_client.get("/workspaces")
     body = await response.get_json()
-    assert response.status_code == 200
+    assert response.status_code == 200, body
     assert body == {
         "workspaces": [
             {"archiving_configuration": "AVAILABLE", "id": ANY, "name": "wksp1", "role": "MANAGER"}

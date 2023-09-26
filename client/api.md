@@ -23,6 +23,7 @@ Voici la liste des erreurs par ordre alphabétique:
 - `bad_data` (HTTP 400)
 - `bad_greeter_sas` (HTTP 400)
 - `bad_key` (HTTP 400)
+- `bad_timestamp_configuration` (HTTP 400)
 - `cannot_delete_root_folder` (HTTP 400)
 - `cannot_move_root_folder` (HTTP 400)
 - `cannot_use_both_authentication_modes` (HTTP 400)
@@ -35,6 +36,7 @@ Voici la liste des erreurs par ordre alphabétique:
 - `email_not_in_recipients` (HTTP 400)
 - `failed_to_disable_offline_availability` (HTTP 400)
 - `failed_to_enable_offline_availability` (HTTP 400)
+- `file_exists` (HTTP 400)
 - `forbidden_workspace` (HTTP 403)
 - `invalid_configuration` (HTTP 400)
 - `invalid_passphrase` (HTTP 400)
@@ -1077,6 +1079,7 @@ HTTP 200
 - HTTP 404: `unknown_workspace`
 - HTTP 410: `deleted_workspace`
 - HTTP 403: `forbidden_workspace`
+- HTTP 400: `bad_timestamp_configuration`
 - HTTP 401: `not_connected_to_rie`
 
 
@@ -1339,6 +1342,7 @@ HTTP 201
 - HTTP 403: `forbidden_workspace`
 - HTTP 403: `archived_workspace`
 - HTTP 404: `unknown_parent`
+- HTTP 400: `file_exists`
 - HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 ### `POST /workspaces/<id>/folders/rename`
@@ -1501,6 +1505,7 @@ HTTP 201
 - HTTP 410: `deleted_workspace`
 - HTTP 403: `forbidden_workspace`
 - HTTP 404: `unknown_path`
+- HTTP 400: `file_exists`
 - HTTP 503: `offline`, le client Parsec n'a pas pu joindre le serveur Parsec (e.g. le poste client est hors-ligne et le chemin à accéder n'est pas dans le cache local)
 
 

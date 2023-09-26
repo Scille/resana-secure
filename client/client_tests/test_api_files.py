@@ -577,7 +577,7 @@ async def test_bad_workspace(testbed: FilesTestBed, bad_wid: str):
 async def test_create_folder_already_exists(testbed: FilesTestBed):
     await testbed.create_folder("foo", parent=testbed.root_entry_id)
 
-    expected_body = {"error": "unexpected_error", "detail": "File exists: /foo"}
+    expected_body = {"error": "file_exists"}
     assert (
         await testbed.create_folder("foo", parent=testbed.root_entry_id, expected_status_code=400)
         == expected_body
