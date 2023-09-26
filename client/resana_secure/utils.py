@@ -333,6 +333,8 @@ def backend_errors_to_api_exceptions() -> Iterator[None]:
         raise APIException(403, {"error": "sharing_not_allowed"})
     except FSBackendOfflineError:
         raise APIException(503, {"error": "offline"})
+    except FileExistsError:
+        raise APIException(400, {"error": "file_exists"})
     except FSError as exc:
         raise APIException(400, {"error": "unexpected_error", "detail": repr(exc)})
 

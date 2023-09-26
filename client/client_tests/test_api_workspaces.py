@@ -260,7 +260,7 @@ async def test_self_share_not_allowed(
     )
     body = await response.get_json()
     assert response.status_code == 400
-    assert body == {"error": "unexpected_error", "detail": "Cannot share to oneself"}
+    assert body == {"error": "unexpected_error", "detail": "FSError('Cannot share to oneself')"}
 
 
 @pytest.mark.trio
