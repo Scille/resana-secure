@@ -1,4 +1,5 @@
 from collections import namedtuple
+from typing import Awaitable, Callable
 from unittest.mock import ANY, Mock
 
 import pytest
@@ -11,6 +12,49 @@ from parsec.api.data import EntryID
 from .conftest import LocalDeviceTestbed, RemoteDeviceTestbed
 
 WorkspaceInfo = namedtuple("WorkspaceInfo", "id,name")
+
+
+async def wait_for(condition: Callable[[], Awaitable[None]], timeout=5.0):
+    with trio.fail_after(timeout):
+        while True:
+            try:
+                await condition()
+            except AssertionError:
+                pass
+            else:
+                return
+            await trio.sleep(0)
+
+
+@pytest.fixture
+async def workspace_mounted(authenticated_client: TestClientProtocol, workspace: WorkspaceInfo):
+    async def condition():
+        response = await authenticated_client.get("/workspaces/mountpoints")
+        assert response.status_code == 200
+        data = await response.get_json()
+        assert len(data["workspaces"]) == 1
+
+    await wait_for(condition)
+
+
+@pytest.fixture
+async def remanence_monitor_prepared(
+    authenticated_client: TestClientProtocol,
+    workspace: WorkspaceInfo,
+    remanence_monitor_event: trio.Event,
+):
+    remanence_monitor_event.set()
+
+    async def condition():
+        response = await authenticated_client.get(
+            f"/workspaces/{workspace.id}/get_offline_availability_status"
+        )
+        body = await response.get_json()
+        assert response.status_code == 200
+        assert body["is_running"]
+        assert body["is_prepared"]
+
+    await wait_for(condition)
 
 
 @pytest.fixture
@@ -241,9 +285,8 @@ async def test_share_ok(
 async def test_mount_unmount_workspace(
     authenticated_client: TestClientProtocol,
     workspace: WorkspaceInfo,
+    workspace_mounted: None,
 ):
-    await trio.sleep(2)  # 2 seconds to ensure the default mountpoint is present
-
     # Unmount workspace mounted by default
     response = await authenticated_client.post(f"/workspaces/{workspace.id}/unmount")
     body = await response.get_json()
@@ -285,8 +328,8 @@ async def test_mount_unmount_workspace(
 async def test_mount_unmount_workspace_timestamped(
     authenticated_client: TestClientProtocol,
     workspace: WorkspaceInfo,
+    workspace_mounted: None,
 ):
-    await trio.sleep(2)  # 2 seconds to ensure the default mountpoint is present
     now = DateTime.now().to_rfc3339()
 
     # List mountpoints
@@ -298,6 +341,13 @@ async def test_mount_unmount_workspace_timestamped(
             {"id": workspace.id, "name": workspace.name, "role": "OWNER"},
         ],
     }
+
+    # Force sync before accessing timestamped workspace
+    # Otherwise we might get an `FSRemoteManifestNotFound`
+    response = await authenticated_client.post("/workspaces/sync", json={})
+    body = await response.get_json()
+    assert response.status_code == 200, body
+    assert body == {}
 
     # Mount timestamped
     response = await authenticated_client.post(
@@ -374,25 +424,6 @@ async def test_toggle_offline_availability(
     body = await response.get_json()
     assert response.status_code == 400
     assert body == {"error": "bad_data", "fields": ["enable"]}
-
-
-@pytest.fixture
-async def remanence_monitor_prepared(
-    authenticated_client: TestClientProtocol,
-    workspace: WorkspaceInfo,
-    remanence_monitor_event: trio.Event,
-):
-    remanence_monitor_event.set()
-    with trio.fail_after(3.0):
-        while True:
-            response = await authenticated_client.get(
-                f"/workspaces/{workspace.id}/get_offline_availability_status"
-            )
-            body = await response.get_json()
-            assert response.status_code == 200
-            if body["is_prepared"]:
-                return
-            await trio.sleep(0)
 
 
 @pytest.mark.trio
@@ -799,7 +830,13 @@ async def test_workspace_archiving_not_allowed(
     assert response.status_code == 200
     assert body == {}
 
-    await trio.sleep(1)
+    async def condition():
+        response = await bob_client.get("/workspaces")
+        body = await response.get_json()
+        assert response.status_code == 200
+        assert len(body["workspaces"]) == 1
+
+    await wait_for(condition)
 
     # Check bob's workspace list
     response = await bob_client.get("/workspaces")
