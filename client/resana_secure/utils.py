@@ -47,7 +47,12 @@ from parsec.core.invite import (
     InvitePeerResetError,
 )
 from parsec.core.logged_core import LoggedCore
-from parsec.core.mountpoint import MountpointAlreadyMounted, MountpointNotMounted
+from parsec.core.mountpoint.exceptions import (
+    MountpointAlreadyMounted,
+    MountpointConfigurationWorkspaceFSTimestampedError,
+    MountpointError,
+    MountpointNotMounted,
+)
 from parsec.core.types import BackendInvitationAddr, BackendOrganizationAddr
 
 from .app import current_app
@@ -354,6 +359,10 @@ def backend_errors_to_api_exceptions() -> Iterator[None]:
         raise APIException(400, {"error": "mountpoint_already_mounted"})
     except MountpointNotMounted:
         raise APIException(404, {"error": "mountpoint_not_mounted"})
+    except MountpointConfigurationWorkspaceFSTimestampedError:
+        raise APIException(400, {"error": "bad_timestamp_configuration"})
+    except MountpointError as exc:
+        raise APIException(400, {"error": "unexpected_error", "detail": repr(exc)})
 
 
 def get_default_device_label() -> DeviceLabel:

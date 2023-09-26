@@ -332,6 +332,14 @@ async def test_mount_unmount_workspace_timestamped(
     workspace: WorkspaceInfo,
     workspace_mounted: None,
 ):
+    # Force sync so the workspace exists before taking the time reference
+    # Otherwise we might get an `FSRemoteManifestNotFound`
+    response = await authenticated_client.post("/workspaces/sync", json={})
+    body = await response.get_json()
+    assert response.status_code == 200, body
+    assert body == {}
+
+    # Take a time reference
     now = DateTime.now().to_rfc3339()
 
     # List mountpoints
@@ -344,13 +352,6 @@ async def test_mount_unmount_workspace_timestamped(
             {"id": workspace.id, "name": workspace.name, "role": "OWNER"},
         ],
     }
-
-    # Force sync before accessing timestamped workspace
-    # Otherwise we might get an `FSRemoteManifestNotFound`
-    response = await authenticated_client.post("/workspaces/sync", json={})
-    body = await response.get_json()
-    assert response.status_code == 200, body
-    assert body == {}
 
     # Mount timestamped
     response = await authenticated_client.post(

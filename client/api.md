@@ -23,6 +23,7 @@ Voici la liste des erreurs par ordre alphabétique:
 - `bad_data` (HTTP 400)
 - `bad_greeter_sas` (HTTP 400)
 - `bad_key` (HTTP 400)
+- `bad_timestamp_configuration` (HTTP 400)
 - `cannot_delete_root_folder` (HTTP 400)
 - `cannot_move_root_folder` (HTTP 400)
 - `cannot_use_both_authentication_modes` (HTTP 400)
@@ -1078,6 +1079,7 @@ HTTP 200
 - HTTP 404: `unknown_workspace`
 - HTTP 410: `deleted_workspace`
 - HTTP 403: `forbidden_workspace`
+- HTTP 400: `bad_timestamp_configuration`
 - HTTP 401: `not_connected_to_rie`
 
 
