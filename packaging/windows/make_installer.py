@@ -38,9 +38,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--sign-mode", choices=("all", "exe", "none"), default="none", type=lambda x: x.lower()
     )
+    parser.add_argument("--conformity", action="store_true")
     args = parser.parse_args()
 
     assert which("makensis"), "makensis command not in PATH !"
+    BUILD_DIR_NAME = "build" if not args.conformity else "build-conformity"
+    BUILD_DIR = Path(BUILD_DIR_NAME).resolve()
 
     # Given `manifest.ini` is often generated on the CI, then consumed on a dev machine
     # to sign the release, we must provide paths as relative (given there is no guarantee
@@ -95,7 +98,10 @@ if __name__ == "__main__":
 
     if args.sign_mode == "none":
         print("### Building installer ###")
-        run(f"makensis { BASE_DIR / 'installer.nsi' }")
+        if args.conformity:
+            run(f"makensis { BASE_DIR / 'installer_with_conformity.nsi' }")
+        else:
+            run(f"makensis { BASE_DIR / 'installer_without_conformity.nsi' }")
         print("/!\\ Installer generated with no signature /!\\")
         (installer,) = BUILD_DIR.glob("resana_secure-*-setup.exe")
         print(f"{installer} is ready")

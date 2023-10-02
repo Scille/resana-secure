@@ -93,7 +93,7 @@ def main(program_source: Path, conformity: bool = False):
         else "launch_script_with_conformity.py"
     )
     (Path(__file__).parent / "launch_script.py").unlink(missing_ok=True)
-    (Path(__file__).parent / script).rename("launch_script.py")
+    shutil.copy(Path(__file__).parent / script, "launch_script.py")
 
     pyinstaller_build = BUILD_DIR / "pyinstaller_build"
     pyinstaller_dist = BUILD_DIR / "pyinstaller_dist"
@@ -116,12 +116,12 @@ def main(program_source: Path, conformity: bool = False):
     # Path must be provided relative, otherwise we cannot generate this on the CI and
     # run the `make_installer.py` on dev machine (required to have the installer&binary signed)
     (BUILD_DIR / "manifest.ini").write_text(
-        f'target = "{target_dir.relative_to(BUILD_DIR)}"\n'
+        f'target = "{target_dir}"\n'
         f'program_version = "{program_version}"\n'
         f'python_version = "{PYTHON_VERSION}"\n'
         f'platform = "{get_archslug()}"\n'
         f'winfsp_installer_name = "{winfsp_installer.name}"\n'
-        f'winfsp_installer_path = "{winfsp_installer.relative_to(BUILD_DIR)}"\n'
+        f'winfsp_installer_path = "{winfsp_installer}"\n'
     )
 
     # Create the install and uninstall file list for NSIS installer
