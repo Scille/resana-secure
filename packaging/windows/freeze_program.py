@@ -116,12 +116,12 @@ def main(program_source: Path, conformity: bool = False):
     # Path must be provided relative, otherwise we cannot generate this on the CI and
     # run the `make_installer.py` on dev machine (required to have the installer&binary signed)
     (BUILD_DIR / "manifest.ini").write_text(
-        f'target = "{target_dir}"\n'
+        f'target = "{target_dir.relative_to(BUILD_DIR)}"\n'
         f'program_version = "{program_version}"\n'
         f'python_version = "{PYTHON_VERSION}"\n'
         f'platform = "{get_archslug()}"\n'
         f'winfsp_installer_name = "{winfsp_installer.name}"\n'
-        f'winfsp_installer_path = "{winfsp_installer}"\n'
+        f'winfsp_installer_path = "{winfsp_installer.relative_to(BUILD_DIR)}"\n'
     )
 
     # Create the install and uninstall file list for NSIS installer
