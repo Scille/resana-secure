@@ -46,7 +46,6 @@ def run_cmd_with_log_scan(args: argparse.Namespace, cmd: List[str]) -> subproces
                 # Command has finished
                 return
 
-            print(line)
             # Filter unwanted error messages
             if any((msg in line for msg in IGNORE_MESSAGES)):
                 continue
