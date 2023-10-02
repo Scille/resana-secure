@@ -29,7 +29,7 @@ pytest = "^7.0"
 black = "^23.7.0"
 pytest-trio = "^0.8"
 pytest-xdist = "^3.2.1"
-httpx = "0.24.1"
+httpx = "0.25.0"
 PyQt5_stubs = "^5.15"
 mypy = "^0.991"
 
