@@ -19,6 +19,7 @@ log_file = config_dir / "resana_secure.log"
 
 # Config file is just a convoluted way of passing params to sys.argv
 args = sys.argv[1:]
+args.append("--check-conformity")
 config_file_path = config_dir / "config.json"
 try:
     conf = json.loads(config_file_path.read_text())
@@ -27,7 +28,6 @@ try:
             if isinstance(key, str) and isinstance(value, str):
                 args.append(f"--{key.replace('_', '-')}")
                 args.append(value)
-    args.append("--check-conformity")
 except FileNotFoundError:
     pass
 except (OSError, json.JSONDecodeError) as exc:
