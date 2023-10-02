@@ -16,7 +16,7 @@ NOTIFICATION_BASE_MSG = f"Application `{os.environ.get('APP', '<unknown app>')}`
 
 # Do not notify on this error messages
 IGNORE_MESSAGES = [
-    "Database connection lost (PostgreSQL notification query has been lost), retrying in 1.0 seconds",
+    b"Database connection lost (PostgreSQL notification query has been lost), retrying in 1.0 seconds",
 ]
 
 
