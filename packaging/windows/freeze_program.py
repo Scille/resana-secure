@@ -14,9 +14,6 @@ BUILD_DIR = Path("build").resolve()
 
 WINFSP_URL = "https://github.com/billziss-gh/winfsp/releases/download/v1.8/winfsp-1.8.20304.msi"
 WINFSP_HASH = "8d6f2c519f3f064881b576452fbbd35fe7ad96445aa15d9adcea1e76878b4f00"
-TOOLS_VENV_DIR = BUILD_DIR / "tools_venv"
-PYINSTALLER_VENV_DIR = BUILD_DIR / "pyinstaller_venv"
-WHEELS_DIR = BUILD_DIR / "wheels"
 
 PYTHON_VERSION = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 PYTHON_EXECUTABLE = sys.executable
@@ -35,7 +32,14 @@ def run(cmd, **kwargs):
     return subprocess.check_call(cmd, shell=True, **kwargs)
 
 
-def main(program_source: Path):
+def main(program_source: Path, conformity: bool = False):
+    BUILD_DIR_NAME = "build" if not conformity else "build-conformity"
+
+    BUILD_DIR = Path(BUILD_DIR_NAME).resolve()
+    TOOLS_VENV_DIR = BUILD_DIR / "tools_venv"
+    PYINSTALLER_VENV_DIR = BUILD_DIR / "pyinstaller_venv"
+    BUILD_DIR / "wheels"
+
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
 
     print(f"### Detected Python version {PYTHON_VERSION} ###")
@@ -81,6 +85,15 @@ def main(program_source: Path):
             "POETRY_VIRTUALENVS_PATH": str(PYINSTALLER_VENV_DIR.absolute()),
         },
     )
+
+    # Move launch_script depending on the option
+    script = (
+        "launch_script_without_conformity.py"
+        if not conformity
+        else "launch_script_with_conformity.py"
+    )
+    (Path(__file__).parent / "launch_script.py").unlink(missing_ok=True)
+    shutil.copy(Path(__file__).parent / script, "launch_script.py")
 
     pyinstaller_build = BUILD_DIR / "pyinstaller_build"
     pyinstaller_dist = BUILD_DIR / "pyinstaller_dist"
@@ -158,7 +171,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Freeze Resana Secure")
     parser.add_argument("program_source", type=Path)
     parser.add_argument("--disable-check-python", action="store_true")
+    parser.add_argument("--conformity", action="store_true")
     args = parser.parse_args()
     if not args.disable_check_python:
         check_python_version()
-    main(args.program_source)
+    main(args.program_source, args.conformity)

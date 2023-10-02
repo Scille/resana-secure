@@ -18,6 +18,7 @@ class _CoreConfig(CoreConfig):
 class ResanaConfig:
     core_config: _CoreConfig
     rie_server_addrs: List[Tuple[str, int | None]] = []
+    check_conformity: bool = False
 
     def evolve(self, **kwargs: Any) -> ResanaConfig:
         return attr.evolve(self, **kwargs)

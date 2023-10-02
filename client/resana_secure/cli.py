@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import platform
 import sys
 from functools import partial
 from pathlib import Path
@@ -23,6 +24,7 @@ from parsec.core.config import BackendAddr
 from ._version import __version__
 from .app import serve_app
 from .config import ResanaConfig, _CoreConfig
+from .tgb import TGB, TGBException
 
 logger = structlog.get_logger()
 
@@ -140,7 +142,15 @@ def run_cli(
         "--log-level", choices=("DEBUG", "INFO", "WARNING", "ERROR"), default=default_log_level
     )
     parser.add_argument("--log-file", type=Path, default=default_log_file)
+    parser.add_argument(
+        "--check-conformity",
+        action="store_true",
+        help="Use TheGreenBow conformity DLL. Only available on Windows.",
+    )
     namespace = parser.parse_args(args=args)
+
+    if platform.system() != "Windows" and namespace.check_conformity:
+        parser.exit(1, message="`--check-conformity` is only available on Windows")
 
     rie_server_addrs = []
     for host in namespace.rie_server_addr:
@@ -181,6 +191,7 @@ def run_cli(
             ),
         ),
         rie_server_addrs=rie_server_addrs,
+        check_conformity=namespace.check_conformity,
     )
 
     _setup_logging(namespace.log_level, namespace.log_file)
@@ -202,12 +213,23 @@ def run_cli(
 
         manager.get_mountpoint_runner = _get_mountpoint_runner_mocked
 
+    tgb = None
+    if config.check_conformity:
+        # For some reason, trying to perform a LoadLibrary later fails (async context?).
+        # So we're doing this early and forwarding the result.
+        tgb = TGB()
+        try:
+            tgb.load_dll()
+        except TGBException:
+            logger.exception("Failed to load conformity DLL")
+
     quart_app_context = partial(
         serve_app,
         host=namespace.host,
         port=namespace.port,
         config=config,
         client_allowed_origins=namespace.client_origin,
+        tgb=tgb,
     )
 
     if namespace.disable_gui:

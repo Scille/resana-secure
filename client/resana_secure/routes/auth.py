@@ -32,6 +32,9 @@ async def do_head(subpath: str) -> tuple[dict[str, Any], int]:
 @rate_limit(2, timedelta(seconds=1))
 @rate_limit(20, timedelta(minutes=1))
 async def do_auth() -> tuple[dict[str, Any], int]:
+    if current_app.tgb and not current_app.tgb.is_compliant():
+        raise APIException(401, {"error": "host machine is not compliant"})
+
     # Either send a non-encrypted Parsec Key using the field `key`
     # or send the encrypted Parsec Key with the field `encrypted_key` and
     # the user password with the field `user_password`.
