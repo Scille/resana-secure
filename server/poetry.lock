@@ -820,14 +820,14 @@ files = [
 
 [[package]]
 name = "parsec-cloud"
-version = "2.16.0rc4"
+version = "2.16.0rc5"
 description = "Secure cloud framework"
 optional = false
 python-versions = ">=3.9.10,<3.10.0"
 files = [
-    {file = "parsec_cloud-2.16.0rc4-cp39-cp39-macosx_11_0_x86_64.whl", hash = "sha256:0292a086a7659afcd543ab3d8aaaf1a70f1c7f2b3e68083fc89d94fb22ed8c94"},
-    {file = "parsec_cloud-2.16.0rc4-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d65f040f973a8719aea8b3a855b21d8e445976e6fb540947a3c5baa92e93f626"},
-    {file = "parsec_cloud-2.16.0rc4-cp39-cp39-win_amd64.whl", hash = "sha256:71ac20afb6fd7bee4776cc922c9679cf1236ba2e297e7bca3ec81dda6b19fd33"},
+    {file = "parsec_cloud-2.16.0rc5-cp39-cp39-macosx_11_0_x86_64.whl", hash = "sha256:50876d6afe1e5973b2251d243b4b9d5cb03e41f2361d18d4c779dbe3d95f98a7"},
+    {file = "parsec_cloud-2.16.0rc5-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:2d62e546c561e1641a824d716a949251a2f93ef622f1ece5b3368d07c09cd319"},
+    {file = "parsec_cloud-2.16.0rc5-cp39-cp39-win_amd64.whl", hash = "sha256:1f1f919fa59671d1e6d0277bd905593ee9cc5d6409da6b648dab1b82e203315e"},
 ]
 
 [package.dependencies]
@@ -1399,4 +1399,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = "~3.9.10"
-content-hash = "ddfad135013157436beb07e7213078775ec3b4ef2e8fe76c2e35f37f5c9a85b3"
+content-hash = "b3ca905762e7ac2a41ee9fad4b03284fd4e3beb1a9d02111b1b17f8f49ec09ec"

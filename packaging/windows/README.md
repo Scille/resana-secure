@@ -14,6 +14,10 @@ Run the `freeze_program.py` Python script with the path to the Resana Secure sou
 ```shell
 python freeze_program.py ../../client
 ```
+or
+```shell
+python freeze_program.py ../../client --conformity
+```
 
 Note the Python version embedded inside the build will be taken from the interpreter
 you run the script with.
