@@ -22,7 +22,7 @@ Make a release branch from `master`:
 ```shell
 git checkout master
 git pull
-git checkout -b MAJOR.MINOR
+git checkout -b releases/MAJOR.MINOR.PATCH
 ```
 
 1) Modify version in `resana_secure/_version.py`
