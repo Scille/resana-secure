@@ -157,15 +157,13 @@ class CoresManager:
         user_password: Optional[str] = None,
         encrypted_key: Optional[str] = None,
     ) -> str:
-        # We have a user password, we're trying to get the device key from it
+        # We have a user password, we're trying to log in while offline, so get the device key from it
         if user_password:
-            # No encrypted key, meaning we're trying to log in while offline
+            # Load the key from the file
+            encrypted_key = load_device_encrypted_key(device)
+            # No key, probably because we never logged while online
             if not encrypted_key:
-                # Load the key from the file
-                encrypted_key = load_device_encrypted_key(device)
-                # No key, probably because we never logged while online
-                if not encrypted_key:
-                    raise CoreDeviceEncryptedKeyNotFoundError
+                raise CoreDeviceEncryptedKeyNotFoundError
             try:
                 # Decrypt the parsec password using the user password
                 key = decrypt_parsec_key(user_password, encrypted_key)
@@ -177,8 +175,8 @@ class CoresManager:
             available_device=device,
             password=key or "",
         )
-        # Everything seems alright, if we have a user_password and an encrypted_key, let's save the encrypted_key so it stays up to date
-        if user_password and encrypted_key:
+        # Save the encrypted_key so it stays up to date if presents
+        if not user_password and encrypted_key:
             save_device_encrypted_key(device, encrypted_key=encrypted_key)
 
         # The lock is needed here to avoid concurrent logins with the same email

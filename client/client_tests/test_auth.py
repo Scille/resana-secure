@@ -560,13 +560,13 @@ async def test_encrypted_key_auth(
     with pytest.raises(CoreDeviceEncryptedKeyNotFoundError):
         await cores_manager.login(email=EMAIL, organization_id=ORG_ID, user_password=USER_PASSWORD)
 
-    # Auth using encrypted_key and user_password should work
+    # Auth using encrypted_key should work
     response = await test_client.post(
         "/auth",
         json={
             "email": EMAIL,
+            "key": PARSEC_KEY,
             "encrypted_key": ENCRYPTED_KEY,
-            "user_password": USER_PASSWORD,
             "organization": ORG_ID.str if use_org_id else None,
         },
     )
@@ -627,4 +627,4 @@ async def test_auth_with_conformity_check(
                 assert "token" in body
             else:
                 assert response.status_code == 401
-                assert body["error"] == "host machine is not compliant"
+                assert body["error"] == "host_machine_not_compliant"
