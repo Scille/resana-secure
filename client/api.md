@@ -160,26 +160,16 @@ de session permettant d'authentifier les autres requêtes.
 
 Deux différentes options sont disponibles pour l'authentification :
 
-- La première (historique) utilise la clef Parsec :
-
 ```python
 {
     "organization": Optional<string>,
     "email": <string>,
-    "key": <base64>
+    "key": <base64>,
+    "encrypted_key": Optional<base64>
 }
 ```
 
-- La seconde utilise la clef Parsec chiffrée ainsi que le mot de passe utilisateur. Cette méthode d'authentification doit être utilisée au moins une fois avant de pouvoir se connecter en mode hors-ligne.
-
-```python
-{
-    "organization": Optional<string>,
-    "email": <string>,
-    "encrypted_key": <base64>,
-    "user_password": <string>
-}
-```
+`encrypted_key`, clef Parsec chiffrée, doit être utilisée au moins une fois avant de pouvoir se connecter en mode hors-ligne.
 
 `email` correspondant à l'email utilisé lors de l'enrôlement RESANA Secure.
 
@@ -200,8 +190,7 @@ Set-Cookie: session=<token>; HttpOnly; Path=/; SameSite=Strict
 
 - HTTP 404: `device_not_found`, le poste n'a pas été enrôlé pour cet utilisateur (i.e. il ne contient pas de fichier de clés de Device à déchiffrer)
 - HTTP 400: `bad_key`, la clé de déchiffrement est invalide
-- HTTP 400: `cannot_use_both_authentication_modes`, si les deux modes d'authentification sont utilisés simultanément
-- HTTP 401: `host machine is not compliant` le client Resana est configuré pour utiliser la DLL de conformité, mais la DLL de conformité est soit non-présente, soit invalide, soit a déclaré que la machine n'était pas conforme
+- HTTP 401: `host_machine_not_compliant` le client Resana est configuré pour utiliser la DLL de conformité, mais la DLL de conformité est soit non-présente, soit invalide, soit a déclaré que la machine n'était pas conforme
 
 Une fois obtenu, le token d'authentification est
 

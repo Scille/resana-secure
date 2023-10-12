@@ -33,7 +33,7 @@ async def do_head(subpath: str) -> tuple[dict[str, Any], int]:
 @rate_limit(20, timedelta(minutes=1))
 async def do_auth() -> tuple[dict[str, Any], int]:
     if current_app.tgb and not current_app.tgb.is_compliant():
-        raise APIException(401, {"error": "host machine is not compliant"})
+        raise APIException(401, {"error": "host_machine_not_compliant"})
 
     # Either send a non-encrypted Parsec Key using the field `key`
     # or send the encrypted Parsec Key with the field `encrypted_key` and
@@ -41,38 +41,26 @@ async def do_auth() -> tuple[dict[str, Any], int]:
     data = await get_data()
     parser = Parser()
     parser.add_argument("email", type=str, required=True)
-    parser.add_argument("key", type=str)
+    parser.add_argument("key", type=str, required=True)
     parser.add_argument("encrypted_key", type=str)
-    parser.add_argument("user_password", type=str)
     parser.add_argument("organization", converter=OrganizationID)
     args, bad_fields = parser.parse_args(data)
     if bad_fields:
         raise APIException.from_bad_fields(bad_fields)
 
-    if (
-        args["key"] is not None
-        and args["encrypted_key"] is not None
-        and args["user_password"] is not None
-    ):
-        raise APIException(400, {"error": "cannot_use_both_authentication_modes"})
-    if args["key"] is None:
-        if not (args["encrypted_key"] and args["user_password"]):
-            raise APIException.from_bad_fields(
-                ["encrypted_key"] if not args["encrypted_key"] else ["user_password"]
-            )
-        else:
-            try:
-                # Check if it's base64 but don't store the result
-                base64.b64decode(args["encrypted_key"])
-            except (ValueError, TypeError) as exc:
-                raise APIException.from_bad_fields(["encrypted_key"]) from exc
+    if args["encrypted_key"] is not None:
+        try:
+            # Check if it's base64 but don't store the result
+            base64.b64decode(args["encrypted_key"])
+        except (ValueError, TypeError) as exc:
+            raise APIException.from_bad_fields(["encrypted_key"]) from exc
 
     cores_manager = cast(CoresManager, current_app.cores_manager)
     try:
         auth_token = await cores_manager.login(
             email=args["email"],
             key=args["key"],
-            user_password=args["user_password"],
+            user_password=None,
             encrypted_key=args["encrypted_key"],
             organization_id=args["organization"],
         )
