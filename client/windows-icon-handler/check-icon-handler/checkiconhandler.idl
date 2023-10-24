@@ -27,7 +27,7 @@ library windowsiconhandlerLib
 {
     importlib("stdole2.tlb");
     [
-        uuid(5449bc90-310b-40a8-9abf-c5cfcec7f431)
+        uuid(5449BC90-310B-40A8-9ABF-C5CFCEC7F431)
     ]
     coclass CheckIconHandler
     {

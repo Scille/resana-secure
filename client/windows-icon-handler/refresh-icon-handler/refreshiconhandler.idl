@@ -25,7 +25,7 @@ library refreshiconhandlerLib
 {
 	importlib("stdole2.tlb");
 	[
-		uuid(41e71dd9-368d-46b2-bb9d-4359599bbbc4)
+		uuid(41E71DD9-368D-46B2-BB9D-4359599BBBC4)
 	]
 	coclass RefreshIconHandler
 	{

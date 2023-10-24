@@ -2,7 +2,7 @@ HKCR
 {
 	NoRemove CLSID
 	{
-		ForceRemove {41e71dd9-368d-46b2-bb9d-4359599bbbc4} = s 'RefreshIconHandler class'
+		ForceRemove {41E71DD9-368D-46B2-BB9D-4359599BBBC4} = s 'RefreshIconHandler class'
 		{
 			ForceRemove Programmable
 			InprocServer32 = s '%MODULE%'
