@@ -52,85 +52,8 @@ function navTo(className) {
   openNav();
 }
 
-
-// BOOTSTRAP
-
-const defaultEmail = "gordon.freeman@blackmesa.nm";
-const inviteeEmail = "eli.vance@blackmesa.nm";
-const defaultPassword = "P@ssw0rd";
-
-function boostrap() {
-  const organizationUrl = document.getElementById("bootstrap-url").value;
-  const sequesterVerifyKey = document.getElementById("sequester-verify-key").value;
-  const http = new XMLHttpRequest();
-  http.open("POST", "http://localhost:5775/organization/bootstrap");
-  http.setRequestHeader("Content-type", "application/json");
-  http.send(JSON.stringify({
-    organization_url: organizationUrl,
-    email: defaultEmail,
-    key: defaultPassword,
-    sequester_verify_key: sequesterVerifyKey
-  }));
-  http.onreadystatechange = (e) => {
-    document.getElementById("bootstrap-result").innerHTML = getHttpResult(http);
-  }
-}
-
 // AUTH
 let tokenSession = null;
-let authMethod = "password";
-
-function switchAuth() {
-  authMethod = authMethod == "key" ? "password" : "key";
-  const keyAuth = document.getElementById("key-auth");
-  const passwordAuth = document.getElementById("password-auth");
-  if (authMethod === "key") {
-    keyAuth.style.display = "block";
-    passwordAuth.style.display = "none";
-  } else {
-    keyAuth.style.display = "none";
-    passwordAuth.style.display = "block";
-  }
-}
-
-function login() {
-  const keyEmail = document.getElementById("key-email").value;
-  const key = document.getElementById("key").value;
-  const keyOrganization = document.getElementById("key-organization-id").value;
-  const PasswordEmail = document.getElementById("password-email").value;
-  const password = document.getElementById("password").value;
-  const encryptedKey = document.getElementById("encrypted-key").value;
-  const PasswordOrganization = document.getElementById("password-organization-id").value;
-  const http = new XMLHttpRequest();
-  http.open("POST", "http://localhost:5775/auth");
-  http.setRequestHeader("Content-type", "application/json");
-  if (authMethod === "key") {
-    http.send(JSON.stringify({
-      email: keyEmail,
-      key,
-      organization: keyOrganization
-    }));
-  } else {
-    http.send(JSON.stringify({
-      email: PasswordEmail,
-      user_password: password,
-      encrypted_key: encryptedKey,
-      organization: PasswordOrganization
-    }));
-  }
-  http.onreadystatechange = (e) => {
-    document.getElementById("auth-result").innerHTML = getHttpResult(http);
-    if (http.status === 200) {
-      if (authMethod === "key") {
-        document.getElementById("auth-info").innerHTML = `${keyEmail} | ${keyOrganization}`;
-      } else {
-        document.getElementById("auth-info").innerHTML = `${PasswordEmail} | ${PasswordOrganization}`;
-      }
-      tokenSession = JSON.parse(http.responseText).token;
-      listWorkspaces();
-    }
-  }
-}
 
 const saltDerive2 = new Uint8Array("122,205,180,252,110,57,134,101,147,170,189,150,191,228,84,206".split(","));
 
@@ -621,6 +544,8 @@ function deleteFiles() {
 }
 
 // INVITATION
+const inviteeEmail = "eli.vance@blackmesa.nm";
+
 function updateInvitationsSelect(usersInvitations, deviceInvitation) {
   const elms = document.getElementsByClassName("invitations-select");
   for (const elm of elms) {
@@ -962,97 +887,6 @@ function shamirGetOthers() {
 }
 
 
-// LOGOUT
-function deconnect(force = false) {
-  const http = new XMLHttpRequest();
-  http.open("DELETE", "http://localhost:5775/auth");
-  http.setRequestHeader("Authorization", `bearer ${tokenSession}`);
-  http.send();
-  http.onreadystatechange = (e) => {
-    document.getElementById("auth-info").innerHTML = "";
-    document.getElementById("logout-result").innerHTML = getHttpResult(http);
-  }
-  openAccount(force);
-}
-
-function deconnectAll(force = false) {
-  const http = new XMLHttpRequest();
-  http.open("DELETE", "http://localhost:5775/auth/all");
-  http.setRequestHeader("Authorization", `bearer ${tokenSession}`);
-  http.send();
-  http.onreadystatechange = (e) => {
-    document.getElementById("auth-info").innerHTML = "";
-    document.getElementById("logout-result").innerHTML = getHttpResult(http);
-  }
-  openAccount(force);
-}
-
-const keyAuthStorageKey = "resana-secure-release-tests-key-auth";
-const passwordAuthStorageKey = "resana-secure-release-tests-password-auth";
-
-function saveAuth() {
-  const auth = {};
-  let storage = null;
-  if (authMethod === "key") {
-    auth['email'] = document.getElementById("key-email").value;
-    auth['key'] = document.getElementById("key").value;
-    auth['organization'] = document.getElementById("key-organization-id").value;
-  } else {
-    auth['email'] = document.getElementById("password-email").value;
-    auth['password'] = document.getElementById("password").value;
-    auth['encryptedKey'] = document.getElementById("encrypted-key").value;
-    auth['organization'] = document.getElementById("password-organization-id").value;
-  }
-  const storageKey = authMethod === "key" ? keyAuthStorageKey : passwordAuthStorageKey;
-  storage = localStorage.getItem(storageKey) || "[]";
-  storage = JSON.parse(storage);
-  storage.push(auth);
-  localStorage.setItem(storageKey, JSON.stringify(storage));
-}
-
-function listAuth() {
-  const storageKey = authMethod === "key" ? keyAuthStorageKey : passwordAuthStorageKey;
-  let saves = [];
-  const storage = localStorage.getItem(storageKey);
-  saves = JSON.parse(storage) || [];
-  const modal = document.getElementById("save-modal");
-  modal.style.display = "block";
-  const listElem = document.getElementById("saves-list");
-  listElem.innerHTML = "";
-  saves.forEach((save, index) => {
-    if (authMethod === "key") {
-      listElem.innerHTML += `<li onclick="loadAuth(${index})">${save.email} | ${save.key} | ${save.organization}</li>`;
-    } else {
-      listElem.innerHTML += `<li onclick="loadAuth(${index})">${save.email} | ${save.password} | ${save.organization}</li>`;
-    }
-  });
-}
-
-function loadAuth(index) {
-  const storageKey = authMethod === "key" ? keyAuthStorageKey : passwordAuthStorageKey;
-  const storage = localStorage.getItem(storageKey);
-  const saves = JSON.parse(storage) || [];
-  if (authMethod === "key") {
-    document.getElementById("key-email").value = saves[index].email;
-    document.getElementById("key").value = saves[index].key;
-    document.getElementById("key-organization-id").value = saves[index].organization;
-  } else {
-    document.getElementById("password-email").value = saves[index].email;
-    document.getElementById("password").value = saves[index].password;
-    document.getElementById("encrypted-key").value = saves[index].encryptedKey;
-    document.getElementById("password-organization-id").value = saves[index].organization;
-  }
-  const modal = document.getElementById("save-modal");
-  modal.style.display = "none";
-}
-
-function closeAuthModal() {
-  const elem = document.getElementById("save-modal");
-  elem.style.display = "none";
-}
-
 // RESULT
 
-(function() {
-  switchAuth();
-})();
+(function() {})();

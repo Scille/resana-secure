@@ -157,6 +157,14 @@ parsec backend sequester generate_service_certificate --service-label="Service a
 
       <section id="bootstrap">
         <h2>Bootstrap</h2>
+
+
+        <label for="bootstrap-email">Email</label>
+        <input id="bootstrap-email" value="gordon.freeman@blackmesa.nm">
+        <br>
+        <label for="bootstrap-key">Clé</label>
+        <input id="bootstrap-key" value="P@ssw0rd">
+        <br>
         <label for="bootstrap-url">URL de boostrap</label>
         <input id="bootstrap-url" value="">
         <br>
@@ -183,38 +191,21 @@ parsec backend sequester generate_service_certificate --service-label="Service a
           <li>Spammer le bouton "Se connecter" (avec mauvaise key) pour vérifier la protection anti-bruteforce</li>
         </ul>
 
-        <div>
-          Key
-          <label class="switch">
-            <input id="switch-auth" type="checkbox" onchange="switchAuth()">
-            <span class="slider round"></span>
-          </label>
-          User password
-        </div>
-
-        <div id="key-auth">
-          <label for="key-email">Email</label>
-          <input id="key-email" value="gordon.freeman@blackmesa.nm">
-          <br>
-          <label for="key">Key</label>
-          <input id="key" value="P@ssw0rd">
-          <br>
-          <label for="key-organization-id">ID organisation</label>
-          <input id="key-organization-id" value="test_release_">
-        </div>
-        <div id="password-auth">
-          <label for="password-email">Email</label>
-          <input id="password-email" value="gordon.freeman@blackmesa.nm">
-          <br>
-          <label for="password">Mot de passe</label>
-          <input id="password" value="P@ssw0rd">
-          <br>
-          <label for="encrypted-key">Encrypted key</label>
-          <input id="encrypted-key" value="">
-          <br>
-          <label for="password-organization-id">ID organisation</label>
-          <input id="password-organization-id" value="test_release_">
-        </div>
+        <label for="auth-email">Email</label>
+        <input id="auth-email" value="gordon.freeman@blackmesa.nm">
+        <br>
+        <label for="auth-key">Key</label>
+        <input id="auth-key" value="P@ssw0rd">
+        <br>
+        <label for="auth-organization-id">ID organisation</label>
+        <input id="auth-organization-id" value="test_release_">
+        <br>
+        <label for="auth-encrypted-key">Encrypted key</label>
+        <input id="auth-encrypted-key" value="">
+        <br>
+        <label for="auth-password">Password</label>
+        <input id="auth-password" value="">
+        <br>
         <button onclick="login()">Se connecter</button>
         <button onclick="saveAuth()">Sauvegarder</button>
         <button onclick="listAuth()">Charger</button>

@@ -7,10 +7,3 @@ function releaseVersionChange(event) {
     element.innerHTML = releaseVersion;
   }
 }
-
-(function() {
-  const xmlhttp = new XMLHttpRequest();
-  xmlhttp.open("GET", "release/release.html", false);
-  xmlhttp.send();
-  document.getElementById('release').innerHTML = xmlhttp.responseText;
-})();
