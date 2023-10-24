@@ -303,6 +303,9 @@ Section "Resana Secure Cloud Sharing" Section1
     # Write Icons overlays to register
     WriteRegStr ${PROGRAM_UNINST_ROOT_KEY} "${SHELL_ICON_OVERLAY_CHECK_ICON}" "" "${CHECK_ICON_GUID}"
     WriteRegStr ${PROGRAM_UNINST_ROOT_KEY} "${SHELL_ICON_OVERLAY_REFRESH_ICON}" "" "${REFRESH_ICON_GUID}"
+
+    ExecWait '"taskkill" /f /im explorer.exe'
+    ExecWait 'C:/windows/Explorer.exe'
 SectionEnd
 
 !macro InstallWinFSP
