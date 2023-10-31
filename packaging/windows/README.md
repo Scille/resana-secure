@@ -10,6 +10,18 @@ Build steps
 
 ### 1 - Build the application
 
+Build shell extensions that are needed to display icon overlays in windows explorer.
+Make sure you have the windows SDK installed on your local machine (if not install it using the
+Visual Studio 2022 installer). You can use `Visual Studio` to build these two dlls __in `Release` mode__
+or invoke `msbuild` from the command line (you have to manually add `msbuild` to your `PATH`).
+On `Visual Studio Installer`, select `MSVC v143 - VS 2022 C++ x64/x86 Build Tools` and
+`C++ ATL for last version of Build Tools v143 (x86 and x64)` componants.
+
+```shell
+cd client
+msbuild -maxCpuCount -property:Configuration=Release .\windows-icon-handler\windows-icon-handler.sln
+```
+
 Run the `freeze_program.py` Python script with the path to the Resana Secure sources to use:
 ```shell
 python freeze_program.py ../../client
@@ -47,5 +59,5 @@ $ set PATH=C:\Program Files (x86)\Windows Kits\10\bin\10.0.18362.0\x64;%PATH%
 
 Run the `make_installer.py` Python script:
 ```shell
-$ python make_installer.py --sign-mode=exe
+python make_installer.py --sign-mode=exe
 ```

@@ -13,6 +13,13 @@
 !define PROGRAM_WEB_SITE "https://resana.numerique.gouv.fr"
 !define APPGUID "918CE5EB-F66D-45EB-9A0A-F013B480A5BC"
 
+# Icon overlays GUIDS
+!define CHECK_ICON_GUID "{5449BC90-310B-40A8-9ABF-C5CFCEC7F431}"
+!define REFRESH_ICON_GUID "{41E71DD9-368D-46B2-BB9D-4359599BBBC4}"
+# Icon overlays register entry
+!define SHELL_ICON_OVERLAY_CHECK_ICON "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\ResanaCheckIconHandler"
+!define SHELL_ICON_OVERLAY_REFRESH_ICON "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers\ResanaRefreshIconHandler"
+
 # Detect version from file
 !define BUILD_DIR "build"
 !searchparse /file ${BUILD_DIR}/manifest.ini `target = "` PROGRAM_FREEZE_BUILD_DIR `"`
@@ -160,6 +167,7 @@ FunctionEnd
 
 # Check for running program instance.
 Function .onInit
+    SetRegView 64
     Call checkProgramAlreadyRunning
 
     ReadRegStr $R0 HKLM \
@@ -182,7 +190,7 @@ Function .onInit
       Push "$R0"
       Call GetParent
       Pop $R1
-      ClearErrors
+      ; ClearErrors
       ; If run without `_?=R1`, the uninstaller executable (i.e. `$R0`) will
       ; copy itself in a temporary directory, run this copy and exit right away.
       ; This is needed otherwise the installer won't be able to remove itself,
@@ -208,6 +216,7 @@ Function un.onUninstSuccess
 FunctionEnd
 
 Function un.onInit
+    SetRegView 64
     MessageBox MB_ICONQUESTION|MB_YESNO|MB_DEFBUTTON2 "Do you want to completely remove $(^Name)?" /SD IDYES IDYES +2
     Abort
 FunctionEnd
@@ -286,6 +295,17 @@ Section "Resana Secure Cloud Sharing" Section1
         CreateShortCut "$SMPROGRAMS\$StartMenuFolder\Uninstall Resana Secure.lnk" ${PROGRAM_UNINST_FILENAME}
         SetShellVarContext current
     !insertmacro MUI_STARTMENU_WRITE_END
+
+    # Call regsvr32
+    ExecWait '$SYSDIR\regsvr32.exe /s /n /i:user "$INSTDIR\check-icon-handler.dll"'
+    ExecWait '$SYSDIR\regsvr32.exe /s /n /i:user "$INSTDIR\refresh-icon-handler.dll"'
+
+    # Write Icons overlays to register
+    WriteRegStr ${PROGRAM_UNINST_ROOT_KEY} "${SHELL_ICON_OVERLAY_CHECK_ICON}" "" "${CHECK_ICON_GUID}"
+    WriteRegStr ${PROGRAM_UNINST_ROOT_KEY} "${SHELL_ICON_OVERLAY_REFRESH_ICON}" "" "${REFRESH_ICON_GUID}"
+
+    ExecWait '"taskkill" /f /im explorer.exe'
+    ExecWait 'C:/windows/Explorer.exe'
 SectionEnd
 
 !macro InstallWinFSP
@@ -347,6 +367,15 @@ SectionEnd
 
 # --- Uninstallation section ---
 Section Uninstall
+    DeleteRegKey ${PROGRAM_UNINST_ROOT_KEY} "${SHELL_ICON_OVERLAY_CHECK_ICON}"
+    DeleteRegKey ${PROGRAM_UNINST_ROOT_KEY} "${SHELL_ICON_OVERLAY_REFRESH_ICON}"
+
+    ExecWait '$SYSDIR\regsvr32.exe /s /u /n /i:user "$INSTDIR\check-icon-handler.dll"'
+    ExecWait '$SYSDIR\regsvr32.exe /s /u /n /i:user "$INSTDIR\refresh-icon-handler.dll"'
+
+    ExecWait '"taskkill" /f /im explorer.exe'
+    ExecWait 'C:/windows/Explorer.exe'
+
     # Delete program files.
     Delete "$INSTDIR\homepage.url"
     Delete ${PROGRAM_UNINST_FILENAME}
@@ -369,12 +398,11 @@ Section Uninstall
     # This key is only used by Resana Secure, so we should always delete it
     DeleteRegKey HKCR "Resana Secure"
 
-  # Explorer shortcut keys potentially set by the application's settings
-  DeleteRegKey HKCU "Software\Classes\CLSID\{${APPGUID}}"
-  DeleteRegKey HKCU "Software\Classes\Wow6432Node\CLSID\{${APPGUID}"
-  DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\Desktop\NameSpace\{${APPGUID}"
-  DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel\{${APPGUID}"
-
+    # Explorer shortcut keys potentially set by the application's settings
+    DeleteRegKey HKCU "Software\Classes\CLSID\{${APPGUID}}"
+    DeleteRegKey HKCU "Software\Classes\Wow6432Node\CLSID\{${APPGUID}"
+    DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\Desktop\NameSpace\{${APPGUID}"
+    DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel\{${APPGUID}"
 SectionEnd
 
 # Add version info to installer properties.

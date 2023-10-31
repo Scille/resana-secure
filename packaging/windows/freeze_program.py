@@ -110,6 +110,18 @@ def main(program_source: Path, conformity: bool = False):
         raise SystemExit(f"{target_dir} already exists, exiting...")
     shutil.move(pyinstaller_dist / "resana_secure", target_dir)
 
+    # Copy windows icon overlays dll needed by `explorer.exe` to display overlays
+    # These dll are supposed to be built before running this script
+    for dll_file in [
+        program_source.joinpath("windows-icon-handler\\x64\\Release\\check-icon-handler.dll"),
+        program_source.joinpath("windows-icon-handler\\x64\\Release\\refresh-icon-handler.dll"),
+    ]:
+        assert os.path.isfile(
+            dll_file
+        ), f"{dll_file} not found or isn't a file! Did you forget to build it using Release profile?"
+        print(f"### Copying {dll_file} to {target_dir} ###")
+        shutil.copy(dll_file, target_dir)
+
     # # Include LICENSE file
     # # (target_dir / "LICENSE.txt").write_text((program_source / "LICENSE").read_text())
 
@@ -142,6 +154,10 @@ def main(program_source: Path, conformity: bool = False):
     _recursive_collect_target_files(target_dir)
 
     install_files_lines = ["; Files to install", 'SetOutPath "$INSTDIR\\"']
+
+    install_files_lines.append('File "${PROGRAM_FREEZE_BUILD_DIR}\\check-icon-handler.dll"')
+    install_files_lines.append('File "${PROGRAM_FREEZE_BUILD_DIR}\\refresh-icon-handler.dll"')
+
     curr_dir = Path(".")
     for target_is_dir, target_file in target_files:
         if target_is_dir:
