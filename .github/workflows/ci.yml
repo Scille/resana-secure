@@ -71,7 +71,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3 # pin@v3.0.2
+        uses: actions/checkout@v4 # pin@v3.0.2
         with:
           submodules: true
 
@@ -191,7 +191,7 @@ jobs:
         working-directory: server
     steps:
       - name: Checkout
-        uses: actions/checkout@v3 # pin@v3.0.2
+        uses: actions/checkout@v4 # pin@v3.0.2
         with:
           submodules: true
 
@@ -251,7 +251,7 @@ jobs:
         working-directory: client
     steps:
       - name: Checkout
-        uses: actions/checkout@v3 # pin@v3.0.2
+        uses: actions/checkout@v4 # pin@v3.0.2
         with:
           submodules: true
 
