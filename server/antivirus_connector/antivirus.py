@@ -110,4 +110,4 @@ async def check_for_malwares(content_stream, config: AppConfig) -> List[str]:
                         return []
                 else:
                     # Avoid making too many requests
-                    await trio.sleep(0.5)
+                    await trio.sleep(2)
