@@ -117,7 +117,7 @@ jobs:
       # Using this workaround to cache `poetry` dependencies until
       # https://github.com/actions/setup-python/issues/476 is resolved
       - name: Restore python dependencies
-        uses: actions/cache/restore@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8  # pin v3.3.1
+        uses: actions/cache/restore@704facf57e6136b1bc63b828d79edcd491f0ee84  # pin v3.3.2
         id: restore
         with:
           key: ${{ steps.cache-key.outputs.key }}
@@ -174,7 +174,7 @@ jobs:
       # Using this workaround to cache `poetry` dependencies until
       # https://github.com/actions/setup-python/issues/476 is resolved
       - name: Save python dependencies before `pre-commit`
-        uses: actions/cache/save@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8  # pin v3.3.1
+        uses: actions/cache/save@704facf57e6136b1bc63b828d79edcd491f0ee84  # pin v3.3.2
         if: steps.restore.outputs.cache-hit != 'true'
         with:
           key: ${{ steps.cache-key.outputs.key }}
@@ -227,7 +227,7 @@ jobs:
       # Using this workaround to cache `poetry` dependencies until
       # https://github.com/actions/setup-python/issues/476 is resolved
       - name: Cache python dependencies
-        uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8  # pin v3.3.1
+        uses: actions/cache@704facf57e6136b1bc63b828d79edcd491f0ee84  # pin v3.3.2
         with:
           key: linux-server-2-${{ hashFiles('server/poetry.lock') }}
           path: /home/runner/.cache/pypoetry/virtualenvs/resana-server-OVnVNowq-py3.9
@@ -290,7 +290,7 @@ jobs:
       # Using this workaround to cache `poetry` dependencies until
       # https://github.com/actions/setup-python/issues/476 is resolved
       - name: Cache python dependencies
-        uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8  # pin v3.3.1
+        uses: actions/cache@704facf57e6136b1bc63b828d79edcd491f0ee84  # pin v3.3.2
         with:
           key: windows-build-${{ hashFiles('client/poetry.lock', 'client/submodules/parsec-cloud/**') }}
           path: C:\Users\runneradmin\AppData\Local\pypoetry\Cache\virtualenvs\resana-secure-*
