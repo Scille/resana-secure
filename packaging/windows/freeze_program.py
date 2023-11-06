@@ -48,6 +48,8 @@ def main(program_source: Path, conformity: bool = False):
     global_dict: dict[str, str] = {}
     exec((program_source / "resana_secure/_version.py").read_text(), global_dict)
     program_version = global_dict.get("__version__")
+    if conformity:
+        program_version = f"{program_version}-conformity"
     print(f"### Detected Resana Secure version {program_version} ###")
 
     winfsp_installer = BUILD_DIR / WINFSP_URL.rsplit("/", 1)[1]
