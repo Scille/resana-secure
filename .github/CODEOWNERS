@@ -1,0 +1,10 @@
+# This file lists the owners of the sub-parts in our monorepo.
+# These parts are assigned to a specific team whose members are proficient in them.
+# If you think you belongs to one of these teams because you're proficient in one of those parts, ask @Landeers.
+
+/client/                @Scille/Resana-dev
+/misc/                  @Scille/Resana-dev
+/packaging/             @Scille/Resana-dev
+/server/                @Scille/Resana-dev
+/.github/               @Scille/Resana-dev
+/.github/CODEOWNERS     @touilleMan @Landeers
