@@ -261,7 +261,8 @@ class AsgiIpFilteringMiddleware:
         specific_authorized_networks = self.authorized_networks_by_organization.get(organization_id)
         # If the organization is not configured, use default authorized networks
         if specific_authorized_networks is None:
-            logger.warning(f"No specific configuration for organization `{organization}`")
+            if self.authorized_networks_by_organization:
+                logger.warning(f"No specific configuration for organization `{organization}`")
             return self.authorized_networks
         return specific_authorized_networks
 
