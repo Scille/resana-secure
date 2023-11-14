@@ -48,6 +48,7 @@ async def antivirus_test_app(sequester_service):
         db_url="postgresql://db.localhost",
         db_min_connections=5,
         db_max_connections=7,
+        rate_limiter=2,
     )
 
     async with app_factory(config=config, blockstore=MagicMock(), client_allowed_origins=[]) as app:

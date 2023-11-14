@@ -20,3 +20,4 @@ class AppConfig:
     db_url: str
     db_min_connections: int
     db_max_connections: int
+    rate_limiter: int

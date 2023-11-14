@@ -145,6 +145,13 @@ def _parse_sequester_service_private_key_param(
     metavar="CONFIG",
     help="Blockstore configuration",
 )
+@click.option(
+    "--rate-limiter",
+    default=2,
+    show_default=True,
+    envvar="ANTIVIRUS_RATE_LIMITER",
+    help="Timeout between each request with cache",
+)
 def run_cli(
     port: int,
     host: str,
@@ -160,6 +167,7 @@ def run_cli(
     db_min_connections: int,
     db_max_connections: int,
     blockstore: BaseBlockStoreConfig,
+    rate_limiter: int,
 ):
     if not sequester_service_private_key:
         var = os.environ.get("ANTIVIRUS_CONNECTOR_SEQUESTER_SERVICE_PRIVATE_KEY")
@@ -191,6 +199,7 @@ def run_cli(
         db_url=db,
         db_min_connections=db_min_connections,
         db_max_connections=db_max_connections,
+        rate_limiter=rate_limiter,
     )
 
     trio_main = partial(
