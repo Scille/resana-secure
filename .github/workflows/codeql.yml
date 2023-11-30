@@ -45,7 +45,7 @@ jobs:
           languages: python
           setup-python-dependencies: false
 
-      - uses: Scille/parsec-cloud/.github/actions/setup-python-poetry@7a8d846ed3e869fb5dfd6dad5e783f525dceaee6
+      - uses: Scille/parsec-cloud/.github/actions/setup-python-poetry@e6b9e781e7dbeed84f92931d933bd7418b185ec0
         id: setup-python
         with:
           project-path: ${{ matrix.type }}
