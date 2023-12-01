@@ -40,7 +40,7 @@ jobs:
           submodules: true
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@04df1262e6247151b5ac09cd2c303ac36ad3f62b # pin v2.2.9
+        uses: github/codeql-action/init@407ffafae6a767df3e0230c3df91b6443ae8df75 # pin v2.22.8
         with:
           languages: python
           setup-python-dependencies: false
@@ -62,6 +62,6 @@ jobs:
           POETRY_LIBPARSEC_BUILD_STRATEGY: no_build
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@04df1262e6247151b5ac09cd2c303ac36ad3f62b # pin v2.2.9
+        uses: github/codeql-action/analyze@407ffafae6a767df3e0230c3df91b6443ae8df75 # pin v2.22.8
         with:
           category: /language:python
