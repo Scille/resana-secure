@@ -152,24 +152,28 @@ Function GetParent
 
 FunctionEnd
 
-Function checkProgramAlreadyRunning
+!macro checkProgramAlreadyRunning un message
+Function ${un}checkProgramAlreadyRunning
     check:
         System::Call 'kernel32::OpenMutex(i 0x100000, b 0, t "resana-secure") i .R0'
         IntCmp $R0 0 notRunning
             System::Call 'kernel32::CloseHandle(i $R0)'
             MessageBox MB_OKCANCEL|MB_ICONEXCLAMATION \
                 "Resana Secure is running, please close it first.$\n$\n \
-                Click `OK` to retry or `Cancel` to cancel this upgrade." \
+                Click `OK` to retry or `Cancel` to cancel this ${message}." \
                 /SD IDCANCEL IDOK check
             Abort
     notRunning:
 FunctionEnd
+!macroend
+!insertmacro checkProgramAlreadyRunning "" "upgrade"
+!insertmacro checkProgramAlreadyRunning "un." "removal"
 
 # Check for running program instance.
 Function .onInit
-    SetRegView 64
     Call checkProgramAlreadyRunning
 
+    SetRegView 64
     ReadRegStr $R0 HKLM \
     "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PROGRAM_NAME}" \
     "UninstallString"
@@ -216,6 +220,7 @@ Function un.onUninstSuccess
 FunctionEnd
 
 Function un.onInit
+    Call un.checkProgramAlreadyRunning
     SetRegView 64
     MessageBox MB_ICONQUESTION|MB_YESNO|MB_DEFBUTTON2 "Do you want to completely remove $(^Name)?" /SD IDYES IDYES +2
     Abort
@@ -264,6 +269,35 @@ FunctionEnd
 #     end:
 # FunctionEnd
 
+!macro DeleteOrMoveFile dir temp name
+    # This routine ensures that we are not leaving an old `${dir}\${name}` file in place
+    # Case 1: the DLL file is not used:
+    #  - it's properly deleted
+    # Case 2: the DLL file is used, and is in the same drive as `${temp}`:
+    #  - the file is moved to `${temp}`
+    # Case 3: the DLL file is used, and is not in the same drive as `${temp}`:
+    #  - the file is renamed in-place as `${temp}.old`
+    Delete "${dir}\${name}"
+    Delete "${dir}\${name}.old"
+    Delete "${temp}\${name}.old"
+    Rename "${dir}\${name}" "${dir}\${name}.old"
+    Rename "${dir}\${name}.old" "${temp}\${name}.old"
+    Delete "${temp}\${name}.old"
+!macroend
+
+!macro MoveParsecShellExtension
+    # When upgrading or uninstalling, shell extensions may be loaded by `explorer.exe`
+    # thus windows will prevent us to delete or modify the dll extensions. The trick
+    # here is to move the loaded dll somewhere else (like in a temp folder) and then resume
+    # the upgrade/uninstall process as usual.
+    RmDir /r "$TEMP\parsec_tmp"
+    CreateDirectory "$TEMP\parsec_tmp"
+    !insertmacro DeleteOrMoveFile "$INSTDIR" "$TEMP\parsec_tmp" "check-icon-handler.dll"
+    !insertmacro DeleteOrMoveFile "$INSTDIR" "$TEMP\parsec_tmp" "refresh-icon-handler.dll"
+    !insertmacro DeleteOrMoveFile "$INSTDIR" "$TEMP\parsec_tmp" "vcruntime140.dll"
+    !insertmacro DeleteOrMoveFile "$INSTDIR" "$TEMP\parsec_tmp" "vcruntime140_1.dll"
+!macroend
+
 # --- Installation sections ---
 !define PROGRAM_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PROGRAM_NAME}"
 !define PROGRAM_UNINST_ROOT_KEY "HKLM"
@@ -280,6 +314,7 @@ ShowUnInstDetails hide
 
 # Install main application
 Section "Resana Secure Cloud Sharing" Section1
+    !insertmacro MoveParsecShellExtension
     SectionIn RO
     !include "${BUILD_DIR}\install_files.nsh"
 
@@ -303,9 +338,6 @@ Section "Resana Secure Cloud Sharing" Section1
     # Write Icons overlays to register
     WriteRegStr ${PROGRAM_UNINST_ROOT_KEY} "${SHELL_ICON_OVERLAY_CHECK_ICON}" "" "${CHECK_ICON_GUID}"
     WriteRegStr ${PROGRAM_UNINST_ROOT_KEY} "${SHELL_ICON_OVERLAY_REFRESH_ICON}" "" "${REFRESH_ICON_GUID}"
-
-    ExecWait '"taskkill" /f /im explorer.exe'
-    ExecWait 'C:/windows/Explorer.exe'
 SectionEnd
 
 !macro InstallWinFSP
@@ -367,14 +399,13 @@ SectionEnd
 
 # --- Uninstallation section ---
 Section Uninstall
+    !insertmacro MoveParsecShellExtension
+
     DeleteRegKey ${PROGRAM_UNINST_ROOT_KEY} "${SHELL_ICON_OVERLAY_CHECK_ICON}"
     DeleteRegKey ${PROGRAM_UNINST_ROOT_KEY} "${SHELL_ICON_OVERLAY_REFRESH_ICON}"
 
     ExecWait '$SYSDIR\regsvr32.exe /s /u /n /i:user "$INSTDIR\check-icon-handler.dll"'
     ExecWait '$SYSDIR\regsvr32.exe /s /u /n /i:user "$INSTDIR\refresh-icon-handler.dll"'
-
-    ExecWait '"taskkill" /f /im explorer.exe'
-    ExecWait 'C:/windows/Explorer.exe'
 
     # Delete program files.
     Delete "$INSTDIR\homepage.url"
