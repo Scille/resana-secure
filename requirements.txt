@@ -1,1 +1,1 @@
-git+ssh://git@github.com/Scille/resana-secure.git@v0.15.1#subdirectory=server
+git+ssh://git@github.com/Scille/resana-secure.git@remove-specific_authorized_networks-warning#subdirectory=server
