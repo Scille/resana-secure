@@ -170,11 +170,18 @@ def run_cli(
     rate_limiter: int,
 ):
     if not sequester_service_private_key:
-        var = os.environ.get("ANTIVIRUS_CONNECTOR_SEQUESTER_SERVICE_PRIVATE_KEY")
-        if var:
-            sequester_service_private_key = [
-                _parse_sequester_service_private_key_param(x) for x in var.split(";")
-            ]
+        sequester_service_private_key = []
+        env_service_ids = os.environ.get("ANTIVIRUS_CONNECTOR_SEQUESTER_SERVICE_IDS")
+        if env_service_ids:
+            service_ids = env_service_ids.split("\n")
+            for service_id in service_ids:
+                antivirus_private_key = os.environ.get(f"ANTIVIRUS_PRIVATE_KEY_{service_id}")
+                if antivirus_private_key:
+                    sequester_service_private_key.append(
+                        _parse_sequester_service_private_key_param(antivirus_private_key)
+                    )
+                else:
+                    logger.info(f"Missing env key ANTIVIRUS_PRIVATE_KEY_{service_id}.")
 
     _setup_logging(log_level, log_file)
     logger.debug("Starting antivirus-connector !", version=__version__)
