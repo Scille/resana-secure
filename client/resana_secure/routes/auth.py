@@ -44,7 +44,7 @@ async def do_auth() -> tuple[dict[str, Any], int]:
 
         if not current_app.tgb.is_compliant():
             if not current_app.tgb.is_signed:
-                qt_app.conformity_fail.emit()
+                qt_app.conformity_sign_fail.emit()
             if not current_app.tgb.is_firewall_compliant:
                 qt_app.conformity_firewall_fail.emit()
             if not current_app.tgb.is_antivirus_compliant:

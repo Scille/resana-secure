@@ -129,6 +129,7 @@ class ResanaGuiApp(QApplication):
     save_file_requested = pyqtSignal(WorkspaceFS, FsPath)
     file_rejected = pyqtSignal(FsPath)
     conformity_fail = pyqtSignal()
+    conformity_sign_fail = pyqtSignal()
     conformity_antivirus_fail = pyqtSignal()
     conformity_firewall_fail = pyqtSignal()
 
@@ -167,6 +168,7 @@ class ResanaGuiApp(QApplication):
         )
         self.file_rejected.connect(self._on_file_rejected)
         self.conformity_fail.connect(self._on_conformity_fail)
+        self.conformity_sign_fail.connect(self._on_conformity_sign_fail)
         self.conformity_antivirus_fail.connect(self._on_conformity_antivirus_fail)
         self.conformity_firewall_fail.connect(self._on_conformity_firewall_fail)
 
@@ -217,6 +219,12 @@ class ResanaGuiApp(QApplication):
             "L'agent TGB n'est pas joignable.",
         )
 
+    def _on_conformity_sign_fail(self) -> None:
+        self.message_requested.emit(
+            "Connexion refusée",
+            "L'agent TGB n'a pas pu être vérifié.",
+        )
+
     def _on_conformity_antivirus_fail(self) -> None:
         self.message_requested.emit(
             "Connexion refusée",
@@ -226,7 +234,7 @@ class ResanaGuiApp(QApplication):
     def _on_conformity_firewall_fail(self) -> None:
         self.message_requested.emit(
             "Connexion refusée",
-            "Votre parefeu ne respecte pas les exigences de conformité.",
+            "Votre pare-feu ne respecte pas les exigences de conformité.",
         )
 
     async def _on_login_clicked(self, device: AvailableDevice, password: str) -> None:
@@ -239,7 +247,7 @@ class ResanaGuiApp(QApplication):
 
             if not self.quart_app.tgb.is_compliant():
                 if not self.quart_app.tgb.is_signed:
-                    self.conformity_fail.emit()
+                    self.conformity_sign_fail.emit()
                 if not self.quart_app.tgb.is_firewall_compliant:
                     self.conformity_firewall_fail.emit()
                 if not self.quart_app.tgb.is_antivirus_compliant:
