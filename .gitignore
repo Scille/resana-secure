@@ -7,3 +7,4 @@
 *.pyc
 __pycache__
 /packaging/windows/build
+/packaging/windows/build-conformity
