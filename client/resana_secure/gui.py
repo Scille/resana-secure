@@ -128,6 +128,10 @@ class ResanaGuiApp(QApplication):
     message_requested = pyqtSignal(str, str)
     save_file_requested = pyqtSignal(WorkspaceFS, FsPath)
     file_rejected = pyqtSignal(FsPath)
+    conformity_fail = pyqtSignal()
+    conformity_sign_fail = pyqtSignal()
+    conformity_antivirus_fail = pyqtSignal()
+    conformity_firewall_fail = pyqtSignal()
 
     def __init__(
         self,
@@ -163,6 +167,10 @@ class ResanaGuiApp(QApplication):
             lambda title, msg: self.tray.showMessage(title, msg, self.windowIcon())
         )
         self.file_rejected.connect(self._on_file_rejected)
+        self.conformity_fail.connect(self._on_conformity_fail)
+        self.conformity_sign_fail.connect(self._on_conformity_sign_fail)
+        self.conformity_antivirus_fail.connect(self._on_conformity_antivirus_fail)
+        self.conformity_firewall_fail.connect(self._on_conformity_firewall_fail)
 
         # Show the tray only after setting an icon to avoid a warning
         self.tray.show()
@@ -205,7 +213,47 @@ class ResanaGuiApp(QApplication):
             f"Le fichier `{file_path}` a été détecté comme malicieux. Il ne sera pas synchronisé.",
         )
 
+    def _on_conformity_fail(self) -> None:
+        self.message_requested.emit(
+            "Connexion refusée",
+            "L'agent TGB n'est pas joignable.",
+        )
+
+    def _on_conformity_sign_fail(self) -> None:
+        self.message_requested.emit(
+            "Connexion refusée",
+            "L'agent TGB n'a pas pu être vérifié.",
+        )
+
+    def _on_conformity_antivirus_fail(self) -> None:
+        self.message_requested.emit(
+            "Connexion refusée",
+            "Votre antivirus ne respecte pas les exigences de conformité.",
+        )
+
+    def _on_conformity_firewall_fail(self) -> None:
+        self.message_requested.emit(
+            "Connexion refusée",
+            "Votre pare-feu ne respecte pas les exigences de conformité.",
+        )
+
     async def _on_login_clicked(self, device: AvailableDevice, password: str) -> None:
+        if self.quart_app.tgb:
+            try:
+                self.quart_app.tgb.compute()
+            except AssertionError:
+                self.conformity_fail.emit()
+                return
+
+            if not self.quart_app.tgb.is_compliant():
+                if not self.quart_app.tgb.is_signed:
+                    self.conformity_sign_fail.emit()
+                if not self.quart_app.tgb.is_firewall_compliant:
+                    self.conformity_firewall_fail.emit()
+                if not self.quart_app.tgb.is_antivirus_compliant:
+                    self.conformity_antivirus_fail.emit()
+                return
+
         assert device.human_handle is not None
         try:
             await self.quart_app.cores_manager.login(

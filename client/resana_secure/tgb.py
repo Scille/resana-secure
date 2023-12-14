@@ -49,10 +49,11 @@ class TGB:
             self._dll_handle = ctypes.cdll.LoadLibrary(self.dll_path)
         except OSError:
             raise TGBException(f"Could not load DLL `{self.dll_path}`")
-        else:
-            self._signed = self._get_dll_signed()
-            self._antivirus_compliant = self._get_antivirus_compliance()
-            self._firewall_compliant = self._get_firewall_compliance()
+
+    def compute(self) -> None:
+        self._signed = self._get_dll_signed()
+        self._antivirus_compliant = self._get_antivirus_compliance()
+        self._firewall_compliant = self._get_firewall_compliance()
 
     def _get_dll_signed(self) -> bool:
         return tgbverifier.is_signed(self.dll_path)

@@ -4,6 +4,7 @@ import base64
 from datetime import timedelta
 from typing import Any, cast
 
+from PyQt5.QtWidgets import QApplication
 from quart import Blueprint, session
 from quart_rate_limiter import rate_limit
 
@@ -16,6 +17,7 @@ from ..cores_manager import (
     CoreNotLoggedError,
     CoresManager,
 )
+from ..gui import ResanaGuiApp
 from ..utils import APIException, Parser, get_auth_token, get_data
 
 auth_bp = Blueprint("auth_api", __name__)
@@ -32,8 +34,22 @@ async def do_head(subpath: str) -> tuple[dict[str, Any], int]:
 @rate_limit(2, timedelta(seconds=1))
 @rate_limit(20, timedelta(minutes=1))
 async def do_auth() -> tuple[dict[str, Any], int]:
-    if current_app.tgb and not current_app.tgb.is_compliant():
-        raise APIException(401, {"error": "host_machine_not_compliant"})
+    if current_app.tgb:
+        qt_app = cast(ResanaGuiApp, QApplication.instance())
+        try:
+            current_app.tgb.compute()
+        except AssertionError:
+            qt_app.conformity_fail.emit()
+            raise APIException(401, {"error": "host_machine_not_compliant"})
+
+        if not current_app.tgb.is_compliant():
+            if not current_app.tgb.is_signed:
+                qt_app.conformity_sign_fail.emit()
+            if not current_app.tgb.is_firewall_compliant:
+                qt_app.conformity_firewall_fail.emit()
+            if not current_app.tgb.is_antivirus_compliant:
+                qt_app.conformity_antivirus_fail.emit()
+            raise APIException(401, {"error": "host_machine_not_compliant"})
 
     # Either send a non-encrypted Parsec Key using the field `key`
     # or send the encrypted Parsec Key with the field `encrypted_key` and
