@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "resana_server"
-version = "0.15.1"
+version = "0.15.2"
 description = ""
 authors = ["Scille SAS"]
 packages = [
