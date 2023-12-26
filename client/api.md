@@ -15,65 +15,65 @@ HTTP <CODE>
 ```
 
 Voici la liste des erreurs par ordre alphabétique:
-- `archived_workspace` (HTTP 403)
-- `archiving_not_allowed` (HTTP 403)
-- `archiving_period_is_too_short` (HTTP 400)
-- `authentication_requested` (HTTP 401)
-- `bad_claimer_sas` (HTTP 400)
-- `bad_data` (HTTP 400)
-- `bad_greeter_sas` (HTTP 400)
-- `bad_key` (HTTP 400)
-- `bad_timestamp_configuration` (HTTP 400)
-- `cannot_delete_root_folder` (HTTP 400)
-- `cannot_move_root_folder` (HTTP 400)
-- `cannot_use_both_authentication_modes` (HTTP 400)
-- `claimer_already_member` (HTTP 400)
-- `claimer_not_a_member` (HTTP 400)
-- `connection_refused_by_server` (HTTP 502)
-- `deleted_workspace` (HTTP 410)
-- `destination_parent_not_a_folder` (HTTP 400)
-- `device_not_found` (HTTP 404)
+- `archived_workspace` (HTTP 403) opération non autorisée, cause : espace archivé
+- `archiving_not_allowed` (HTTP 403) archivage impossible
+- `archiving_period_is_too_short` (HTTP 400) la période d'archivage est trop courte
+- `authentication_requested` (HTTP 401) authentification requise
+- `bad_claimer_sas` (HTTP 400) mauvais code sas
+- `bad_data` (HTTP 400) mauvais champ (le champ doit être présent dans le champ fields)
+- `bad_greeter_sas` (HTTP 400) mauvais code sas
+- `bad_key` (HTTP 400) mot de passe incorrect
+- `bad_timestamp_configuration` (HTTP 400) Date incorrecte
+- `cannot_delete_root_folder` (HTTP 400) impossible de supprimer le dossier racine
+- `cannot_move_root_folder` (HTTP 400) impossible de déplacer le dossier racine
+- `claimer_already_member` (HTTP 400) utilisateur déjà enrôlé
+- `claimer_not_a_member` (HTTP 400) Shamir : le compte à récupérer n'existe pas
+- `connection_refused_by_server` (HTTP 502) Connexion refusée par le serveur
+- `deleted_workspace` (HTTP 410) Opération impossible, espace supprimé
+- `destination_parent_not_a_folder` (HTTP 400) déplacement impossible, la destination n'est pas un dossier
+- `device_not_found` (HTTP 404) fichier de clé non trouvé sur le poste
 - `email_not_in_recipients` (HTTP 400)
-- `failed_to_disable_offline_availability` (HTTP 400)
-- `failed_to_enable_offline_availability` (HTTP 400)
-- `file_exists` (HTTP 400)
-- `forbidden_workspace` (HTTP 403)
-- `invalid_configuration` (HTTP 400)
-- `invalid_passphrase` (HTTP 400)
-- `invalid_state` (HTTP 409)
-- `invitation_already_used` (HTTP 400)
-- `invitation_not_found` (HTTP 400)
-- `json_body_expected` (HTTP 400)
-- `mountpoint_already_mounted` (HTTP 400)
-- `mountpoint_not_mounted` (HTTP 404)
-- `no_shamir_recovery_setup` (HTTP 400)
-- `not_enough_shares` (HTTP 400)
-- `not_a_file` (HTTP 404)
-- `not_a_folder` (HTTP 404)
-- `not_connected_to_rie` (HTTP 401)
-- `not_found` (HTTP 404)
-- `not_setup` (HTTP 404)
-- `offline` (HTTP 503)
-- `offline_availability_already_disabled` (HTTP 400)
-- `offline_availability_already_enabled` (HTTP 400)
-- `organization_already_bootstrapped` (HTTP 400)
-- `precondition_failed` (HTTP 409)
-- `read_only_workspace` (HTTP 403)
-- `recipient_already_recovered` (HTTP 400)
-- `sharing_not_allowed` (HTTP 403)
-- `source_not_a_folder` (HTTP 404)
-- `unexpected_error` (HTTP 400)
-- `unknown_destination_parent` (HTTP 404)
-- `unknown_email` (HTTP 404)
-- `unknown_entry` (HTTP 404)
-- `unknown_file` (HTTP 404)
-- `unknown_folder` (HTTP 404)
-- `unknown_organization` (HTTP 404)
-- `unknown_parent` (HTTP 404)
-- `unknown_source` (HTTP 404)
-- `unknown_token` (HTTP 404)
-- `unknown_workspace` (HTTP 404)
-- `users_not_found` (HTTP 400)
+- `failed_to_disable_offline_availability` (HTTP 400) impossible de désactiver la rémanence des données
+- `failed_to_enable_offline_availability` (HTTP 400) impossible d'activer la rémanence des données
+- `file_exists` (HTTP 400) le fichier existe déjà
+- `forbidden_workspace` (HTTP 403) accès à l'espace interdit
+- `host_machine_not_compliant` (HTTP 401) le poste de répond pas aux conditions de conformité
+- `invalid_configuration` (HTTP 400) Shamir : mauvaise configuration
+- `invalid_passphrase` (HTTP 400) import de clé : mauvaise passphrase
+- `invalid_state` (HTTP 409) état invalide (désynchonisation des utilisateurs), il faut repartir à l'étape 1
+- `invitation_already_used` (HTTP 400) invitation déjà utilisée
+- `invitation_not_found` (HTTP 400) invitation introuvable
+- `json_body_expected` (HTTP 400) json attendu en payload
+- `mountpoint_already_mounted` (HTTP 400) point de montage déjà monté
+- `mountpoint_not_mounted` (HTTP 404) point de montage non monté
+- `no_shamir_recovery_setup` (HTTP 400) Shamir : pas de configuration présente
+- `not_enough_shares` (HTTP 400) Shamir : pas assez de partage
+- `not_a_file` (HTTP 404) pas un fichier
+- `not_a_folder` (HTTP 404) pas un dossier
+- `not_connected_to_rie` (HTTP 401) connexion impossible, utilisateur non connecté sur le RIE
+- `not_found` (HTTP 404) introuvable
+- `not_setup` (HTTP 404) Shamir : non paramétré
+- `offline` (HTTP 503) serveur injoignable
+- `offline_availability_already_disabled` (HTTP 400) rémanence des donnée déjà désactivé
+- `offline_availability_already_enabled` (HTTP 400) rémanence des donnée déjà activé
+- `organization_already_bootstrapped` (HTTP 400) organisation déjà validée
+- `precondition_failed` (HTTP 409) mauvais nom actuel de l'espace
+- `read_only_workspace` (HTTP 403) espace en lecture seule
+- `recipient_already_recovered` (HTTP 400) Shamir
+- `sharing_not_allowed` (HTTP 403) partage non autorisé
+- `source_not_a_folder` (HTTP 404) la source n'est pas un dossier
+- `unexpected_error` (HTTP 400) Shamir
+- `unknown_destination_parent` (HTTP 404) destination inconnue
+- `unknown_email` (HTTP 404) email inconnu
+- `unknown_entry` (HTTP 404) entrée inconnue
+- `unknown_file` (HTTP 404) fichier inconnue
+- `unknown_folder` (HTTP 404) dossier inconnu
+- `unknown_organization` (HTTP 404) organisation inconnue
+- `unknown_parent` (HTTP 404) parent inconnu
+- `unknown_source` (HTTP 404) source inconnue
+- `unknown_token` (HTTP 404) token inconnu
+- `unknown_workspace` (HTTP 404) espace inconnu
+- `users_not_found` (HTTP 400) utilisateurs non trouvés
 
 
 Une erreur dans le formatage de la requête est retournée sous la forme suivante:
