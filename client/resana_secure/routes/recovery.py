@@ -86,7 +86,13 @@ async def export_device(core: LoggedCore) -> tuple[dict[str, Any], int]:
     finally:
         path.unlink()
 
-    file_name = get_recovery_device_file_name(core.device).replace("parsec-", "resana-secure-", 1)
+    # base file_name format : parsec-recovery-<id_org>-<user-label="-unknown-">.psrk
+    # target file_name : resana-secure-recovery-<id_org>.psrk
+    file_name = (
+        get_recovery_device_file_name(core.device)
+        .replace("parsec-", "resana-secure-", 1)
+        .replace("--unknown-", "")
+    )
 
     return (
         {
