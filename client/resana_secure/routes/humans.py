@@ -6,7 +6,12 @@ from quart import Blueprint, request
 
 from parsec.core.logged_core import LoggedCore
 
-from ..utils import APIException, authenticated, backend_errors_to_api_exceptions
+from ..utils import (
+    APIException,
+    authenticated,
+    backend_errors_to_api_exceptions,
+    get_user_id_from_email,
+)
 
 humans_bp = Blueprint("humans_api", __name__)
 
@@ -67,19 +72,10 @@ async def search_humans(core: LoggedCore) -> tuple[dict[str, Any], int]:
 @authenticated
 async def revoke_user(core: LoggedCore, email: str) -> tuple[dict[str, Any], int]:
     with backend_errors_to_api_exceptions():
-        results, _ = await core.find_humans(query=email)
-        # find_humans doesn't guarantee exact match on email, so manually filter just to be sure
-        recipient = next(
-            (
-                r.user_id
-                for r in results
-                if r.human_handle is not None and r.human_handle.email == email
-            ),
-            None,
-        )
-        if not recipient:
+        user_id = await get_user_id_from_email(core, email, omit_revoked=True)
+        if not user_id:
             raise APIException(404, {"error": "unknown_email"})
 
-        await core.revoke_user(user_id=recipient)
+        await core.revoke_user(user_id=user_id)
 
     return {}, 200
