@@ -793,13 +793,13 @@ files = [
 
 [[package]]
 name = "jinja2"
-version = "3.1.2"
+version = "3.1.3"
 description = "A very fast and expressive template engine."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "Jinja2-3.1.2-py3-none-any.whl", hash = "sha256:6088930bfe239f0e6710546ab9c19c9ef35e29792895fed6e6e31a023a182a61"},
-    {file = "Jinja2-3.1.2.tar.gz", hash = "sha256:31351a702a408a9e7595a8fc6150fc3f43bb6bf7e319770cbc0db9df9437e852"},
+    {file = "Jinja2-3.1.3-py3-none-any.whl", hash = "sha256:7d6d50dd97d52cbc355597bd845fabfbac3f551e1f99619e39a35ce8c370b5fa"},
+    {file = "Jinja2-3.1.3.tar.gz", hash = "sha256:ac8bd6544d4bb2c9792bf3a159e80bba8fda7f07e81bc3aed565432d5925ba90"},
 ]
 
 [package.dependencies]
@@ -1069,7 +1069,7 @@ files = [
 
 [[package]]
 name = "parsec-cloud"
-version = "v2.16.3"
+version = "v2.17.0"
 description = "Secure cloud framework"
 optional = false
 python-versions = "~3.9.10"
@@ -1087,7 +1087,7 @@ click = "^8.0"
 fusepy = {version = "^3.0", optional = true, markers = "platform_system == \"Linux\" or platform_system == \"Darwin\""}
 h11 = ">=0.13,<0.15"
 hypercorn = {version = "^0.13.2", optional = true}
-jinja2 = {version = "^3.0", optional = true}
+jinja2 = {version = "3.1.3", optional = true}
 msgpack = "^1.0"
 outcome = "^1.1"
 packaging = ">=21.3,<24.0"
@@ -1114,7 +1114,7 @@ wsproto = "^1.2"
 zxcvbn = {version = "^4.4", optional = true}
 
 [package.extras]
-backend = ["async_generator (>=1.10,<2.0)", "boto3 (>=1.23,<2.0)", "botocore (>=1.26,<2.0)", "hypercorn (>=0.13.2,<0.14.0)", "jinja2 (>=3.0,<4.0)", "pbr (>=5.9,<6.0)", "python-swiftclient (>=3.13,<5.0)", "quart (>=0.18.1,<0.19.0)", "quart-trio (>=0.10.0,<0.11.0)", "trio-asyncio (>=0.12,<0.13)", "triopg (>=0.6,<0.7)", "werkzeug (>=2.2.3,<3.0.0)"]
+backend = ["async_generator (>=1.10,<2.0)", "boto3 (>=1.23,<2.0)", "botocore (>=1.26,<2.0)", "hypercorn (>=0.13.2,<0.14.0)", "jinja2 (==3.1.3)", "pbr (>=5.9,<6.0)", "python-swiftclient (>=3.13,<5.0)", "quart (>=0.18.1,<0.19.0)", "quart-trio (>=0.10.0,<0.11.0)", "trio-asyncio (>=0.12,<0.13)", "triopg (>=0.6,<0.7)", "werkzeug (>=2.2.3,<3.0.0)"]
 core = ["PyQt5 (>=5.15,<6.0)", "fusepy (>=3.0,<4.0)", "packaging (>=21.3,<24.0)", "psutil (>=5.9,<6.0)", "pypac (>=0.16,<0.17)", "pyqt5-sip (>=12.9,<13.0)", "qrcode (>=7.3,<8.0)", "qtrio (>=0.6.0,<0.7.0)", "winfspy (>=0.8,<0.9)", "zxcvbn (>=4.4,<5.0)"]
 parsec-ext-deps = ["asn1crypto (>=1.5.1,<2.0.0)", "certvalidator (>=0.11.1,<0.12.0)", "oscrypto (>=1.3.0,<2.0.0)"]
 

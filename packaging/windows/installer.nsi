@@ -338,10 +338,6 @@ Section "Resana Secure Cloud Sharing" Section1
     # Write Icons overlays to register
     WriteRegStr ${PROGRAM_UNINST_ROOT_KEY} "${SHELL_ICON_OVERLAY_CHECK_ICON}" "" "${CHECK_ICON_GUID}"
     WriteRegStr ${PROGRAM_UNINST_ROOT_KEY} "${SHELL_ICON_OVERLAY_REFRESH_ICON}" "" "${REFRESH_ICON_GUID}"
-
-    # Create quick_access registry key to mountpoint directory
-    # (https://github.com/Scille/parsec-cloud/blob/v2.16.3/parsec/core/win_registry.py#L276)
-    WriteRegStr "HKCU" "Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel" "" ""
 SectionEnd
 
 !macro InstallWinFSP
