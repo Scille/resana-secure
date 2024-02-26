@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "resana_server"
-version = "0.15.4"
+version = "0.16.0"
 description = ""
 authors = ["Scille SAS"]
 packages = [
@@ -27,7 +27,7 @@ oscrypto = "1.3.0"
 werkzeug = "2.2.3"
 
 # install parsec from pypi for linux, or from git for windows & macos
-parsec-cloud = { version = "^2.16.3", extras = ["backend"] }
+parsec-cloud = { version = "^2.17.0", extras = ["backend"] }
 
 [tool.poetry.dev-dependencies]
 pytest = "^8.0"
