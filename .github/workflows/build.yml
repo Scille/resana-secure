@@ -39,7 +39,7 @@ jobs:
         run: sudo snap install snapcraft --classic
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.1.1
         with:
           submodules: true
 
@@ -62,7 +62,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4 # pin@v3.0.2
+        uses: actions/checkout@v4.1.1 # pin@v3.0.2
         with:
           submodules: true
 
